@@ -4,6 +4,9 @@ description: Forces AI Agents to use shadcn-ui MCP server when building UI compo
 # General Rule
 When a task requires building or modifying a user interface, you must use the tools available in the `shadcn-ui` MCP server.
 
+# Project UI Stack
+When using the `shadcn-ui` MCP server, keep in mind the project uses: React.js, TailwindCSS, and Typescript.
+
 # Planning Rule
 When planning a UI build using `shadcn`:
 1. Discover Assets: First, use `get_project_registries()` to confirm which registries are configured, then `list_items_in_registries()` (optionally filtered by `types`, e.g. `["block", "component", "ui"]`) or `search_items_in_registries(query)` to find candidate assets.
