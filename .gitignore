@@ -1,1 +1,4 @@
 .env
+.env.mcp.local
+node_modules/
+.continue/

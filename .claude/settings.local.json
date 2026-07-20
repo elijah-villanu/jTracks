@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__shadcn__view_items_in_registries",
+      "mcp__shadcn__get_project_registries",
+      "mcp__shadcn__get_item_examples_from_registries",
+      "WebFetch(domain:raw.githubusercontent.com)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "shadcn"
+  ]
+}
