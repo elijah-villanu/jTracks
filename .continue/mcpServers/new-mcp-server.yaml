@@ -1,0 +1,15 @@
+name: Shadcn-ui Config
+version: 1.0.0
+schema: v1
+
+models: []
+
+mcpServers:
+  - name: shadcn-ui
+    type: stdio
+    command: npx
+    args:
+      - "-y"
+      - "@jpisnice/shadcn-ui-mcp-server"
+    env:
+      GITHUB_PERSONAL_ACCESS_TOKEN: ${{ secrets.GITHUB_PERSONAL_ACCESS_TOKEN }}
