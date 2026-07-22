@@ -18,7 +18,7 @@ Same `applications`/`users` entity fields as in DATABASE_TASKS.md, and the same 
 
 ## Milestone F1: Auth
 
-- [ ] **F2 — Signup/login UI** (M)
+- [x] **F2 — Signup/login UI** (M)
   Email/password forms + "Sign in with Google" button; stores the JWT; protected-route wrapper redirecting unauthenticated users.
   Acceptance: works end-to-end against the mock API; swaps to the real API once B2/B3 ship with no component changes.
   Depends on: F1

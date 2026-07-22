@@ -39,3 +39,14 @@ export interface User {
   ghost_days_default: number
   created_at: string
 }
+
+/**
+ * Auth contract (F2 -- mocked in src/mocks/handlers/auth.ts until B2/B3
+ * ship). `access_token` is a JWT once the real backend exists; the mock
+ * issues an opaque fake token. `AuthResponse` is returned by
+ * `/auth/signup`, `/auth/login`, and `/auth/oauth/google`.
+ */
+export interface AuthResponse {
+  access_token: string
+  user: User
+}

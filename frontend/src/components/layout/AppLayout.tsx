@@ -1,6 +1,7 @@
-import { NavLink, Outlet } from "react-router"
-import { Briefcase, Plus } from "lucide-react"
+import { NavLink, Outlet, useNavigate } from "react-router"
+import { Briefcase, LogOut, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useAuth } from "@/hooks/useAuth"
 import { cn } from "@/lib/utils"
 
 const NAV_LINKS = [
@@ -16,6 +17,14 @@ const NAV_LINKS = [
  * real pages/modals lands in later milestones (F2+).
  */
 export function AppLayout() {
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+
+  function handleLogout() {
+    logout()
+    navigate("/login", { replace: true })
+  }
+
   return (
     <div className="flex min-h-screen flex-col">
       <header className="border-b border-border">
@@ -42,10 +51,21 @@ export function AppLayout() {
             ))}
           </nav>
 
-          <Button size="sm" disabled>
-            <Plus />
-            Add Job
-          </Button>
+          <div className="flex items-center gap-3">
+            {user && (
+              <span className="hidden text-sm text-muted-foreground sm:inline">
+                {user.email}
+              </span>
+            )}
+            <Button size="sm" disabled>
+              <Plus />
+              Add Job
+            </Button>
+            <Button size="sm" variant="ghost" onClick={handleLogout}>
+              <LogOut />
+              Log out
+            </Button>
+          </div>
         </div>
       </header>
 

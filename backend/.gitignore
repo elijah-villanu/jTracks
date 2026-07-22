@@ -10,3 +10,4 @@ jtracks_dev.db
 
 # Env
 .env
+.env.example
