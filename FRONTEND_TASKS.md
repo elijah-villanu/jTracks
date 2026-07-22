@@ -11,7 +11,7 @@ Same `applications`/`users` entity fields as in DATABASE_TASKS.md, and the same 
 
 ## Milestone F0: Foundation
 
-- [ ] **F1 — React + Vite + Tailwind scaffolding** (S)
+- [x] **F1 — React + Vite + Tailwind scaffolding** (S)
   Routing (e.g. react-router), base layout, API client wrapper reading `VITE_API_URL`, and a mock API layer (MSW) seeded with fixtures matching the shared contract.
   Acceptance: app runs and renders a seeded list of mock applications with no backend running.
   Depends on: none
