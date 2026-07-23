@@ -1,6 +1,8 @@
+import { useState } from "react"
 import { NavLink, Outlet, useNavigate } from "react-router"
-import { Briefcase, LogOut, Plus } from "lucide-react"
+import { Briefcase, ClipboardPaste, LogOut, Plus } from "lucide-react"
 import { ApplicationFormDialog } from "@/components/applications/application-form-dialog"
+import { AutofillDialog } from "@/components/applications/autofill-dialog"
 import { Button } from "@/components/ui/button"
 import { useApplicationsContext } from "@/hooks/useApplicationsContext"
 import { useAuth } from "@/hooks/useAuth"
@@ -24,6 +26,7 @@ export function AppLayout() {
   const { user, logout } = useAuth()
   const { openCreateForm } = useApplicationsContext()
   const navigate = useNavigate()
+  const [isAutofillOpen, setIsAutofillOpen] = useState(false)
 
   function handleLogout() {
     logout()
@@ -62,7 +65,11 @@ export function AppLayout() {
                 {user.email}
               </span>
             )}
-            <Button size="sm" onClick={openCreateForm}>
+            <Button size="sm" variant="outline" onClick={() => setIsAutofillOpen(true)}>
+              <ClipboardPaste />
+              Paste a Link
+            </Button>
+            <Button size="sm" onClick={() => openCreateForm()}>
               <Plus />
               Add Job
             </Button>
@@ -79,6 +86,7 @@ export function AppLayout() {
       </main>
 
       <ApplicationFormDialog />
+      <AutofillDialog open={isAutofillOpen} onOpenChange={setIsAutofillOpen} />
     </div>
   )
 }

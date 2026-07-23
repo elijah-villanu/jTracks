@@ -102,10 +102,18 @@ export function ApplicationFormDialog() {
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
   // Reset the dialog-local state every time it opens (for a new
-  // create, or a possibly-different application to edit).
+  // create, a possibly-different application to edit, or -- F5 --  a
+  // create seeded with autofill's parsed fields/pasted URL). Merge
+  // over EMPTY_VALUES rather than replacing wholesale so any field
+  // autofill didn't touch (notes, date_saved, etc.) still defaults
+  // sanely instead of ending up `undefined`.
   useEffect(() => {
     if (formState) {
-      setValues(toFormValues(formState.mode === "edit" ? formState.application : undefined))
+      setValues(
+        formState.mode === "edit"
+          ? toFormValues(formState.application)
+          : { ...EMPTY_VALUES, ...formState.initialValues }
+      )
       setFieldErrors({})
       setSubmitError(null)
       setDeleteError(null)

@@ -14,12 +14,16 @@ export type ApplicationInput = Omit<Application, "id" | "user_id" | "created_at"
 
 /**
  * "Is the add/edit dialog open, and for which application" -- shared
- * between the trigger (header's Add Job button, or a per-row edit
- * button deep in the table) and the dialog itself (rendered once in
- * AppLayout), which live in different parts of the tree.
+ * between the trigger (header's Add Job button, a per-row edit button
+ * deep in the table, or F5's "Paste a Link" autofill dialog) and the
+ * dialog itself (rendered once in AppLayout), which live in different
+ * parts of the tree. The `create` variant's `initialValues` lets F5
+ * hand off whatever the mocked `POST /applications/autofill` returned
+ * (or just the pasted URL, on the unsupported/failed/error paths) so
+ * this form always opens pre-filled instead of blank.
  */
 export type ApplicationFormState =
-  | { mode: "create" }
+  | { mode: "create"; initialValues?: Partial<ApplicationInput> }
   | { mode: "edit"; application: Application }
   | null
 
@@ -46,7 +50,7 @@ export interface ApplicationsContextValue {
    */
   deleteApplication: (id: string) => Promise<void>
   formState: ApplicationFormState
-  openCreateForm: () => void
+  openCreateForm: (initialValues?: Partial<ApplicationInput>) => void
   openEditForm: (application: Application) => void
   closeForm: () => void
 }
@@ -113,8 +117,8 @@ export function ApplicationsProvider({ children }: { children: ReactNode }) {
     setApplications((prev) => prev.filter((application) => application.id !== id))
   }, [])
 
-  const openCreateForm = useCallback(() => {
-    setFormState({ mode: "create" })
+  const openCreateForm = useCallback((initialValues?: Partial<ApplicationInput>) => {
+    setFormState({ mode: "create", initialValues })
   }, [])
 
   const openEditForm = useCallback((application: Application) => {

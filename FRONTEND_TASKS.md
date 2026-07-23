@@ -36,7 +36,7 @@ Same `applications`/`users` entity fields as in DATABASE_TASKS.md, and the same 
 
 ## Milestone F3: Autofill
 
-- [ ] **F5 — Autofill URL paste flow** (M)
+- [x] **F5 — Autofill URL paste flow** (M)
   "Paste a link" entry point; loading state while `POST /applications/autofill` resolves; always routes into F4's review/edit form, pre-filled with whatever came back — including the unsupported/failed case, which pre-fills only the URL.
   Acceptance: verified against mocked success, unsupported-domain, and parse-failure responses — all three land on the same review screen with no dead ends.
   Depends on: F4
