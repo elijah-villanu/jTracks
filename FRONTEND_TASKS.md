@@ -43,7 +43,7 @@ Same `applications`/`users` entity fields as in DATABASE_TASKS.md, and the same 
 
 ## Milestone F4: Settings
 
-- [ ] **F6 — Ghost-time settings UI** (S)
+- [x] **F6 — Ghost-time settings UI** (S)
   Global default field (settings page) + per-application override field inside F4's form.
   Depends on: F4
 

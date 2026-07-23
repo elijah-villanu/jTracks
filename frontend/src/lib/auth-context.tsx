@@ -16,6 +16,13 @@ export interface AuthContextValue {
   signup: (email: string, password: string) => Promise<void>
   loginWithGoogle: () => Promise<void>
   logout: () => void
+  /**
+   * Sends `PATCH /settings` and merges the response back into `user` --
+   * F6's settings page and F4's form (which just needs to *display* the
+   * current global default) both read `user.ghost_days_default` via
+   * `useAuth()`, so this is the one place that value gets updated.
+   */
+  updateSettings: (ghostDaysDefault: number) => Promise<void>
 }
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -124,8 +131,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }, [])
 
+  const updateSettings = useCallback(async (ghostDaysDefault: number) => {
+    const response = await apiClient.patch<{ ghost_days_default: number }>("/settings", {
+      ghost_days_default: ghostDaysDefault,
+    })
+    setUser((prev) => (prev ? { ...prev, ghost_days_default: response.ghost_days_default } : prev))
+  }, [])
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, signup, loginWithGoogle, logout }}>
+    <AuthContext.Provider
+      value={{ user, isLoading, login, signup, loginWithGoogle, logout, updateSettings }}
+    >
       {children}
     </AuthContext.Provider>
   )

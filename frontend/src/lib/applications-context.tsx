@@ -5,10 +5,8 @@ import type { Application } from "@/types/api"
 /**
  * User-editable fields for create/edit -- everything in the shared
  * contract except the server-managed `id`/`user_id`/`created_at`/
- * `updated_at` (see DATABASE_TASKS.md). `ghost_days_override` is
- * included in the type since it's part of `Application`, but F4's form
- * doesn't render a field for it yet (that's F6) -- callers just don't
- * set it, and the mock defaults it to `null`.
+ * `updated_at` (see DATABASE_TASKS.md). `ghost_days_override` (F6) is
+ * nullable -- `null` means "use the user's global default".
  */
 export type ApplicationInput = Omit<Application, "id" | "user_id" | "created_at" | "updated_at">
 

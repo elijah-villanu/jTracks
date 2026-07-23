@@ -20,7 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -32,6 +32,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { ALL_STATUSES, STATUS_LABEL } from "@/components/StatusBadge"
 import { useApplicationsContext } from "@/hooks/useApplicationsContext"
+import { useAuth } from "@/hooks/useAuth"
 import { ApiError } from "@/lib/api-client"
 import type { ApplicationInput } from "@/lib/applications-context"
 import { todayIsoDate } from "@/lib/utils"
@@ -67,6 +68,7 @@ interface FieldErrors {
   title?: boolean
   status?: boolean
   date_applied?: boolean
+  ghost_days_override?: boolean
 }
 
 function extractErrorMessage(err: unknown, fallback: string): string {
@@ -82,12 +84,13 @@ function extractErrorMessage(err: unknown, fallback: string): string {
  * for create vs. edit, and which application is being edited, are
  * decided by whoever called `openCreateForm()`/`openEditForm()` (the
  * header's Add Job button, or a row's edit button), not by this
- * component. Covers every user-editable field in the shared contract
- * except `ghost_days_override`, which F6 adds.
+ * component. Covers every user-editable field in the shared contract,
+ * including F6's `ghost_days_override`.
  */
 export function ApplicationFormDialog() {
   const { formState, closeForm, createApplication, updateApplication, deleteApplication } =
     useApplicationsContext()
+  const { user } = useAuth()
 
   const isOpen = formState !== null
   const mode = formState?.mode ?? "create"
@@ -143,10 +146,21 @@ export function ApplicationFormDialog() {
       // whether that status was picked directly on create or set via
       // an edit that skips the row-level Saved->Applied prompt.
       date_applied: values.status !== "saved" && !values.date_applied,
+      // `null` means "use the global default" and is always valid; a
+      // non-null override must be a positive whole number of days.
+      ghost_days_override:
+        values.ghost_days_override !== null &&
+        (!Number.isInteger(values.ghost_days_override) || values.ghost_days_override <= 0),
     }
     setFieldErrors(errors)
 
-    if (errors.company || errors.title || errors.status || errors.date_applied) {
+    if (
+      errors.company ||
+      errors.title ||
+      errors.status ||
+      errors.date_applied ||
+      errors.ghost_days_override
+    ) {
       return
     }
 
@@ -331,6 +345,32 @@ export function ApplicationFormDialog() {
                 )}
               </Field>
             </div>
+
+            <Field data-invalid={fieldErrors.ghost_days_override}>
+              <FieldLabel htmlFor="application-ghost-days-override">
+                Ghost override (days)
+              </FieldLabel>
+              <Input
+                id="application-ghost-days-override"
+                type="number"
+                min={1}
+                step={1}
+                placeholder={`Default: ${user?.ghost_days_default ?? 14} days`}
+                value={values.ghost_days_override ?? ""}
+                onChange={(event) => {
+                  const raw = event.target.value
+                  updateField("ghost_days_override", raw === "" ? null : Number(raw))
+                }}
+                aria-invalid={fieldErrors.ghost_days_override}
+              />
+              {fieldErrors.ghost_days_override ? (
+                <FieldError>Enter a whole number of days greater than 0, or leave blank.</FieldError>
+              ) : (
+                <FieldDescription>
+                  Leave blank to use your global default ({user?.ghost_days_default ?? 14} days).
+                </FieldDescription>
+              )}
+            </Field>
 
             <Field>
               <FieldLabel htmlFor="application-notes">Notes</FieldLabel>

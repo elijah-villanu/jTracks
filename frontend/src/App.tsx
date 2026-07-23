@@ -5,6 +5,7 @@ import { ApplicationsProvider } from "@/lib/applications-context"
 import { ApplicationsPage } from "@/routes/ApplicationsPage"
 import { LoginPage } from "@/routes/LoginPage"
 import { PlaceholderPage } from "@/routes/PlaceholderPage"
+import { SettingsPage } from "@/routes/SettingsPage"
 import { SignupPage } from "@/routes/SignupPage"
 
 function App() {
@@ -33,15 +34,7 @@ function App() {
               />
             }
           />
-          <Route
-            path="profile"
-            element={
-              <PlaceholderPage
-                title="Profile"
-                description="Ghost-time settings land in a later milestone (F6)."
-              />
-            }
-          />
+          <Route path="profile" element={<SettingsPage />} />
         </Route>
       </Route>
     </Routes>
