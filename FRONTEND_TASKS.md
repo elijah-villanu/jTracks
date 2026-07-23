@@ -49,7 +49,7 @@ Same `applications`/`users` entity fields as in DATABASE_TASKS.md, and the same 
 
 ## Milestone F5: Dashboard
 
-- [ ] **F7 — Dashboard charts** (M)
+- [x] **F7 — Dashboard charts** (M)
   Status breakdown, applications-over-time, response/ghost rate, avg time-to-response, using a charting library (e.g. Recharts); range toggle (week/month/all).
   Acceptance: renders correctly against F1's mock fixtures; wire to the real `GET /dashboard/stats` once B14 ships.
   Depends on: F1

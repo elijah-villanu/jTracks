@@ -92,3 +92,33 @@ export function isAutofillUnsupported(response: AutofillResponse): response is A
 export function isAutofillFailed(response: AutofillResponse): response is AutofillFailed {
   return "failed" in response && response.failed === true
 }
+
+/**
+ * Dashboard stats contract (F7 -- mocked in src/mocks/handlers/dashboard.ts
+ * until BACKEND_TASKS.md's B14 ships). `GET /dashboard/stats?range=...`
+ * returns this shape. Per PRD.md, the status breakdown deliberately
+ * excludes `saved` (those haven't entered the outcome funnel yet) --
+ * `total_applications` is the one figure that includes it.
+ */
+export type DashboardRange = "week" | "month" | "all"
+
+export interface StatusBreakdownEntry {
+  status: ApplicationStatus // only applied/interviewing/offer/rejected/ghosted will appear
+  count: number
+  percentage: number // 0-100, of the applied-or-later cohort (the breakdown's own total), not of all applications including saved
+}
+
+export interface ApplicationsOverTimePoint {
+  date: string // ISO date, bucket start
+  count: number
+}
+
+export interface DashboardStats {
+  range: DashboardRange
+  total_applications: number // every application regardless of status, including saved
+  status_breakdown: StatusBreakdownEntry[]
+  applications_over_time: ApplicationsOverTimePoint[]
+  response_rate: number // 0-1 fraction: (interviewing+offer+rejected) / (applied+interviewing+offer+rejected+ghosted) -- i.e. of everything that was actually applied to, how much got ANY response
+  ghost_rate: number // 0-1 fraction: ghosted / (applied+interviewing+offer+rejected+ghosted)
+  avg_response_time_days: number | null // null if there's no data to compute it from in the current range
+}
