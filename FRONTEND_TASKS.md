@@ -25,9 +25,9 @@ Same `applications`/`users` entity fields as in DATABASE_TASKS.md, and the same 
 
 ## Milestone F2: Board
 
-- [ ] **F3 — Kanban board layout & application card** (M)
-  Columns for Saved, Applied, Interviewing, Offer, Rejected, Ghosted; card shows company/title/key dates; move between columns via drag-and-drop or a menu.
-  Acceptance: moving a card calls the (mocked) `PATCH /applications/{id}` and the board updates without a full reload.
+- [x] **F3 — Application table (spreadsheet view)** (M)
+  Single sortable/filterable table listing every application (per UXPLAN.md's Pipeline View), with a toolbar for filtering by status and a search bar. Each row shows company/title/key dates/location, and a status-change control (e.g. dropdown) to move it through the pipeline.
+  Acceptance: changing a row's status calls the (mocked) `PATCH /applications/{id}` and the table updates without a full reload.
   Depends on: F1
 
 - [ ] **F4 — Manual add/edit application form** (M)

@@ -1,7 +1,7 @@
 # jTracks — Job Application Tracking Board
 
 ## Summary
-jTracks is a web application that helps job seekers (primarily new-grad software engineers) track applications through a Kanban-style pipeline, automatically flags applications as "Ghosted" after a configurable time limit, and gives users a stats dashboard — including a shareable, Instagram-Stories-style recap image — so they can see how their job search is actually going.
+jTracks is a web application that helps job seekers (primarily new-grad software engineers) track applications through a spreadsheet-style pipeline table, automatically flags applications as "Ghosted" after a configurable time limit, and gives users a stats dashboard — including a shareable, Instagram-Stories-style recap image — so they can see how their job search is actually going.
 
 ## Problem Statement
 Job seekers applying to dozens or hundreds of roles typically track them in spreadsheets or emails, which makes it hard to see application status at a glance, easy to forget to follow up, and impossible to answer basic questions like "what's my response rate?" or "how many companies never got back to me?" jTracks centralizes this into one board with automatic ghost-detection and built-in analytics.
@@ -38,7 +38,7 @@ Primary persona: an individual job seeker (e.g., a new CS grad) managing their o
 - Status pipeline: **Saved → Applied → Interviewing → Offer / Rejected / Ghosted**
   - **Saved**: jobs the user is considering but hasn't submitted an application for yet
   - Moving an entry from Saved to Applied prompts the user to confirm/set the "date applied" (defaults to today); this date is what starts the ghosting clock, not the date the job was saved
-- Kanban board view with a column per status; users can move an application between statuses manually
+- Spreadsheet/table view listing every application, filterable/searchable by status; users can change an application's status manually via a per-row control
 - Per-application ghost-time override (in addition to the global default, described below)
 
 **Autofill from job link**
