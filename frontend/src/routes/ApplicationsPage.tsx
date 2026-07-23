@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react"
 import { ALL_STATUSES } from "@/components/StatusBadge"
+import { ConfirmAppliedDialog } from "@/components/applications/confirm-applied-dialog"
 import {
   ApplicationsToolbar,
   type StatusFilter,
@@ -9,7 +10,7 @@ import {
   type SortDirection,
   type SortKey,
 } from "@/components/table/applications-table"
-import { useApplications } from "@/hooks/useApplications"
+import { useApplicationsContext } from "@/hooks/useApplicationsContext"
 import { ApiError } from "@/lib/api-client"
 import type { Application, ApplicationStatus } from "@/types/api"
 
@@ -19,7 +20,7 @@ import type { Application, ApplicationStatus } from "@/types/api"
  * status and a search bar. Replaces F1's static placeholder table.
  */
 export function ApplicationsPage() {
-  const { applications, isLoading, error, updateApplication } = useApplications()
+  const { applications, isLoading, error, updateApplication } = useApplicationsContext()
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
   const [search, setSearch] = useState("")
@@ -28,6 +29,15 @@ export function ApplicationsPage() {
 
   const [actionError, setActionError] = useState<string | null>(null)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
+
+  // Saved -> Applied is the one transition the PRD requires a confirm
+  // step for (it sets `date_applied`, which starts the ghosting
+  // clock); every other transition still fires immediately below.
+  const [confirmApplied, setConfirmApplied] = useState<{ id: string; company: string } | null>(
+    null
+  )
+  const [confirmAppliedError, setConfirmAppliedError] = useState<string | null>(null)
+  const [isConfirmingApplied, setIsConfirmingApplied] = useState(false)
 
   function handleSort(key: SortKey) {
     if (key === sortKey) {
@@ -38,11 +48,11 @@ export function ApplicationsPage() {
     }
   }
 
-  async function handleStatusChange(id: string, status: ApplicationStatus) {
+  async function applyStatusChange(id: string, patch: Partial<Application>) {
     setActionError(null)
     setUpdatingId(id)
     try {
-      await updateApplication(id, { status })
+      await updateApplication(id, patch)
     } catch (err) {
       setActionError(
         err instanceof ApiError
@@ -52,6 +62,44 @@ export function ApplicationsPage() {
     } finally {
       setUpdatingId(null)
     }
+  }
+
+  function handleStatusChange(id: string, status: ApplicationStatus) {
+    const current = applications.find((application) => application.id === id)
+
+    if (current?.status === "saved" && status === "applied") {
+      setConfirmAppliedError(null)
+      setConfirmApplied({ id, company: current.company })
+      return
+    }
+
+    void applyStatusChange(id, { status })
+  }
+
+  async function handleConfirmApplied(dateApplied: string) {
+    if (!confirmApplied) {
+      return
+    }
+
+    setConfirmAppliedError(null)
+    setIsConfirmingApplied(true)
+    try {
+      await updateApplication(confirmApplied.id, { status: "applied", date_applied: dateApplied })
+      setConfirmApplied(null)
+    } catch (err) {
+      setConfirmAppliedError(
+        err instanceof ApiError
+          ? ((err.body as { message?: string })?.message ?? "Failed to update status.")
+          : "Failed to update status. Please try again."
+      )
+    } finally {
+      setIsConfirmingApplied(false)
+    }
+  }
+
+  function handleCancelApplied() {
+    setConfirmApplied(null)
+    setConfirmAppliedError(null)
   }
 
   const visibleApplications = useMemo(() => {
@@ -112,6 +160,14 @@ export function ApplicationsPage() {
           />
         </>
       )}
+
+      <ConfirmAppliedDialog
+        target={confirmApplied}
+        isSubmitting={isConfirmingApplied}
+        error={confirmAppliedError}
+        onConfirm={handleConfirmApplied}
+        onCancel={handleCancelApplied}
+      />
     </div>
   )
 }

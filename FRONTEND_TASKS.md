@@ -30,7 +30,7 @@ Same `applications`/`users` entity fields as in DATABASE_TASKS.md, and the same 
   Acceptance: changing a row's status calls the (mocked) `PATCH /applications/{id}` and the table updates without a full reload.
   Depends on: F1
 
-- [ ] **F4 — Manual add/edit application form** (M)
+- [x] **F4 — Manual add/edit application form** (M)
   Form covering every field in the shared contract. Moving Saved→Applied prompts for/defaults `date_applied` to today per the PRD.
   Depends on: F3
 

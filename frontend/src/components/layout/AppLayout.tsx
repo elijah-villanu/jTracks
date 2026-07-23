@@ -1,6 +1,8 @@
 import { NavLink, Outlet, useNavigate } from "react-router"
 import { Briefcase, LogOut, Plus } from "lucide-react"
+import { ApplicationFormDialog } from "@/components/applications/application-form-dialog"
 import { Button } from "@/components/ui/button"
+import { useApplicationsContext } from "@/hooks/useApplicationsContext"
 import { useAuth } from "@/hooks/useAuth"
 import { cn } from "@/lib/utils"
 
@@ -12,12 +14,15 @@ const NAV_LINKS = [
 
 /**
  * Base app shell: logo, nav tabs, and the "Add Job" primary action.
- * Per UXPLAN.md's Dashboard Page Structure. Nav links and the "Add
- * Job" button are non-functional placeholders in F1 -- routing to
- * real pages/modals lands in later milestones (F2+).
+ * Per UXPLAN.md's Dashboard Page Structure. The add/edit application
+ * dialog is rendered once here (rather than per-page) since both the
+ * header's "Add Job" button and the table's per-row edit button (deep
+ * inside ApplicationsPage) need to open the same dialog -- see
+ * src/lib/applications-context.tsx's `formState`.
  */
 export function AppLayout() {
   const { user, logout } = useAuth()
+  const { openCreateForm } = useApplicationsContext()
   const navigate = useNavigate()
 
   function handleLogout() {
@@ -57,7 +62,7 @@ export function AppLayout() {
                 {user.email}
               </span>
             )}
-            <Button size="sm" disabled>
+            <Button size="sm" onClick={openCreateForm}>
               <Plus />
               Add Job
             </Button>
@@ -72,6 +77,8 @@ export function AppLayout() {
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
         <Outlet />
       </main>
+
+      <ApplicationFormDialog />
     </div>
   )
 }

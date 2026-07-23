@@ -1,6 +1,7 @@
 import { Route, Routes } from "react-router"
 import { AppLayout } from "@/components/layout/AppLayout"
 import { GuestRoute, ProtectedRoute } from "@/components/ProtectedRoute"
+import { ApplicationsProvider } from "@/lib/applications-context"
 import { ApplicationsPage } from "@/routes/ApplicationsPage"
 import { LoginPage } from "@/routes/LoginPage"
 import { PlaceholderPage } from "@/routes/PlaceholderPage"
@@ -14,7 +15,13 @@ function App() {
         <Route path="signup" element={<SignupPage />} />
       </Route>
 
-      <Route element={<ProtectedRoute />}>
+      <Route
+        element={
+          <ApplicationsProvider>
+            <ProtectedRoute />
+          </ApplicationsProvider>
+        }
+      >
         <Route element={<AppLayout />}>
           <Route index element={<ApplicationsPage />} />
           <Route

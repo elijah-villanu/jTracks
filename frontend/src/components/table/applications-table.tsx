@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
-import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react"
+import { ArrowDown, ArrowUp, ArrowUpDown, Pencil } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import {
   Table,
   TableBody,
@@ -11,6 +12,7 @@ import {
 } from "@/components/ui/table"
 import { StatusBadge, STATUS_CELL_CLASSES } from "@/components/StatusBadge"
 import { StatusSelect } from "@/components/table/status-select"
+import { useApplicationsContext } from "@/hooks/useApplicationsContext"
 import { cn } from "@/lib/utils"
 import type { Application, ApplicationStatus } from "@/types/api"
 
@@ -51,6 +53,9 @@ export function ApplicationsTable({
   onStatusChange,
   updatingId,
 }: ApplicationsTableProps) {
+  const { openEditForm } = useApplicationsContext()
+  const columnCount = COLUMNS.length + 1
+
   return (
     <div className="overflow-hidden rounded-md border border-border">
       <Table>
@@ -72,12 +77,15 @@ export function ApplicationsTable({
                 </SortButton>
               </TableHead>
             ))}
+            <TableHead className="w-9">
+              <span className="sr-only">Edit</span>
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {applications.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={COLUMNS.length} className="h-24 text-center text-muted-foreground">
+              <TableCell colSpan={columnCount} className="h-24 text-center text-muted-foreground">
                 No applications match your filters.
               </TableCell>
             </TableRow>
@@ -98,6 +106,17 @@ export function ApplicationsTable({
                 </TableCell>
                 <TableCell>{application.location ?? "—"}</TableCell>
                 <TableCell>{application.date_applied ?? "—"}</TableCell>
+                <TableCell>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Edit ${application.company} — ${application.title}`}
+                    onClick={() => openEditForm(application)}
+                  >
+                    <Pencil />
+                  </Button>
+                </TableCell>
               </TableRow>
             ))
           )}
