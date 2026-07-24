@@ -122,3 +122,31 @@ export interface DashboardStats {
   ghost_rate: number // 0-1 fraction: ghosted / (applied+interviewing+offer+rejected+ghosted)
   avg_response_time_days: number | null // null if there's no data to compute it from in the current range
 }
+
+/**
+ * Recap contract (F8 -- mocked in src/mocks/handlers/recap.ts until
+ * BACKEND_TASKS.md's B16 ships). `GET /dashboard/recap?range=week|month`
+ * returns this shape. Mirrors backend/app/schemas/dashboard.py's
+ * `DashboardRecap`/`RecapHighlight` field-for-field -- unlike
+ * `DashboardStats` above, this one is deliberately kept in exact sync
+ * with the real backend contract (see docs/decisions/recap-image-approach.md,
+ * B15: client-side rendering) so F8 needs zero changes when B16 ships,
+ * only a mock-vs-real fetch swap. Recap only supports week/month (no "all").
+ */
+export type RecapRange = "week" | "month"
+
+export interface RecapHighlight {
+  label: string
+  value: string
+}
+
+export interface DashboardRecap {
+  range: RecapRange
+  period_label: string // "This week" / "This month"
+  period_start: string // ISO date (YYYY-MM-DD)
+  period_end: string // ISO date (YYYY-MM-DD)
+  total_applications: number
+  headline: string
+  highlights: RecapHighlight[]
+  status_breakdown: StatusBreakdownEntry[]
+}

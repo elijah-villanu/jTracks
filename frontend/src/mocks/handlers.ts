@@ -2,6 +2,7 @@ import { authHandlers } from "@/mocks/handlers/auth"
 import { applicationHandlers } from "@/mocks/handlers/applications"
 import { autofillHandlers } from "@/mocks/handlers/autofill"
 import { dashboardHandlers } from "@/mocks/handlers/dashboard"
+import { recapHandlers } from "@/mocks/handlers/recap"
 import { settingsHandlers } from "@/mocks/handlers/settings"
 
 /**
@@ -10,7 +11,8 @@ import { settingsHandlers } from "@/mocks/handlers/settings"
  * surface (see src/mocks/handlers/applications.ts); F5 adds the mocked
  * autofill parser (see src/mocks/handlers/autofill.ts); F6 adds the
  * `/settings` handlers (see src/mocks/handlers/settings.ts); F7 adds
- * `GET /dashboard/stats` (see src/mocks/handlers/dashboard.ts). The
+ * `GET /dashboard/stats` (see src/mocks/handlers/dashboard.ts); F8 adds
+ * `GET /dashboard/recap` (see src/mocks/handlers/recap.ts). The
  * remaining endpoints from the shared API surface (BACKEND_TASKS.md)
  * are stubbed as comments below so future milestones have an obvious
  * place to add handlers without needing to rediscover the base URL
@@ -22,9 +24,9 @@ export const handlers = [
   ...autofillHandlers,
   ...settingsHandlers,
   ...dashboardHandlers,
+  ...recapHandlers,
 
   // POST   /applications
   // GET    /applications/{id}
   // DELETE /applications/{id}
-  // GET    /dashboard/recap?range=week|month
 ]

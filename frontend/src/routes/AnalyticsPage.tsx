@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { ApplicationsOverTimeChart } from "@/components/dashboard/applications-over-time-chart"
+import { RecapDialog } from "@/components/dashboard/recap-dialog"
 import { StatTile } from "@/components/dashboard/stat-tile"
 import { StatusBreakdownChart } from "@/components/dashboard/status-breakdown-chart"
 import { Button } from "@/components/ui/button"
@@ -21,6 +22,7 @@ const RANGE_OPTIONS: { value: DashboardRange; label: string }[] = [
  */
 export function AnalyticsPage() {
   const [range, setRange] = useState<DashboardRange>("month")
+  const [isRecapOpen, setIsRecapOpen] = useState(false)
   const { stats, isLoading, error } = useDashboardStats(range)
 
   return (
@@ -33,21 +35,29 @@ export function AnalyticsPage() {
           </p>
         </div>
 
-        <div className="flex gap-1.5" role="group" aria-label="Date range">
-          {RANGE_OPTIONS.map((option) => (
-            <Button
-              key={option.value}
-              type="button"
-              size="sm"
-              variant={range === option.value ? "default" : "outline"}
-              aria-pressed={range === option.value}
-              onClick={() => setRange(option.value)}
-            >
-              {option.label}
-            </Button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex gap-1.5" role="group" aria-label="Date range">
+            {RANGE_OPTIONS.map((option) => (
+              <Button
+                key={option.value}
+                type="button"
+                size="sm"
+                variant={range === option.value ? "default" : "outline"}
+                aria-pressed={range === option.value}
+                onClick={() => setRange(option.value)}
+              >
+                {option.label}
+              </Button>
+            ))}
+          </div>
+
+          <Button type="button" size="sm" variant="secondary" onClick={() => setIsRecapOpen(true)}>
+            Generate recap
+          </Button>
         </div>
       </div>
+
+      <RecapDialog open={isRecapOpen} onOpenChange={setIsRecapOpen} />
 
       {error && (
         <p

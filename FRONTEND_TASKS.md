@@ -56,7 +56,7 @@ Same `applications`/`users` entity fields as in DATABASE_TASKS.md, and the same 
 
 ## Milestone F6: Recap
 
-- [ ] **F8 — Shareable recap UI** (M, scope set by backend's B15 decision)
+- [x] **F8 — Shareable recap UI** (M, scope set by backend's B15 decision)
   "Generate recap" button. If backend chose client-side rendering (B15): implement the transparent-background, Stories-aspect image export here (e.g. via html-to-image/canvas) from the `GET /dashboard/recap` data. If server-side: fetch and display/download the returned image. Include native share-sheet integration on mobile (Web Share API).
   Depends on: F7, and BACKEND_TASKS.md's B15/B16
 

@@ -17,7 +17,7 @@ import type { StatusBreakdownEntry } from "@/types/api"
  * exist if a toggle ever ships: interviewing #d97706, offer #059669
  * (others unchanged).
  */
-const STATUS_BREAKDOWN_COLORS: Record<StatusBreakdownEntry["status"], string> = {
+export const STATUS_BREAKDOWN_COLORS: Record<StatusBreakdownEntry["status"], string> = {
   applied: "#3b82f6",
   interviewing: "#f59e0b",
   offer: "#10b981",
