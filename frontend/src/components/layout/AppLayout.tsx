@@ -1,9 +1,18 @@
 import { useState } from "react"
 import { NavLink, Outlet, useNavigate } from "react-router"
-import { Briefcase, ClipboardPaste, LogOut, Plus } from "lucide-react"
+import { Briefcase, ClipboardPaste, LogOut, Menu, Plus } from "lucide-react"
 import { ApplicationFormDialog } from "@/components/applications/application-form-dialog"
 import { AutofillDialog } from "@/components/applications/autofill-dialog"
 import { Button } from "@/components/ui/button"
+import { Separator } from "@/components/ui/separator"
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
 import { useApplicationsContext } from "@/hooks/useApplicationsContext"
 import { useAuth } from "@/hooks/useAuth"
 import { cn } from "@/lib/utils"
@@ -22,11 +31,20 @@ const NAV_LINKS = [
  * inside ApplicationsPage) need to open the same dialog -- see
  * src/lib/applications-context.tsx's `formState`.
  */
+/** Shared active-state styling for the Tracker/Analytics/Profile nav links. */
+function navLinkClassName({ isActive }: { isActive: boolean }) {
+  return cn(
+    "rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+    isActive && "bg-muted text-foreground"
+  )
+}
+
 export function AppLayout() {
   const { user, logout } = useAuth()
   const { openCreateForm } = useApplicationsContext()
   const navigate = useNavigate()
   const [isAutofillOpen, setIsAutofillOpen] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   function handleLogout() {
     logout()
@@ -42,24 +60,15 @@ export function AppLayout() {
             <span>jTracks</span>
           </div>
 
-          <nav className="flex items-center gap-1">
+          <nav className="hidden items-center gap-1 sm:flex">
             {NAV_LINKS.map((link) => (
-              <NavLink
-                key={link.to}
-                to={link.to}
-                className={({ isActive }) =>
-                  cn(
-                    "rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-                    isActive && "bg-muted text-foreground"
-                  )
-                }
-              >
+              <NavLink key={link.to} to={link.to} className={navLinkClassName}>
                 {link.label}
               </NavLink>
             ))}
           </nav>
 
-          <div className="flex items-center gap-3">
+          <div className="hidden items-center gap-3 sm:flex">
             {user && (
               <span className="hidden text-sm text-muted-foreground sm:inline">
                 {user.email}
@@ -78,6 +87,58 @@ export function AppLayout() {
               Log out
             </Button>
           </div>
+
+          <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+            <SheetTrigger render={<Button size="icon" variant="outline" className="sm:hidden" />}>
+              <Menu />
+              <span className="sr-only">Open menu</span>
+            </SheetTrigger>
+            <SheetContent side="right" className="sm:hidden">
+              <SheetHeader>
+                <SheetTitle className="flex items-center gap-2">
+                  <Briefcase className="size-5 text-primary" aria-hidden="true" />
+                  jTracks
+                </SheetTitle>
+              </SheetHeader>
+
+              <nav className="flex flex-col gap-1 px-4">
+                {NAV_LINKS.map((link) => (
+                  <NavLink
+                    key={link.to}
+                    to={link.to}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={({ isActive }) =>
+                      cn(navLinkClassName({ isActive }), "block w-full")
+                    }
+                  >
+                    {link.label}
+                  </NavLink>
+                ))}
+              </nav>
+
+              <Separator className="my-1" />
+
+              <div className="flex flex-col gap-3 px-4">
+                {user && (
+                  <span className="text-sm text-muted-foreground">{user.email}</span>
+                )}
+                <SheetClose
+                  render={<Button variant="outline" onClick={() => setIsAutofillOpen(true)} />}
+                >
+                  <ClipboardPaste />
+                  Paste a Link
+                </SheetClose>
+                <SheetClose render={<Button onClick={() => openCreateForm()} />}>
+                  <Plus />
+                  Add Job
+                </SheetClose>
+                <SheetClose render={<Button variant="ghost" onClick={handleLogout} />}>
+                  <LogOut />
+                  Log out
+                </SheetClose>
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
       </header>
 

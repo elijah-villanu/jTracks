@@ -62,7 +62,7 @@ Same `applications`/`users` entity fields as in DATABASE_TASKS.md, and the same 
 
 ## Milestone F7: Polish
 
-- [ ] **F9 — Responsive pass** (S)
+- [x] **F9 — Responsive pass** (S)
   Verify and fix layout down to ~375px viewport width across the board, forms, and dashboard.
   Depends on: F3, F4, F7
 
