@@ -11,11 +11,11 @@
 
 | # | Severity | Finding | Status |
 |---|----------|---------|--------|
-| H1 | **High** | SSRF: Workday autofill fetches an attacker-controlled host, plaintext, following redirects | Confirmed by PoC |
-| H2 | **High** | Weak default JWT secret in code + committed in `docker-compose.yml` → full auth bypass | Confirmed by PoC |
-| H3 | **High** | Google OAuth links accounts without checking `email_verified` → account takeover | Confirmed by review |
-| H4 | **High** | No rate limiting on `/auth/login` / `/auth/signup` → unlimited brute force | Confirmed by PoC |
-| M1 | Medium | Autofill host allowlist uses bare `endswith()` → domain-suffix confusion | Confirmed by PoC |
+| H1 | **High** | SSRF: Workday autofill fetches an attacker-controlled host, plaintext, following redirects | ✅ **FIXED** 2026-07-28 |
+| H2 | **High** | Weak default JWT secret in code + committed in `docker-compose.yml` → full auth bypass | ✅ **FIXED** 2026-07-28 |
+| H3 | **High** | Google OAuth links accounts without checking `email_verified` → account takeover | ✅ **FIXED** 2026-07-28 |
+| H4 | **High** | No rate limiting on `/auth/login` / `/auth/signup` → unlimited brute force | ✅ **FIXED** 2026-07-28 |
+| M1 | Medium | Autofill host allowlist uses bare `endswith()` → domain-suffix confusion | ✅ **FIXED** (required by H1) |
 | M2 | Medium | No request-body size cap; `notes` has no `max_length` → storage/memory DoS | Confirmed by PoC |
 | M3 | Medium | No response-size cap on outbound autofill fetch | Confirmed by review |
 | M4 | Medium | Vulnerable dependencies: `starlette` 0.41.3 (8 advisories), `ecdsa` 0.19.2 | Confirmed by `pip-audit` |
@@ -347,8 +347,47 @@ Exploit PoCs for H1, H2, H4, M1, M2, M5 were written and executed against the li
 
 ---
 
-## Notes on this run
+## Remediation log — 2026-07-28
 
-- **No application code was modified.** This report is the only file written. No dependencies were changed in the project (`pip-audit` was installed into `.venv` as a tool). The 74-test baseline suite passes unchanged.
-- **PoC scripts** are at `%TEMP%/jtracks_sec/` (`test_security_poc.py` + a copied `conftest.py`). Delete them, or keep them as the basis for the regression tests when you pick up fixes.
-- **Four confirmed HIGH vulnerabilities remain open and unfixed** at your direction (report-only). H2 is the one I'd not leave sitting: if this backend is currently deployed anywhere with the compose file's secret or no `JWT_SECRET` set, anyone who reads this public repo can forge a token for any account right now.
+All four HIGH findings are **fixed and verified**. M1 was fixed as part of H1 (the exact-host
+allowlist is step 1 of that fix and can't be separated from it).
+
+**Files changed**
+
+| File | Finding |
+|---|---|
+| `app/core/config.py` | H2 — no hardcoded secret; `_validate_jwt_secret` fails closed outside development, generates an ephemeral dev secret. Added rate-limit settings. |
+| `docker-compose.yml`, `.env.example` | H2 — literal secret replaced with `${JWT_SECRET:?…}` / blank + generation instructions |
+| `app/services/google_verify.py` | H3 — rejects `email_verified: false` at the boundary |
+| `app/services/auth_service.py` | H3 — required `email_verified` arg on `upsert_google_user`, raises `UnverifiedEmail` |
+| `app/services/autofill/net_guard.py` *(new)* | H1 — scheme/host/resolved-IP guard as an httpx request hook |
+| `app/services/autofill/workday.py` | H1 — forces `https`, uses `.hostname` not `.netloc`, allowlist |
+| `app/services/autofill/greenhouse.py` | M1 — dot-boundary allowlist |
+| `app/services/autofill/dispatcher.py` | H1 — `follow_redirects=False`, guard hook, `blocked_host` result |
+| `app/core/rate_limit.py` *(new)* | H4 — slowapi limiter keyed on peer IP |
+| `app/main.py`, `routes/auth.py`, `routes/applications.py` | H4 — limiter wiring + per-endpoint budgets |
+| `tests/test_security_regression.py` *(new)* | 38 tests re-running every PoC, asserting rejection |
+
+**Verification:** `1 failed, 110 passed`. The single failure is
+`test_dashboard.py::test_stats_all_range` (`assert 31.0 == 30.0`) — a **pre-existing,
+date-sensitive** assertion that fails identically on the unmodified code at commit `3c27fe0`.
+It is a test bug, not a regression, and is unrelated to security.
+
+**Two implementation notes that differ from the recommendations above:**
+
+1. **H2** was *not* implemented as `JWT_SECRET: str` with no default — that breaks local dev and
+   the test suite, neither of which sets the variable. Instead the field defaults to `""` and a
+   validator generates an ephemeral `secrets.token_urlsafe(48)` in development while hard-failing
+   outside it. Same property (no guessable key in source), no breakage.
+2. **`from __future__ import annotations` had to be removed** from `routes/auth.py` and
+   `routes/applications.py`. slowapi's decorator wrapper carries its own `__globals__`, so FastAPI
+   could not resolve the stringified annotations and silently demoted every request body to a
+   query parameter (~35 tests failed with `loc: ["query","payload"]`). Both files now carry a
+   comment explaining why the future-import must not be re-added.
+
+**Still open:** M2–M6 and L1–L6. Highest-value remaining: **M4** (`starlette` 0.41.3 has two
+remotely-triggerable DoS advisories), **M2** (unbounded `notes` — a 5 MB body is still accepted),
+and **M6** (no `.dockerignore`, so `live.db` and `.env` are baked into the image).
+
+- **PoC scripts** are at `%TEMP%/jtracks_sec/`. Now superseded by
+  `tests/test_security_regression.py`; safe to delete.

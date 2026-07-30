@@ -16,6 +16,13 @@ os.environ.setdefault("DATABASE_URL", f"sqlite:///{_TMP_DB}")
 os.environ["RUN_SCHEDULER"] = "false"
 os.environ["AUTO_CREATE_TABLES"] = "true"
 os.environ["GOOGLE_CLIENT_ID"] = "test-client-id.apps.googleusercontent.com"
+# Deterministic signing key so tokens are stable across the session (config.py
+# otherwise generates an ephemeral one in development).
+os.environ["JWT_SECRET"] = "test-only-jwt-secret-not-used-anywhere-real-0123456789"
+# Rate limiting off by default: the `register` fixture posts to /auth/signup on
+# most tests from a single client IP, which would blow the 3/hour budget.
+# tests/test_security_regression.py re-enables it around the cases that need it.
+os.environ["RATE_LIMIT_ENABLED"] = "false"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

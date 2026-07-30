@@ -20,6 +20,10 @@ class InvalidCredentials(AuthError):
     pass
 
 
+class UnverifiedEmail(AuthError):
+    """An OAuth identity asserted an email address it hasn't proven it owns."""
+
+
 def get_user_by_email(db: Session, email: str) -> User | None:
     return db.scalar(select(User).where(User.email == email.lower()))
 
@@ -47,14 +51,26 @@ def authenticate(db: Session, email: str, password: str) -> User:
     return user
 
 
-def upsert_google_user(db: Session, google_id: str, email: str) -> User:
+def upsert_google_user(
+    db: Session, google_id: str, email: str, email_verified: bool
+) -> User:
     """Find-or-create/link a user for a verified Google identity.
 
     Resolution order:
       1. Existing user with this google_id -> return it (repeat login).
       2. Existing user with this email -> link google_id to it (account linking).
       3. Otherwise create a new OAuth-only user (null hashed_password).
+
+    SECURITY (audit H3): `email_verified` is a required argument with no default
+    and is checked before any lookup. Steps 2 and 3 both treat the email address
+    as proof of identity — step 2 hands over an existing password account — so an
+    unproven address must never get this far. `verify_google_id_token` already
+    rejects unverified tokens; this is the second, independent layer that also
+    covers any future caller (a test double, an admin import, another provider).
     """
+    if not email_verified:
+        raise UnverifiedEmail(email)
+
     email = email.lower()
 
     user = get_user_by_google_id(db, google_id)

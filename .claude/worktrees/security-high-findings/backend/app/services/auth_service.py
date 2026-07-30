@@ -1,0 +1,76 @@
+"""Auth business logic: signup, login, Google OAuth link/create."""
+from __future__ import annotations
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.core.security import hash_password, verify_password
+from app.models.user import User
+
+
+class AuthError(Exception):
+    """Base auth error."""
+
+
+class EmailAlreadyRegistered(AuthError):
+    pass
+
+
+class InvalidCredentials(AuthError):
+    pass
+
+
+def get_user_by_email(db: Session, email: str) -> User | None:
+    return db.scalar(select(User).where(User.email == email.lower()))
+
+
+def get_user_by_google_id(db: Session, google_id: str) -> User | None:
+    return db.scalar(select(User).where(User.google_id == google_id))
+
+
+def signup(db: Session, email: str, password: str) -> User:
+    email = email.lower()
+    if get_user_by_email(db, email) is not None:
+        raise EmailAlreadyRegistered(email)
+    user = User(email=email, hashed_password=hash_password(password))
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def authenticate(db: Session, email: str, password: str) -> User:
+    user = get_user_by_email(db, email)
+    # Constant-ish path: verify_password returns False for OAuth-only (null hash).
+    if user is None or not verify_password(password, user.hashed_password):
+        raise InvalidCredentials()
+    return user
+
+
+def upsert_google_user(db: Session, google_id: str, email: str) -> User:
+    """Find-or-create/link a user for a verified Google identity.
+
+    Resolution order:
+      1. Existing user with this google_id -> return it (repeat login).
+      2. Existing user with this email -> link google_id to it (account linking).
+      3. Otherwise create a new OAuth-only user (null hashed_password).
+    """
+    email = email.lower()
+
+    user = get_user_by_google_id(db, google_id)
+    if user is not None:
+        return user
+
+    user = get_user_by_email(db, email)
+    if user is not None:
+        if user.google_id is None:
+            user.google_id = google_id
+            db.commit()
+            db.refresh(user)
+        return user
+
+    user = User(email=email, google_id=google_id, hashed_password=None)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user

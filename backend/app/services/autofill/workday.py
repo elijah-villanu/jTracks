@@ -18,18 +18,36 @@ from urllib.parse import urlsplit
 import httpx
 
 from app.services.autofill.base import ParsedFields, make_parsed, parse_iso_date
+from app.services.autofill.net_guard import host_matches_domain
 
 # locale segment like en-US / en_US / fr-FR
 _LOCALE_RE = re.compile(r"^[a-z]{2}[-_][A-Z]{2}$")
 
+# SECURITY (audit H1/M1): exact domain or true subdomain only. The previous
+# `endswith("myworkdayjobs.com")` also accepted `notmyworkdayjobs.com`, which
+# anyone can register and point at an internal address.
+_ALLOWED_DOMAINS = ("myworkdayjobs.com",)
+
 
 def matches(host: str) -> bool:
-    return host.lower().rstrip(".").endswith("myworkdayjobs.com")
+    return host_matches_domain(host, _ALLOWED_DOMAINS)
 
 
 def _build_cxs_url(url: str) -> str | None:
     parts = urlsplit(url)
-    host = parts.netloc
+    # `.hostname` rather than `.netloc`: lowercased, and strips userinfo/port so
+    # "https://evil@tenant.myworkdayjobs.com:8080" can't smuggle either into the
+    # URL we fetch.
+    try:
+        host = parts.hostname
+    except ValueError:
+        return None
+    # Re-checked here as well as in the dispatcher: this function builds the URL
+    # that actually gets fetched, so it must not depend on a caller having
+    # validated the host first.
+    if not host_matches_domain(host, _ALLOWED_DOMAINS):
+        return None
+
     tenant = host.split(".")[0]
     if not tenant:
         return None
@@ -51,7 +69,8 @@ def _build_cxs_url(url: str) -> str | None:
         return None
 
     path = "/".join(rest)
-    return f"{parts.scheme}://{host}/wday/cxs/{tenant}/{site}/job/{path}"
+    # Always https — never echo back the user's scheme (audit H1).
+    return f"https://{host}/wday/cxs/{tenant}/{site}/job/{path}"
 
 
 def _extract_location(info: dict) -> str | None:
@@ -88,7 +107,7 @@ async def parse(url: str, client: httpx.AsyncClient) -> ParsedFields | None:
         return None
 
     org = data.get("hiringOrganization") or {}
-    tenant = urlsplit(url).netloc.split(".")[0]
+    tenant = (urlsplit(url).hostname or "").split(".")[0]
     company = (org.get("name") if isinstance(org, dict) else None) or tenant.replace(
         "-", " "
     ).title()

@@ -6,9 +6,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from app.api.routes import applications, auth, dashboard, health, settings as settings_route
 from app.core.config import settings
+from app.core.rate_limit import limiter
 from app.db.base import Base
 from app.db.session import engine
 from app.scheduler.ghosting_scheduler import shutdown_scheduler, start_scheduler
@@ -41,6 +44,11 @@ def create_app() -> FastAPI:
         openapi_url="/openapi.json",
         lifespan=lifespan,
     )
+
+    # Rate limiting (audit H4). The @limiter.limit decorators on individual
+    # routes need these registered on the app.
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
     app.add_middleware(
         CORSMiddleware,

@@ -5,10 +5,33 @@ All values are read from environment variables (or a local `.env`). See
 """
 from __future__ import annotations
 
+import logging
+import secrets
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger("jtracks.config")
+
+# Environments treated as "local, not internet-facing". Anything else (staging,
+# production, ...) is held to the strict secret requirements below.
+_DEV_ENVIRONMENTS = frozenset({"development", "dev", "local", "test", "testing"})
+
+# Placeholder secrets that have appeared in this repo's docs/compose/history.
+# They are public, so they are never acceptable outside development.
+_WEAK_JWT_SECRETS = frozenset(
+    {
+        "dev-insecure-secret-change-me",
+        "change-me-in-real-deployments",
+        "change-me-to-a-long-random-string",
+        "changeme",
+        "secret",
+        "test-secret",
+    }
+)
+
+_JWT_SECRET_MIN_LENGTH = 32
 
 
 class Settings(BaseSettings):
@@ -38,9 +61,28 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     # --- Auth / JWT ---
-    JWT_SECRET: str = "dev-insecure-secret-change-me"
+    # SECURITY (audit H2): there is deliberately NO hardcoded default secret.
+    #   * Outside development a strong secret MUST come from the environment or
+    #     the app refuses to start (see `_validate_jwt_secret`).
+    #   * In development an ephemeral random secret is generated per process, so
+    #     no guessable signing key is ever shipped in source control. Tokens do
+    #     not survive a restart locally — that is intentional.
+    JWT_SECRET: str = ""
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+
+    # --- Rate limiting (audit H4) ---
+    # Per-client-IP budgets on the endpoints an attacker hammers. Disabled by
+    # the test suite; see tests/conftest.py.
+    RATE_LIMIT_ENABLED: bool = True
+    RATE_LIMIT_LOGIN: str = "5/minute"
+    RATE_LIMIT_SIGNUP: str = "3/hour"
+    RATE_LIMIT_OAUTH: str = "10/minute"
+    RATE_LIMIT_AUTOFILL: str = "10/minute"
+    # Only enable behind a proxy you control, and make sure that proxy strips
+    # inbound X-Forwarded-For. Otherwise clients spoof the header and evade
+    # every limit above.
+    TRUST_PROXY_HEADERS: bool = False
 
     # --- Google OAuth ---
     # The Google OAuth 2.0 Web client ID that ID tokens are verified against.
@@ -60,6 +102,49 @@ class Settings(BaseSettings):
         "Mozilla/5.0 (compatible; jTracksBot/1.0; +https://github.com/) "
         "AppleWebKit/537.36"
     )
+
+    @property
+    def is_development(self) -> bool:
+        return self.ENVIRONMENT.strip().lower() in _DEV_ENVIRONMENTS
+
+    @model_validator(mode="after")
+    def _validate_jwt_secret(self) -> "Settings":
+        """Fail closed on a missing/weak JWT signing key.
+
+        A predictable secret means anyone can forge a token for any user id and
+        walk straight past `get_current_user` — it defeats every per-user access
+        control in the app, so this is enforced at startup rather than trusted
+        to deployment discipline.
+        """
+        secret = (self.JWT_SECRET or "").strip()
+
+        if self.is_development:
+            if not secret:
+                self.JWT_SECRET = secrets.token_urlsafe(48)
+                logger.warning(
+                    "JWT_SECRET not set; generated an ephemeral development "
+                    "secret. Tokens are invalidated on restart. Set JWT_SECRET "
+                    "in your environment to keep sessions stable."
+                )
+            return self
+
+        if not secret:
+            raise ValueError(
+                "JWT_SECRET must be set when ENVIRONMENT is not a development "
+                'environment. Generate one with: python -c "import secrets; '
+                'print(secrets.token_urlsafe(48))"'
+            )
+        if secret.lower() in _WEAK_JWT_SECRETS:
+            raise ValueError(
+                "JWT_SECRET is a known placeholder value and is public in this "
+                "repository's history. Generate a real random secret."
+            )
+        if len(secret) < _JWT_SECRET_MIN_LENGTH:
+            raise ValueError(
+                f"JWT_SECRET must be at least {_JWT_SECRET_MIN_LENGTH} "
+                f"characters (got {len(secret)})."
+            )
+        return self
 
     @property
     def cors_origins_list(self) -> list[str]:

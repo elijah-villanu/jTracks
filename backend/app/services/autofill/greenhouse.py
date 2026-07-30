@@ -13,16 +13,20 @@ import re
 import httpx
 
 from app.services.autofill.base import ParsedFields, make_parsed, parse_iso_date
+from app.services.autofill.net_guard import host_matches_domain
 
 _API = "https://boards-api.greenhouse.io/v1/boards/{token}/jobs/{job_id}?questions=false"
 
 # .../{token}/jobs/{numeric_id}  (works for boards. and job-boards. hosts)
 _PATH_RE = re.compile(r"/(?P<token>[^/]+)/jobs/(?P<job_id>\d+)")
 
+# SECURITY (audit M1): exact domain or true subdomain only. The previous
+# `endswith("greenhouse.io")` also matched the registerable `evilgreenhouse.io`.
+_ALLOWED_DOMAINS = ("greenhouse.io",)
+
 
 def matches(host: str) -> bool:
-    host = host.lower()
-    return host.endswith("greenhouse.io") or host.endswith("greenhouse.io.")
+    return host_matches_domain(host, _ALLOWED_DOMAINS)
 
 
 def _extract_token_and_id(url: str) -> tuple[str, str] | None:

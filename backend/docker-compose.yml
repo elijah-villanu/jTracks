@@ -26,7 +26,11 @@ services:
       DATABASE_URL: postgresql+psycopg://jtracks:jtracks@db:5432/jtracks
       AUTO_CREATE_TABLES: "false"
       RUN_SCHEDULER: "true"
-      JWT_SECRET: change-me-in-real-deployments
+      # Never hardcode this. Compose refuses to start if JWT_SECRET is unset in
+      # your shell/.env, which is the point — a shared secret in source control
+      # lets anyone forge a token for any account. Generate with:
+      #   python -c "import secrets; print(secrets.token_urlsafe(48))"
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET before running compose}
       CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
       GOOGLE_CLIENT_ID: ""
     ports:
