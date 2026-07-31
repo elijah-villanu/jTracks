@@ -52,12 +52,17 @@ class Settings(BaseSettings):
     #   postgresql+psycopg://user:pass@host:5432/jtracks
     # Dev/test default to SQLite so the app is runnable with no external service.
     DATABASE_URL: str = "sqlite:///./jtracks_dev.db"
-    # Dev/test convenience: create tables from model metadata on startup.
-    # MUST be false in production, where Alembic (DATABASE_TASKS D1) owns schema.
-    AUTO_CREATE_TABLES: bool = True
+    # Dev convenience: create tables from model metadata on startup.
+    # SECURITY (audit M6): defaults to False so the *safe* state is the one you
+    # get by omission. Alembic (DATABASE_TASKS D1) owns the schema; an operator
+    # who forgets this variable should not get create_all() quietly building
+    # tables next to the migrations. Set true locally (or in tests) on purpose.
+    AUTO_CREATE_TABLES: bool = False
 
     # --- CORS ---
     # Comma-separated list of allowed origins for the browser frontend.
+    # `*` is rejected by `_validate_cors_origins` — auth is a Bearer token, so a
+    # wildcard would only ever widen who can drive the API from a browser.
     CORS_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     # --- Auth / JWT ---
@@ -70,6 +75,10 @@ class Settings(BaseSettings):
     JWT_SECRET: str = ""
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+    # Bound claims (audit L4). A token minted for some other service that
+    # happens to share this secret won't validate here, and vice versa.
+    JWT_ISSUER: str = "jtracks"
+    JWT_AUDIENCE: str = "jtracks-api"
 
     # --- Rate limiting (audit H4) ---
     # Per-client-IP budgets on the endpoints an attacker hammers. Disabled by
@@ -96,8 +105,18 @@ class Settings(BaseSettings):
     GHOSTING_JOB_MINUTE: int = 0
     DEFAULT_GHOST_DAYS: int = 14        # fallback if a user row somehow lacks one
 
+    # --- Request limits (audit M2) ---
+    # Largest request body the API will accept. Every endpoint takes a small
+    # JSON document; 1 MiB is generous. Without this, a single POST can carry
+    # gigabytes straight into memory and the `notes` column.
+    MAX_REQUEST_BODY_BYTES: int = 1024 * 1024
+
     # --- Autofill ---
     AUTOFILL_TIMEOUT_SECONDS: float = 8.0
+    # Largest outbound autofill response we will buffer (audit M3). A timeout
+    # bounds *seconds*, not *bytes* — a hostile (or merely broken) job board can
+    # stream indefinitely inside 8s.
+    AUTOFILL_MAX_RESPONSE_BYTES: int = 2 * 1024 * 1024
     AUTOFILL_USER_AGENT: str = (
         "Mozilla/5.0 (compatible; jTracksBot/1.0; +https://github.com/) "
         "AppleWebKit/537.36"
@@ -146,9 +165,34 @@ class Settings(BaseSettings):
             )
         return self
 
+    @model_validator(mode="after")
+    def _validate_cors_origins(self) -> "Settings":
+        """Refuse a wildcard origin (audit L5).
+
+        A `*` origin is only meaningful for a public, unauthenticated API. This
+        one is authenticated, and if credentialed CORS is ever re-enabled the
+        combination becomes "any website can drive this API as the logged-in
+        user". Cheaper to make the misconfiguration unrepresentable.
+        """
+        if any(o == "*" for o in self.cors_origins_list):
+            raise ValueError(
+                "CORS_ORIGINS must be an explicit list of origins; '*' is not "
+                "allowed on an authenticated API."
+            )
+        return self
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+
+    @property
+    def docs_enabled(self) -> bool:
+        """Serve /docs, /redoc and /openapi.json only in development (audit L1).
+
+        The schema is a complete map of every endpoint, field and constraint —
+        useful to a developer, and just as useful to someone probing the API.
+        """
+        return self.is_development
 
     @property
     def is_sqlite(self) -> bool:

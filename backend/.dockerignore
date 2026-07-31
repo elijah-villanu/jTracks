@@ -1,0 +1,38 @@
+# SECURITY (audit M6): the Dockerfile does `COPY . .`, and .gitignore does NOT
+# apply to a Docker build context. Without this file, `live.db` (real user rows
+# and bcrypt hashes) and any local `.env` (JWT secret, DB credentials) are baked
+# into an image layer, readable by anyone who can pull it.
+
+# Secrets and local config
+.env
+.env.*
+!.env.example
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Virtualenvs and caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Tests and dev tooling — not needed in the runtime image
+tests/
+scripts/
+.freeze-before-upgrade.txt
+
+# VCS / editor / docs
+.git/
+.gitignore
+.dockerignore
+.idea/
+.vscode/
+docker-compose.yml
+README.md

@@ -16,12 +16,12 @@
 | H3 | **High** | Google OAuth links accounts without checking `email_verified` → account takeover | ✅ **FIXED** 2026-07-28 |
 | H4 | **High** | No rate limiting on `/auth/login` / `/auth/signup` → unlimited brute force | ✅ **FIXED** 2026-07-28 |
 | M1 | Medium | Autofill host allowlist uses bare `endswith()` → domain-suffix confusion | ✅ **FIXED** (required by H1) |
-| M2 | Medium | No request-body size cap; `notes` has no `max_length` → storage/memory DoS | Confirmed by PoC |
-| M3 | Medium | No response-size cap on outbound autofill fetch | Confirmed by review |
-| M4 | Medium | Vulnerable dependencies: `starlette` 0.41.3 (8 advisories), `ecdsa` 0.19.2 | Confirmed by `pip-audit` |
-| M5 | Medium | User enumeration: signup 409 + 538,000x login timing oracle | Confirmed by PoC |
-| M6 | Medium | No `.dockerignore` → `.env` / `live.db` baked into container image; `AUTO_CREATE_TABLES` defaults `True` | Confirmed by review |
-| L1–L6 | Low | Docs exposure, missing headers, URL-encoding, JWT claims, CORS hardening, gitignore hygiene | See below |
+| M2 | Medium | No request-body size cap; `notes` has no `max_length` → storage/memory DoS | ✅ **FIXED** 2026-07-29 |
+| M3 | Medium | No response-size cap on outbound autofill fetch | ✅ **FIXED** 2026-07-29 |
+| M4 | Medium | Vulnerable dependencies: `starlette` 0.41.3 (8 advisories), `ecdsa` 0.19.2 | ✅ **FIXED** 2026-07-29 |
+| M5 | Medium | User enumeration: signup 409 + 538,000x login timing oracle | ✅ **FIXED** 2026-07-29 (timing; 409 kept deliberately) |
+| M6 | Medium | No `.dockerignore` → `.env` / `live.db` baked into container image; `AUTO_CREATE_TABLES` defaults `True` | ✅ **FIXED** 2026-07-29 |
+| L1–L6 | Low | Docs exposure, missing headers, URL-encoding, JWT claims, CORS hardening, gitignore hygiene | ✅ **FIXED** 2026-07-29 (L4 partial — see log) |
 
 **Verified secure — no action needed:** SQL injection, per-user data isolation (IDOR), password hashing, JWT algorithm confusion, CSRF, server-side XSS. Details in the final section.
 
@@ -385,9 +385,85 @@ It is a test bug, not a regression, and is unrelated to security.
    query parameter (~35 tests failed with `loc: ["query","payload"]`). Both files now carry a
    comment explaining why the future-import must not be re-added.
 
-**Still open:** M2–M6 and L1–L6. Highest-value remaining: **M4** (`starlette` 0.41.3 has two
-remotely-triggerable DoS advisories), **M2** (unbounded `notes` — a 5 MB body is still accepted),
-and **M6** (no `.dockerignore`, so `live.db` and `.env` are baked into the image).
+**Still open at that point:** M2–M6 and L1–L6 — all closed on 2026-07-29, below.
 
 - **PoC scripts** are at `%TEMP%/jtracks_sec/`. Now superseded by
   `tests/test_security_regression.py`; safe to delete.
+
+---
+
+## Remediation log — 2026-07-29 (M2–M6, L1–L6)
+
+Every remaining finding is **fixed and verified**. `pip-audit` now reports
+**"No known vulnerabilities found"** (was 15 advisories across 3 packages).
+
+**Files changed**
+
+| File | Finding |
+|---|---|
+| `app/core/middleware.py` *(new)* | M2 — `BodySizeLimitMiddleware` (413 above 1 MiB, incl. the chunked/no-`Content-Length` bypass); L2 — `SecurityHeadersMiddleware` |
+| `app/schemas/application.py` | M2 — `notes` bounded to 10k chars in **both** `ApplicationBase` and `ApplicationUpdate` |
+| `app/services/autofill/fetch.py` *(new)* | M3 — streaming `fetch_json` with a 2 MiB ceiling, `Content-Type` check, and a declared-`Content-Length` pre-check |
+| `app/services/autofill/greenhouse.py` | M3 — uses `fetch_json`; L3 — `quote(token, safe="")` |
+| `app/services/autofill/workday.py` | M3 — uses `fetch_json` |
+| `requirements.txt` | M4 — `fastapi>=0.141`, `starlette>=1.3.1`, `python-jose` → `pyjwt>=2.10` |
+| `app/core/security.py` | M4 — PyJWT instead of python-jose; M5 — `dummy_verify()`; L4 — `iss`/`aud`/`jti` claims, `require`d at verification |
+| `app/services/auth_service.py` | M5 — `authenticate()` burns a bcrypt comparison on the unknown-user and OAuth-only paths |
+| `.dockerignore` *(new)* | M6 — `.env*`, `*.db`, `.venv/`, `tests/`, `.git/` excluded from the build context |
+| `app/core/config.py` | M6 — `AUTO_CREATE_TABLES` default `False`; L5 — `_validate_cors_origins` rejects `*`; L1 — `docs_enabled`; new `MAX_REQUEST_BODY_BYTES`, `AUTOFILL_MAX_RESPONSE_BYTES`, `JWT_ISSUER`, `JWT_AUDIENCE` |
+| `app/main.py` | L1 — docs/redoc/openapi `None` outside development; L5 — `allow_credentials=False`, explicit method/header lists; middleware wiring |
+| `.gitignore` | L6 — `.env`, `.env.*`, `!.env.example` |
+| `.env.example`, `README.md` | documentation for all of the above |
+| `tests/test_security_regression_medium.py` *(new)* | 42 tests re-running every M/L PoC and asserting rejection |
+
+**Verification:** `1 failed, 152 passed`. The single failure is still
+`test_dashboard.py::test_stats_all_range` (`assert 31.0 == 30.0`) — the same
+**pre-existing, date-sensitive** test-bug that fails on unmodified code at `3c27fe0`.
+Confirmed independently, in a real production-configured process:
+
+```
+env= production auto_create= False docs= False
+health 200 {... 'x-content-type-options': 'nosniff', 'x-frame-options': 'DENY',
+            'referrer-policy': 'no-referrer',
+            'content-security-policy': "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
+            'strict-transport-security': 'max-age=31536000; includeSubDomains'}
+docs 404 openapi 404
+oversize signup -> 413 {"detail": "Request body too large."}
+```
+
+**Implementation notes that differ from the recommendations above**
+
+1. **M4 was resolved by removing python-jose entirely, not by tolerating `ecdsa`.**
+   `fastapi 0.141.1` + `starlette 1.3.1` install cleanly and the suite passes; the old
+   `fastapi<0.116` ceiling was the only thing holding starlette at 0.41.3. `httpx` stays
+   `<0.28`: starlette 1.3's TestClient emits a deprecation warning suggesting `httpx2` but
+   still works, and httpx 0.27.2 has no advisories against it. **PyJWT replaced python-jose**,
+   which is what actually removes `ecdsa`/PYSEC-2026-1325 (unfixable upstream) rather than
+   accepting it as unreachable.
+2. **M2 is enforced in two independent layers.** Middleware caps the raw body at 1 MiB
+   *before* routing or pydantic sees it (and covers chunked requests by buffering with a
+   ceiling, not by trusting `Content-Length`); `max_length=10_000` on `notes` catches
+   anything that fits under the body cap. Middleware order is
+   `SecurityHeaders → CORS → BodySizeLimit → routes` specifically so a 413 still carries CORS
+   headers — otherwise the browser reports an opaque network error instead of the status.
+3. **M5: only the timing oracle was closed.** The signup `409` is kept, as the audit
+   suggested — it is a real UX benefit and, with H4's `3/hour` signup budget, harvesting
+   addresses through it is no longer practical. That is now a recorded decision, not an
+   oversight.
+4. **L4 is partially addressed.** `iss`/`aud`/`jti` are added and *required* at verification
+   (a token missing any of them, or carrying the wrong issuer/audience, is rejected — tested).
+   The **7-day lifetime and the absence of revocation are unchanged**: shortening to 24 h
+   without a refresh flow would log the user out daily, and adding refresh tokens is an
+   API/UX design change that belongs to **api-architect**. `jti` is the hook a revocation list
+   would hang off when that happens.
+5. **Existing tokens are invalidated** by the new required claims. For a solo-user project
+   that means one re-login; worth knowing before deploying.
+6. **L2's CSP is skipped on `/docs`.** `default-src 'none'` would blank out Swagger UI, which
+   loads from a CDN. Those routes only exist in development now (L1), and the exemption is
+   asserted in a test so it can't silently widen.
+
+**Checked, no change needed:** the frontend's only `dangerouslySetInnerHTML`
+(`components/ui/chart.tsx:93`) is fed exclusively by static, developer-defined
+`chartConfig` literals in `status-breakdown-chart.tsx` and
+`applications-over-time-chart.tsx` — no user-supplied text reaches it, so the stored-XSS
+concern noted in "Verified secure" still holds.

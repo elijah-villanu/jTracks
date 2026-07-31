@@ -18,6 +18,7 @@ from urllib.parse import urlsplit
 import httpx
 
 from app.services.autofill.base import ParsedFields, make_parsed, parse_iso_date
+from app.services.autofill.fetch import fetch_json
 from app.services.autofill.net_guard import host_matches_domain
 
 # locale segment like en-US / en_US / fr-FR
@@ -92,13 +93,8 @@ async def parse(url: str, client: httpx.AsyncClient) -> ParsedFields | None:
     if cxs_url is None:
         return None
 
-    resp = await client.get(cxs_url, headers={"Accept": "application/json"})
-    if resp.status_code != 200:
-        return None
-    try:
-        data = resp.json()
-    except ValueError:
-        return None
+    # Bounded read (audit M3) — never buffer an unbounded third-party response.
+    data = await fetch_json(client, cxs_url)
     if not isinstance(data, dict):
         return None
 

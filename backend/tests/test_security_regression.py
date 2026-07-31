@@ -11,8 +11,8 @@ import asyncio
 import ipaddress
 
 import httpx
+import jwt
 import pytest
-from jose import jwt
 
 import app.api.routes.auth as auth_route
 import app.services.autofill.dispatcher as dispatcher_mod

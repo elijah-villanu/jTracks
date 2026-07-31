@@ -9,5 +9,8 @@ __pycache__/
 jtracks_dev.db
 
 # Env
+# The real .env must never be committed; the template documents it and SHOULD be
+# (audit L6 — these two lines used to ignore both).
 .env
-.env.example
+.env.*
+!.env.example

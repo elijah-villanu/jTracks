@@ -4,7 +4,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.security import hash_password, verify_password
+from app.core.security import dummy_verify, hash_password, verify_password
 from app.models.user import User
 
 
@@ -44,10 +44,24 @@ def signup(db: Session, email: str, password: str) -> User:
 
 
 def authenticate(db: Session, email: str, password: str) -> User:
+    """Verify an email/password pair in time that doesn't depend on the email.
+
+    SECURITY (audit M5): the previous version short-circuited when the address
+    was unknown, so no bcrypt ran and the request returned in ~0.001 ms versus
+    ~544 ms for a real account — a 500,000x timing oracle that let anyone
+    enumerate which addresses have accounts. Both the "no such user" and the
+    "OAuth-only account, null hash" paths now burn an equivalent bcrypt
+    comparison against a throwaway hash before failing.
+    """
     user = get_user_by_email(db, email)
-    # Constant-ish path: verify_password returns False for OAuth-only (null hash).
-    if user is None or not verify_password(password, user.hashed_password):
+
+    if user is None or not user.hashed_password:
+        dummy_verify(password)
         raise InvalidCredentials()
+
+    if not verify_password(password, user.hashed_password):
+        raise InvalidCredentials()
+
     return user
 
 
