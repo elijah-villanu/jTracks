@@ -6,9 +6,13 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from app.api.routes import applications, auth, dashboard, health, settings as settings_route
 from app.core.config import settings
+from app.core.middleware import BodySizeLimitMiddleware, SecurityHeadersMiddleware
+from app.core.rate_limit import limiter
 from app.db.base import Base
 from app.db.session import engine
 from app.scheduler.ghosting_scheduler import shutdown_scheduler, start_scheduler
@@ -34,21 +38,48 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
+    # SECURITY (audit L1): the interactive docs and the OpenAPI schema are a
+    # complete inventory of endpoints, fields and validation rules. Handy in
+    # development, a free reconnaissance map in production.
+    docs_on = settings.docs_enabled
     app = FastAPI(
         title=settings.APP_NAME,
         version="1.0.0",
-        docs_url="/docs",
-        openapi_url="/openapi.json",
+        docs_url="/docs" if docs_on else None,
+        redoc_url="/redoc" if docs_on else None,
+        openapi_url="/openapi.json" if docs_on else None,
         lifespan=lifespan,
     )
 
+    # Rate limiting (audit H4). The @limiter.limit decorators on individual
+    # routes need these registered on the app.
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+    # NOTE on ordering: `add_middleware` prepends, so the LAST one added is the
+    # OUTERMOST. The intended nesting is
+    #   SecurityHeaders -> CORS -> BodySizeLimit -> routes
+    # so that a 413 from the body guard still carries CORS and security headers
+    # (otherwise the browser reports an opaque network error instead of the
+    # status), while the guard still runs before routing or pydantic reads a
+    # single byte of the payload.
+    app.add_middleware(
+        BodySizeLimitMiddleware, max_body_bytes=settings.MAX_REQUEST_BODY_BYTES
+    )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins_list,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        # SECURITY (audit L5): auth is an `Authorization: Bearer` header from
+        # localStorage, never a cookie, so the browser has no ambient credential
+        # to attach — credentialed CORS buys nothing and would turn a
+        # mis-set origin into a serious hole. Explicit method/header lists for
+        # the same reason: `*` is wider than anything the frontend sends.
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type"],
+        max_age=600,
     )
+    app.add_middleware(SecurityHeadersMiddleware, hsts=not settings.is_development)
 
     app.include_router(health.router)
     app.include_router(auth.router)

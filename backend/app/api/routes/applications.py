@@ -5,14 +5,17 @@ via `get_application(db, current_user.id, id)`, which returns None (→ 404) for
 row that doesn't exist *or* belongs to someone else — a user can never read or
 mutate another user's data.
 """
-from __future__ import annotations
-
+# NOTE: deliberately NO `from __future__ import annotations` here — see the note
+# in routes/auth.py. slowapi's @limiter.limit wrapper breaks FastAPI's
+# resolution of stringified annotations on the decorated handler.
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.core.config import settings as app_settings
+from app.core.rate_limit import limiter
 from app.db.session import get_db
 from app.models.application import ApplicationStatus
 from app.models.user import User
@@ -65,7 +68,9 @@ def create_application(
     response_model=AutofillParsed | AutofillUnsupported | AutofillFailed,
     responses={200: {"description": "parsed | unsupported | failed"}},
 )
+@limiter.limit(app_settings.RATE_LIMIT_AUTOFILL)
 async def autofill_application(
+    request: Request,
     payload: AutofillRequest,
     current_user: User = Depends(get_current_user),
 ):

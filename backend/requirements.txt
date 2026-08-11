@@ -1,8 +1,10 @@
 # --- Shared / database workstream (DATABASE_TASKS.md) ---
-# Pinned upper bounds added by the backend workstream: fastapi 0.139+ pulls a
-# starlette that requires the brand-new `httpx2`; pinning keeps the mature,
-# well-documented stack the PRD asks for.
-fastapi>=0.115,<0.116
+# SECURITY (audit M4): the old `fastapi<0.116` / `starlette<0.42` pins held
+# starlette at 0.41.3, which carries 8 advisories including two remotely
+# triggerable DoS bugs (PYSEC-2026-1942 crafted Range header -> quadratic CPU;
+# PYSEC-2026-1941 large multipart blocks the event loop). Both are now floors,
+# not ceilings. starlette>=1.3.1 clears every advisory.
+fastapi>=0.141
 uvicorn[standard]>=0.32
 sqlalchemy>=2.0
 alembic>=1.13
@@ -10,16 +12,24 @@ psycopg[binary]>=3.2
 pydantic-settings>=2.5
 
 # --- Backend workstream (BACKEND_TASKS.md) ---
-starlette>=0.41,<0.42
+starlette>=1.3.1
 python-multipart>=0.0.32
 email-validator>=2.2
 # Auth
-python-jose[cryptography]>=3.3
+# PyJWT, not python-jose (audit M4): python-jose drags in `ecdsa`, which has an
+# unfixed Minerva timing advisory (PYSEC-2026-1325) and no upstream patch. This
+# app signs HS256 only, so the vulnerable P-256 path was never reached — but the
+# dependency is avoidable, and PyJWT verifies iss/aud natively (audit L4).
+pyjwt>=2.10
 bcrypt>=4.1
+# Per-IP rate limiting on auth/autofill endpoints (SECURITY_AUDIT H4)
+slowapi>=0.1.9
 # Google OAuth ID-token verification
 google-auth>=2.30
 requests>=2.32
-# Autofill (outbound HTTP); <0.28 to stay compatible with starlette TestClient
+# Autofill (outbound HTTP). Still <0.28: starlette 1.3's TestClient deprecates
+# httpx in favour of httpx2 but continues to work with it, and 0.27 is the last
+# version both the app and the test client agree on. No advisories against it.
 httpx>=0.27,<0.28
 # In-process scheduler (see docs/decisions/scheduler-mechanism.md)
 APScheduler>=3.10

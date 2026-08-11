@@ -48,7 +48,9 @@ pip install -r requirements.txt
 
 # db/session.py reads DATABASE_URL from the OS env — export it before running:
 export DATABASE_URL="sqlite:///./jtracks_dev.db"
-export AUTO_CREATE_TABLES=true          # dev only; creates tables on startup
+export AUTO_CREATE_TABLES=true          # dev only, and opt-in: the default is
+                                        # false so a forgotten variable can
+                                        # never create_all() in production
 
 uvicorn app.main:app --reload
 # -> http://127.0.0.1:8000/docs   (Swagger UI)
@@ -86,12 +88,26 @@ See `.env.example` for the full list. Key ones:
 | Var | Purpose | Dev default |
 |-----|---------|-------------|
 | `DATABASE_URL` | SQLAlchemy URL (read at import by `db/session.py`) | — (set it) |
-| `AUTO_CREATE_TABLES` | Create tables on startup (dev only) | `true` |
-| `JWT_SECRET` | HMAC secret for access tokens | insecure dev value |
+| `AUTO_CREATE_TABLES` | Create tables on startup (dev only) | `false` — opt in |
+| `JWT_SECRET` | HMAC secret for access tokens | random per process; **required** (≥32 chars) outside development |
+| `JWT_ISSUER` / `JWT_AUDIENCE` | Bound into tokens as `iss`/`aud` and required at verification | `jtracks` / `jtracks-api` |
 | `GOOGLE_CLIENT_ID` | OAuth client ID for ID-token verification | empty |
-| `CORS_ORIGINS` | Comma-separated allowed frontend origins | Vite localhost |
+| `CORS_ORIGINS` | Comma-separated allowed frontend origins (`*` rejected) | Vite localhost |
+| `MAX_REQUEST_BODY_BYTES` | Bodies above this get a `413` before being read | `1048576` (1 MiB) |
+| `RATE_LIMIT_*` | Per-IP budgets on auth + autofill endpoints | see `.env.example` |
 | `RUN_SCHEDULER` | Run the in-process ghosting job here | `true` |
 | `GHOSTING_JOB_HOUR` / `_MINUTE` | Daily sweep time (UTC) | `03:00` |
+
+### Security-relevant behaviour
+
+- **`/docs`, `/redoc` and `/openapi.json` are served only when `ENVIRONMENT` is
+  a development value** (`development`/`dev`/`local`/`test`/`testing`). Anywhere
+  else they 404 — the schema is a free map of the API for anyone probing it.
+- **The app refuses to start outside development without a strong `JWT_SECRET`.**
+  That is deliberate: a predictable signing key lets anyone mint a token for any
+  user id and walk past every per-user access control.
+- Regression tests for all of the above live in `tests/test_security_regression.py`
+  and `tests/test_security_regression_medium.py`; see `SECURITY_AUDIT.md`.
 
 ## The daily ghosting job
 

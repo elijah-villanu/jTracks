@@ -18,6 +18,7 @@ import httpx
 from app.core.config import settings
 from app.schemas.autofill import AutofillFailed, AutofillParsed, AutofillUnsupported
 from app.services.autofill import greenhouse, workday
+from app.services.autofill.net_guard import BlockedOutboundRequest, ssrf_request_hook
 
 logger = logging.getLogger("jtracks.autofill")
 
@@ -57,11 +58,21 @@ async def autofill(
         if owns_client:
             client = httpx.AsyncClient(
                 timeout=settings.AUTOFILL_TIMEOUT_SECONDS,
-                follow_redirects=True,
+                # SECURITY (audit H1): redirects are how an allowlisted host
+                # bounces us into 169.254.169.254 or localhost. Don't follow
+                # them; a job board that 302s simply fails to autofill.
+                follow_redirects=False,
                 headers={"User-Agent": settings.AUTOFILL_USER_AGENT},
+                # Transport-level SSRF check on every request this client makes,
+                # whichever parser built the URL.
+                event_hooks={"request": [ssrf_request_hook]},
             )
         try:
             fields = await parser.parse(url, client)
+        except BlockedOutboundRequest as exc:
+            # Expected when someone probes the endpoint — log, don't alarm.
+            logger.warning("Autofill blocked outbound request for %s: %s", url, exc)
+            return AutofillFailed(url=url, reason="blocked_host")
         except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
             logger.warning("Autofill %s parser error for %s: %s", name, url, exc)
             return AutofillFailed(url=url, reason="parser_error")

@@ -48,8 +48,15 @@ def verify_google_id_token(token: str) -> GoogleIdentity:
     if not sub or not email:
         raise GoogleVerificationError("Token missing 'sub' or 'email'.")
 
+    # SECURITY (audit H3): an unverified email must never reach account
+    # resolution. `upsert_google_user` links a Google identity onto an existing
+    # account by email match, so accepting an unproven address would let anyone
+    # who can mint a token asserting victim@example.com take over that account.
+    if not bool(claims.get("email_verified", False)):
+        raise GoogleVerificationError("Google account email is not verified.")
+
     return GoogleIdentity(
         google_id=str(sub),
         email=str(email).lower(),
-        email_verified=bool(claims.get("email_verified", False)),
+        email_verified=True,
     )

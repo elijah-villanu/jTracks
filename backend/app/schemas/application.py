@@ -8,6 +8,12 @@ from pydantic import BaseModel, Field
 
 from app.models.application import ApplicationStatus
 
+# SECURITY (audit M2): `notes` maps to an unbounded TEXT column and was the one
+# string field with no ceiling — a 5 MB value was accepted (confirmed by PoC).
+# 10k characters is several pages of prose, far beyond the field's purpose, and
+# the body-size middleware in app/core/middleware.py backstops it.
+_NOTES_MAX_LENGTH = 10_000
+
 
 class ApplicationBase(BaseModel):
     company: str = Field(min_length=1, max_length=255)
@@ -19,7 +25,7 @@ class ApplicationBase(BaseModel):
     date_saved: date | None = None
     date_applied: date | None = None
     ghost_days_override: int | None = Field(default=None, ge=1, le=365)
-    notes: str | None = None
+    notes: str | None = Field(default=None, max_length=_NOTES_MAX_LENGTH)
 
 
 class ApplicationCreate(ApplicationBase):
@@ -39,7 +45,7 @@ class ApplicationUpdate(BaseModel):
     date_saved: date | None = None
     date_applied: date | None = None
     ghost_days_override: int | None = Field(default=None, ge=1, le=365)
-    notes: str | None = None
+    notes: str | None = Field(default=None, max_length=_NOTES_MAX_LENGTH)
 
     model_config = {"extra": "forbid"}
 

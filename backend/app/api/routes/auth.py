@@ -1,10 +1,15 @@
 """B2/B3/B4 — auth routes."""
-from __future__ import annotations
-
-from fastapi import APIRouter, Depends, HTTPException, status
+# NOTE: deliberately NO `from __future__ import annotations` here. The
+# @limiter.limit decorators (audit H4) wrap these handlers, and slowapi's
+# wrapper carries its own __globals__ — FastAPI then can't resolve stringified
+# annotations, silently demoting body params to query params. Real annotation
+# objects avoid that entirely.
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.core.config import settings
+from app.core.rate_limit import limiter
 from app.core.security import create_access_token
 from app.db.session import get_db
 from app.models.user import User
@@ -25,7 +30,10 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/signup", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-def signup(payload: SignupRequest, db: Session = Depends(get_db)) -> TokenResponse:
+@limiter.limit(settings.RATE_LIMIT_SIGNUP)
+def signup(
+    request: Request, payload: SignupRequest, db: Session = Depends(get_db)
+) -> TokenResponse:
     try:
         user = auth_service.signup(db, payload.email, payload.password)
     except auth_service.EmailAlreadyRegistered:
@@ -37,7 +45,10 @@ def signup(payload: SignupRequest, db: Session = Depends(get_db)) -> TokenRespon
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
+@limiter.limit(settings.RATE_LIMIT_LOGIN)
+def login(
+    request: Request, payload: LoginRequest, db: Session = Depends(get_db)
+) -> TokenResponse:
     try:
         user = auth_service.authenticate(db, payload.email, payload.password)
     except auth_service.InvalidCredentials:
@@ -49,8 +60,9 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse
 
 
 @router.post("/oauth/google", response_model=TokenResponse)
+@limiter.limit(settings.RATE_LIMIT_OAUTH)
 def oauth_google(
-    payload: GoogleOAuthRequest, db: Session = Depends(get_db)
+    request: Request, payload: GoogleOAuthRequest, db: Session = Depends(get_db)
 ) -> TokenResponse:
     try:
         identity = verify_google_id_token(payload.id_token)
@@ -59,7 +71,17 @@ def oauth_google(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid Google credential.",
         )
-    user = auth_service.upsert_google_user(db, identity.google_id, identity.email)
+    try:
+        user = auth_service.upsert_google_user(
+            db, identity.google_id, identity.email, identity.email_verified
+        )
+    except auth_service.UnverifiedEmail:
+        # Same 401 as a bad credential: don't tell the caller whether the
+        # address matched an existing account.
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Google credential.",
+        )
     return TokenResponse(access_token=create_access_token(user.id))
 
 
