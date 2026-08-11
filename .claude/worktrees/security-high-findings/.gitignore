@@ -1,7 +1,0 @@
-.env
-.env.mcp.local
-node_modules/
-.continue/
-backend/.venv/
-backend/__pycache__/
-**/__pycache__/
