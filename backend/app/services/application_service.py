@@ -2,14 +2,14 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.clock import utc_today
 from app.models.application import Application, ApplicationStatus
 from app.schemas.application import ApplicationCreate, ApplicationUpdate
-from app.services.transitions import TransitionError, validate_transition
+from app.services.transitions import validate_transition
 
 
 def list_applications(
@@ -45,15 +45,15 @@ def create_application(
     # PRD: an entry created directly as Applied should have date_applied set
     # (defaults to today) so the ghosting clock has a start.
     if status == ApplicationStatus.APPLIED and data.get("date_applied") is None:
-        data["date_applied"] = date.today()
+        data["date_applied"] = utc_today()
     # A Saved entry with no date_saved defaults to today (the day it was added).
     if status == ApplicationStatus.SAVED and data.get("date_saved") is None:
-        data["date_saved"] = date.today()
+        data["date_saved"] = utc_today()
 
-    # Creation is not a transition, but enforce the same date_applied invariant.
-    if status == ApplicationStatus.APPLIED and data.get("date_applied") is None:
-        raise TransitionError("Creating an Applied entry requires 'date_applied'.")
-
+    # NOTE: creation is not a transition, so `validate_transition` is not called
+    # here. A guard re-checking the date_applied invariant used to sit at this
+    # point; the default above always satisfies it first, so the guard could
+    # never fire and has been removed rather than left as unreachable code.
     app = Application(user_id=user_id, **data)
     db.add(app)
     db.commit()
@@ -79,7 +79,7 @@ def update_application(
             new_status == ApplicationStatus.APPLIED
             and incoming_date_applied is None
         ):
-            incoming_date_applied = date.today()
+            incoming_date_applied = utc_today()
             changes["date_applied"] = incoming_date_applied
 
         validate_transition(

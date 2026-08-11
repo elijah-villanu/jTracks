@@ -1,8 +1,9 @@
 """B9 — daily auto-ghosting job."""
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import timedelta
 
+from app.core.clock import utc_today
 from app.db.session import SessionLocal
 from app.models.application import ApplicationStatus
 from app.services.ghosting import run_ghosting_sweep
@@ -13,7 +14,7 @@ def _mk(client, headers, status, days_ago, **over):
         "company": "Acme",
         "title": "SWE",
         "status": status,
-        "date_applied": str(date.today() - timedelta(days=days_ago)),
+        "date_applied": str(utc_today() - timedelta(days=days_ago)),
         **over,
     }
     r = client.post("/applications", json=body, headers=headers)

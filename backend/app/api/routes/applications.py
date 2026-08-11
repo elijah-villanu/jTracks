@@ -54,10 +54,10 @@ def create_application(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    try:
-        return application_service.create_application(db, current_user.id, payload)
-    except TransitionError as exc:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc))
+    # No TransitionError mapping here: creation runs no transition validation,
+    # so this handler can only fail on schema validation (422). PATCH is where
+    # the 400 lives. Re-add the try/except here if create ever starts validating.
+    return application_service.create_application(db, current_user.id, payload)
 
 
 # NOTE: declared before the dynamic `/{app_id}` routes are matched. It's a POST

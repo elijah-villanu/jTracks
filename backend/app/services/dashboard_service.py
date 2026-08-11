@@ -11,9 +11,10 @@ Definitions:
   * response_rate  = responded / submitted
   * ghost_rate     = ghosted   / submitted
   * rejection_rate = rejected  / submitted
-  * avg_time_to_response = mean(updated_at.date - date_applied) over responded
-    rows. NOTE: we don't persist per-status-change history, so `updated_at` is a
-    documented proxy for "first status change away from Applied".
+  * avg_time_to_response = mean(updated_at - date_applied) over responded rows,
+    both read as UTC calendar dates (see app/core/clock.py). NOTE: we don't
+    persist per-status-change history, so `updated_at` is a documented proxy for
+    "first status change away from Applied".
 """
 from __future__ import annotations
 
@@ -24,6 +25,7 @@ from datetime import date, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.clock import to_utc_date, utc_today
 from app.models.application import Application, ApplicationStatus
 from app.schemas.dashboard import (
     DashboardStats,
@@ -102,7 +104,7 @@ def compute_stats(
     range_: str = "all",
     today: date | None = None,
 ) -> DashboardStats:
-    today = today or date.today()
+    today = today or utc_today()
     start = _window_start(range_, today)
     apps = _fetch_submitted(db, user_id, start)
     total = len(apps)
@@ -119,8 +121,12 @@ def compute_stats(
     ghosted = counts.get(ApplicationStatus.GHOSTED, 0)
     rejected = counts.get(ApplicationStatus.REJECTED, 0)
 
+    # `to_utc_date`, not `.date()`: `updated_at` is a timestamptz that psycopg
+    # hands back in the *session* timezone, while `date_applied` is a plain UTC
+    # date. Subtracting the two across a timezone boundary skewed every response
+    # time by a day.
     response_times = [
-        (a.updated_at.date() - a.date_applied).days
+        (to_utc_date(a.updated_at) - a.date_applied).days
         for a in apps
         if a.status in _RESPONDED and a.updated_at is not None
     ]

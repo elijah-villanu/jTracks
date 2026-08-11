@@ -4,10 +4,11 @@ Usage: DATABASE_URL=... python scripts/seed.py
 """
 import os
 import sys
-from datetime import date, timedelta
+from datetime import timedelta
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from app.core.clock import utc_today  # noqa: E402
 from app.db.session import SessionLocal  # noqa: E402
 from app.models import Application, ApplicationStatus, User  # noqa: E402
 
@@ -53,7 +54,7 @@ def seed() -> None:
             db.commit()
             return
 
-        today = date.today()
+        today = utc_today()
         for company, title, status, days_saved, days_applied, ghost_override in SAMPLE_APPLICATIONS:
             db.add(
                 Application(

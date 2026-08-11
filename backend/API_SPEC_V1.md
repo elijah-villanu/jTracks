@@ -404,10 +404,16 @@ Server-applied defaults, in `application_service.create_application`:
 
 - `status` defaults to `"saved"` if omitted.
 - If the resulting `status` is `"applied"` and `date_applied` was not supplied,
-  `date_applied` is set to the server's **local** today.
+  `date_applied` is set to **today in UTC**.
 - If the resulting `status` is `"saved"` and `date_saved` was not supplied, `date_saved`
-  is set to the server's local today.
+  is set to today in UTC.
 - No other status gets a date defaulted.
+
+All server-derived dates come from `app/core/clock.utc_today()`, never the host's local
+calendar, so they are on the same calendar as the `created_at`/`updated_at` timestamps.
+A client in a non-UTC timezone should expect a defaulted date to be the UTC date, which
+near midnight may not be the user's local date — send `date_applied`/`date_saved`
+explicitly if the user's own calendar day matters.
 
 **Transition rules are not enforced on create.** Any `ApplicationStatus` value is accepted
 directly — including creating a row straight as `"ghosted"` or `"offer"` with no
@@ -416,7 +422,6 @@ directly — including creating a row straight as `"ghosted"` or `"offer"` with 
 | Status | Trigger | Body |
 |---|---|---|
 | `201` | Created | [`ApplicationResponse`](#67-applicationresponse) |
-| `400` | `TransitionError` from the service. **In practice unreachable**: the only check is "created as `applied` without `date_applied`", and the line immediately above it already defaults `date_applied` to today. Documented because the handler declares it. | `{"detail": "<message>"}` |
 | `401` | Missing/invalid token | `{"detail": "Not authenticated"}` |
 | `413` | Body > 1 MiB | `{"detail": "Request body too large."}` |
 | `422` | Validation failure (missing `company`/`title`, `notes` > 10 000 chars, bad enum, bad date, …) | Validation-error list (§7.2) |
@@ -869,7 +874,7 @@ Query parameters:
 |---|---|---|---|---|
 | `range` | string enum | no | `"all"` | `week`, `month`, `all` |
 
-Window semantics (`today` = the server's local date):
+Window semantics (`today` = the current date in **UTC**):
 
 | `range` | Window | Time-series buckets |
 |---|---|---|
@@ -926,7 +931,7 @@ when `total` is 0 — never `null`):
 | `response_rate` | `(interviewing + offer + rejected) / total * 100` — a rejection counts as a response |
 | `ghost_rate` | `ghosted / total * 100` |
 | `rejection_rate` | `rejected / total * 100` |
-| `avg_time_to_response_days` | Mean of `updated_at.date() - date_applied` over responded rows, negatives discarded; rounded to 1 decimal. **`null`** when there are no responded rows. Two caveats carried from the source: (a) per-status-change history is not persisted, so `updated_at` is a proxy for "first move away from applied" and is disturbed by any later edit to the row; (b) `updated_at` is a database `now()` while `date_applied` defaults to the server's *local* today, so on a host whose local date differs from the database's, this figure is off by a day — treat it as approximate |
+| `avg_time_to_response_days` | Mean of `updated_at - date_applied` over responded rows, both read as **UTC** calendar dates; negatives discarded; rounded to 1 decimal. **`null`** when there are no responded rows. One caveat carried from the source: per-status-change history is not persisted, so `updated_at` is a proxy for "first move away from applied" and is disturbed by any later edit to the row |
 
 #### `GET /dashboard/recap`
 
@@ -1360,7 +1365,6 @@ limit, the `422` body is therefore roughly as large as the rejected value.
 | `307` | Any canonical path requested with a trailing slash | Starlette redirect-slashes | *(empty; `Location` header)* |
 | `400` | `PATCH /applications/{app_id}` | Disallowed status transition | `{"detail": "Cannot move an application from '…' to '…'."}` |
 | `400` | Any `POST`/`PUT`/`PATCH` | Unparseable `Content-Length` header (body-size middleware) | `{"detail": "Invalid Content-Length header."}` |
-| `400` | `POST /applications` | `TransitionError` on create — declared but unreachable in practice | `{"detail": "<message>"}` |
 | `401` | Every authenticated endpoint | Missing/malformed/expired/wrong-claims token, or no matching user | `{"detail": "Not authenticated"}` + `WWW-Authenticate: Bearer` |
 | `401` | `POST /auth/login` | Bad credentials, unknown email, or OAuth-only account | `{"detail": "Incorrect email or password."}` |
 | `401` | `POST /auth/oauth/google` | Google verification failed, unverified email, or `GOOGLE_CLIENT_ID` unset | `{"detail": "Invalid Google credential."}` |
@@ -1417,10 +1421,9 @@ Status `429 Too Many Requests`. Body uses `error`, **not** `detail`:
 The limiter is constructed with `headers_enabled=False`, so:
 
 - **No `X-RateLimit-Limit` / `-Remaining` / `-Reset` headers** on any response.
-- **No `Retry-After` header on the `429`** either. (A comment in
-  `app/core/rate_limit.py` claims the `429` still carries `Retry-After`; that is not what
-  the code does — `_inject_headers` is a no-op when `headers_enabled` is false. Verified
-  against the running app.)
+- **No `Retry-After` header on the `429`** either. `headers_enabled` gates both header
+  families together — `_inject_headers` is a no-op when it is false. Verified against the
+  running app.
 
 Clients therefore have to infer the retry window from the limit string in the body, or
 back off blindly. The security response headers from §9.3 are present on the `429`.
@@ -1511,7 +1514,7 @@ constructed with `docs_url=None, redoc_url=None, openapi_url=None` and all three
 | `AUTOFILL_TIMEOUT_SECONDS` | `8.0` | Outbound autofill timeout |
 | `AUTOFILL_MAX_RESPONSE_BYTES` | `2097152` (2 MiB) | Outbound autofill response ceiling |
 | `DEFAULT_GHOST_DAYS` | `14` | Fallback ghosting threshold |
-| `GHOSTING_JOB_HOUR` / `_MINUTE` | `3` / `0` | When statuses may flip to `ghosted` server-side (cron in **UTC**; the overdue comparison itself uses the server's local date) |
+| `GHOSTING_JOB_HOUR` / `_MINUTE` | `3` / `0` | When statuses may flip to `ghosted` server-side (cron in **UTC**; the overdue comparison uses the UTC date, so the two agree) |
 | `RUN_SCHEDULER` | `true` | Whether this instance runs the ghosting sweep at all |
 
 ---
@@ -1539,6 +1542,18 @@ one-for-one.
 **v1 — 2026-08-10.** Initial specification of the jTracks backend API as implemented.
 Documents 15 operations across health, auth, applications, autofill, settings and
 dashboard.
+
+**v1.1 — 2026-08-11.** No endpoint, field or status-code changes. Two corrections
+following fixes in the backend:
+
+- All server-derived dates now come from `app/core/clock.utc_today()` instead of the
+  host's local calendar, so `date_applied`/`date_saved` defaults, the dashboard and recap
+  windows, and the ghosting deadline are all on the same calendar as the stored
+  timestamps. `avg_time_to_response_days` was previously off by a day on any non-UTC host;
+  it is now exact.
+- `POST /applications` no longer lists a `400`. The service's create path ran no
+  transition validation, so the `TransitionError` mapping on that handler was unreachable;
+  both have been removed. `400` on applications is now exclusively a `PATCH` response.
 
 Known contract characteristics an integrator should plan around, all documented above
 rather than fixed here:

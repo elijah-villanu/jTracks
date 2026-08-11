@@ -37,9 +37,13 @@ def client_key(request: Request) -> str:
 limiter = Limiter(
     key_func=client_key,
     enabled=settings.RATE_LIMIT_ENABLED,
-    # X-RateLimit-* headers on *successful* responses would require every
-    # limited endpoint to take a `response: Response` parameter, which would
-    # reshape handler signatures for a cosmetic benefit. The 429 itself still
-    # carries Retry-After, which is the part a client actually needs.
+    # No rate-limit headers on any response, including the 429. slowapi's
+    # `_inject_headers` is all-or-nothing: `headers_enabled` gates X-RateLimit-*
+    # and Retry-After together, and enabling it makes every limited endpoint
+    # need a `response: Response` parameter for the *success* path. Clients
+    # therefore get no machine-readable backoff signal and must treat a 429 as
+    # "retry later" with their own backoff; the limit windows are documented in
+    # API_SPEC_V1.md. Flip this to True (and add the parameter to each limited
+    # handler) if a client ever needs Retry-After.
     headers_enabled=False,
 )

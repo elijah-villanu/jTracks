@@ -19,6 +19,7 @@ from datetime import date, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.clock import utc_today
 from app.models.application import Application, ApplicationStatus
 from app.models.user import User
 from app.services.transitions import GHOSTABLE_STATUSES
@@ -50,7 +51,7 @@ def find_overdue(db: Session, today: date) -> list[Application]:
 
 def run_ghosting_sweep(db: Session, today: date | None = None) -> int:
     """Flip all overdue rows to Ghosted. Returns the number transitioned."""
-    today = today or date.today()
+    today = today or utc_today()
     overdue = find_overdue(db, today)
     for app in overdue:
         app.status = ApplicationStatus.GHOSTED

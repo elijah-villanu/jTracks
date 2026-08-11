@@ -1,7 +1,9 @@
 """B14/B16 — dashboard stats + recap."""
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import timedelta
+
+from app.core.clock import utc_today
 
 
 def _mk(client, h, status, days_ago):
@@ -9,7 +11,7 @@ def _mk(client, h, status, days_ago):
         "company": "Acme",
         "title": "SWE",
         "status": status,
-        "date_applied": str(date.today() - timedelta(days=days_ago)),
+        "date_applied": str(utc_today() - timedelta(days=days_ago)),
     }
     assert client.post("/applications", json=body, headers=h).status_code == 201
 

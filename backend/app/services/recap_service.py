@@ -11,6 +11,7 @@ from datetime import date, timedelta
 
 from sqlalchemy.orm import Session
 
+from app.core.clock import utc_today
 from app.models.application import ApplicationStatus
 from app.schemas.dashboard import DashboardRecap, RecapHighlight
 from app.services.dashboard_service import compute_stats
@@ -30,7 +31,7 @@ def compute_recap(
     range_: str = "week",
     today: date | None = None,
 ) -> DashboardRecap:
-    today = today or date.today()
+    today = today or utc_today()
     start, end, label = _period(range_, today)
     stats = compute_stats(db, user_id, range_=range_, today=today)
 

@@ -1,7 +1,7 @@
 """B5/B6/B7 — application CRUD + transition + override via the API."""
 from __future__ import annotations
 
-from datetime import date
+from app.core.clock import utc_today
 
 
 def _create(client, headers, **over):
@@ -15,7 +15,7 @@ def test_crud_lifecycle(client, auth_headers):
     assert r.status_code == 201, r.text
     app = r.json()
     assert app["status"] == "saved"
-    assert app["date_saved"] == date.today().isoformat()
+    assert app["date_saved"] == utc_today().isoformat()
     app_id = app["id"]
 
     # Read
@@ -38,12 +38,12 @@ def test_crud_lifecycle(client, auth_headers):
 def test_create_applied_defaults_date_applied(client, auth_headers):
     r = _create(client, auth_headers, status="applied")
     assert r.status_code == 201
-    assert r.json()["date_applied"] == date.today().isoformat()
+    assert r.json()["date_applied"] == utc_today().isoformat()
 
 
 def test_list_filtered_by_status(client, auth_headers):
     _create(client, auth_headers, status="saved")
-    _create(client, auth_headers, status="applied", date_applied=str(date.today()))
+    _create(client, auth_headers, status="applied", date_applied=str(utc_today()))
     r = client.get("/applications?status=applied", headers=auth_headers)
     assert r.status_code == 200
     assert all(a["status"] == "applied" for a in r.json())
@@ -55,7 +55,7 @@ def test_saved_to_applied_requires_date_applied(client, auth_headers):
     # Move to applied WITHOUT supplying date_applied -> service defaults to today.
     r = client.patch(f"/applications/{app_id}", json={"status": "applied"}, headers=auth_headers)
     assert r.status_code == 200
-    assert r.json()["date_applied"] == date.today().isoformat()
+    assert r.json()["date_applied"] == utc_today().isoformat()
 
 
 def test_disallowed_transition_returns_400(client, auth_headers):
