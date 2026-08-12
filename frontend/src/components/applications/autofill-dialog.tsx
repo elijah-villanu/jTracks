@@ -58,15 +58,16 @@ export function AutofillDialog({ open, onOpenChange }: AutofillDialogProps) {
       const response = await apiClient.post<AutofillResponse>("/applications/autofill", { url })
 
       if (isAutofillSuccess(response)) {
+        const { fields } = response
         handleOpenChange(false)
         openCreateForm({
-          job_url: url,
-          company: response.company,
-          title: response.title,
-          location: response.location,
-          salary: response.salary,
-          date_posted: response.date_posted,
-          status: "applied",
+          job_url: fields.job_url,
+          company: fields.company ?? "",
+          title: fields.title ?? "",
+          location: fields.location,
+          salary: fields.salary,
+          date_posted: fields.date_posted,
+          status: fields.suggested_status,
           date_applied: todayIsoDate(),
         })
         return

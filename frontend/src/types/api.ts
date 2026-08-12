@@ -36,91 +36,110 @@ export interface Application {
 export interface User {
   id: string
   email: string
+  google_id: string | null
   ghost_days_default: number
-  created_at: string
 }
 
 /**
- * Auth contract (F2 -- mocked in src/mocks/handlers/auth.ts until B2/B3
- * ship). `access_token` is a JWT once the real backend exists; the mock
- * issues an opaque fake token. `AuthResponse` is returned by
- * `/auth/signup`, `/auth/login`, and `/auth/oauth/google`.
+ * Auth contract, mirroring the real backend's `TokenResponse`
+ * (backend/API_SPEC_V1.md #6.3). Returned by `/auth/signup`,
+ * `/auth/login`, and `/auth/oauth/google`. Deliberately has **no** `user`
+ * field -- callers must follow up with `GET /auth/me` for the profile
+ * (see `AuthProvider.applyAuthResponse` in src/lib/auth-context.tsx).
  */
 export interface AuthResponse {
   access_token: string
-  user: User
+  token_type: string
 }
 
 /**
- * Autofill contract (F5 -- mocked in src/mocks/handlers/autofill.ts;
- * the real parsers are BACKEND_TASKS.md's B10-B13, not yet built).
- * `POST /applications/autofill { url }` returns one of three shapes:
- * a successful parse, an explicit "we don't support this domain"
- * (LinkedIn/Glassdoor/anything unrecognized), or a "we tried and
- * couldn't" (supported domain, but the fetch/parse itself failed --
- * timeout, blocked, structure changed). Per PRD.md, all three (plus
- * any thrown network error) must land the user on the same manual
- * review/edit form -- see AutofillResponse's consumer in
+ * Autofill contract, mirroring the real backend's `AutofillParsed` /
+ * `AutofillUnsupported` / `AutofillFailed` union (backend/API_SPEC_V1.md
+ * #3.4/#6.12-6.14) field-for-field. `POST /applications/autofill { url }`
+ * always returns `200` and discriminates on `status`, never an HTTP
+ * error status -- a parse failure, an unsupported domain, and a thrown
+ * network error are three different things a client must handle, but
+ * only the last one is an actual `try`/`catch` case. Per PRD.md, all
+ * three (plus any thrown network error) must land the user on the same
+ * manual review/edit form -- see AutofillResponse's consumer in
  * src/components/applications/autofill-dialog.tsx.
  */
 export interface AutofillParsedFields {
-  company: string
-  title: string
+  company: string | null
+  title: string | null
   location: string | null
   salary: string | null
   date_posted: string | null
+  job_url: string
+  suggested_status: ApplicationStatus // always "applied"
+}
+
+export interface AutofillParsed {
+  status: "parsed"
+  source: "greenhouse" | "workday"
+  fields: AutofillParsedFields
 }
 
 export interface AutofillUnsupported {
-  unsupported: true
+  status: "unsupported"
+  url: string
 }
 
 export interface AutofillFailed {
-  failed: true
+  status: "failed"
+  url: string
+  reason: string | null
 }
 
-export type AutofillResponse = AutofillParsedFields | AutofillUnsupported | AutofillFailed
+export type AutofillResponse = AutofillParsed | AutofillUnsupported | AutofillFailed
 
-export function isAutofillSuccess(response: AutofillResponse): response is AutofillParsedFields {
-  return !("unsupported" in response) && !("failed" in response)
+export function isAutofillSuccess(response: AutofillResponse): response is AutofillParsed {
+  return response.status === "parsed"
 }
 
 export function isAutofillUnsupported(response: AutofillResponse): response is AutofillUnsupported {
-  return "unsupported" in response && response.unsupported === true
+  return response.status === "unsupported"
 }
 
 export function isAutofillFailed(response: AutofillResponse): response is AutofillFailed {
-  return "failed" in response && response.failed === true
+  return response.status === "failed"
 }
 
 /**
- * Dashboard stats contract (F7 -- mocked in src/mocks/handlers/dashboard.ts
- * until BACKEND_TASKS.md's B14 ships). `GET /dashboard/stats?range=...`
- * returns this shape. Per PRD.md, the status breakdown deliberately
- * excludes `saved` (those haven't entered the outcome funnel yet) --
- * `total_applications` is the one figure that includes it.
+ * Dashboard stats contract, mirroring the real backend's `DashboardStats`
+ * (backend/API_SPEC_V1.md #6.17) field-for-field. `GET /dashboard/stats?range=...`
+ * returns this shape. Per the real backend, both dashboard endpoints only
+ * consider *submitted* applications (a non-null `date_applied`) -- `total`
+ * excludes `saved` rows entirely, unlike this file's earlier
+ * `total_applications` (which counted every application including
+ * `saved`). See src/mocks/handlers/dashboard.ts for how the mock
+ * approximates this without real status-change history.
  */
 export type DashboardRange = "week" | "month" | "all"
 
 export interface StatusBreakdownEntry {
   status: ApplicationStatus // only applied/interviewing/offer/rejected/ghosted will appear
   count: number
-  percentage: number // 0-100, of the applied-or-later cohort (the breakdown's own total), not of all applications including saved
+  percentage: number // 0-100, share of `total`, 1 decimal
 }
 
 export interface ApplicationsOverTimePoint {
-  date: string // ISO date, bucket start
+  period: string // ISO date (YYYY-MM-DD) for daily buckets, "YYYY-MM" for monthly -- not named `date`
   count: number
 }
 
+export type TimeSeriesGranularity = "day" | "week" | "month"
+
 export interface DashboardStats {
   range: DashboardRange
-  total_applications: number // every application regardless of status, including saved
+  total: number // submitted applications in the window (excludes `saved`) -- not named `total_applications`
   status_breakdown: StatusBreakdownEntry[]
   applications_over_time: ApplicationsOverTimePoint[]
-  response_rate: number // 0-1 fraction: (interviewing+offer+rejected) / (applied+interviewing+offer+rejected+ghosted) -- i.e. of everything that was actually applied to, how much got ANY response
-  ghost_rate: number // 0-1 fraction: ghosted / (applied+interviewing+offer+rejected+ghosted)
-  avg_response_time_days: number | null // null if there's no data to compute it from in the current range
+  time_series_granularity: TimeSeriesGranularity
+  response_rate: number // percentage 0-100: (interviewing+offer+rejected) / total -- a rejection counts as a response
+  ghost_rate: number // percentage 0-100: ghosted / total
+  rejection_rate: number // percentage 0-100: rejected / total
+  avg_time_to_response_days: number | null // null if there's no data to compute it from in the current range
 }
 
 /**

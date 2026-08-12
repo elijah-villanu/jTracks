@@ -39,11 +39,14 @@ function daysAgoIsoDate(days: number): string {
 }
 
 /**
- * Mock `POST /applications/autofill` for F5. There is no real parser
- * here (that's BACKEND_TASKS.md's B10-B13, still unbuilt/unspiked) --
- * this deterministically fabricates a response keyed off the pasted
- * URL's hostname/path so the paste-a-link flow can be built and
- * demoed end-to-end against all three response shapes:
+ * Mock `POST /applications/autofill` for F5, mirroring the real
+ * backend's `AutofillParsed` / `AutofillUnsupported` / `AutofillFailed`
+ * discriminated union (backend/API_SPEC_V1.md #3.4/#6.12-6.14) --
+ * `status` is the discriminator, not boolean flags, and there's no real
+ * parser here (that's BACKEND_TASKS.md's B10-B13, still
+ * unbuilt/unspiked). This deterministically fabricates a response keyed
+ * off the pasted URL's hostname/path so the paste-a-link flow can be
+ * built and demoed end-to-end against all three response shapes:
  *
  * - Success (fabricated fields): any Greenhouse/Workday URL, e.g.
  *     https://boards.greenhouse.io/acme-co/jobs/12345
@@ -60,7 +63,7 @@ function daysAgoIsoDate(days: number): string {
 export const autofillHandlers = [
   http.post(url("/applications/autofill"), async ({ request }) => {
     const body = (await request.json()) as { url?: string }
-    const rawUrl = body.url ?? ""
+    const rawUrl = (body.url ?? "").trim()
 
     let parsed: URL | null = null
     try {
@@ -70,27 +73,34 @@ export const autofillHandlers = [
     }
 
     const hostname = parsed?.hostname ?? ""
+    const source = hostname.includes("myworkdayjobs.com") ? "workday" : "greenhouse"
     const isSupportedPlatform = SUPPORTED_HOSTNAME_SUBSTRINGS.some((substring) =>
       hostname.includes(substring)
     )
 
     if (!isSupportedPlatform) {
-      const response: AutofillResponse = { unsupported: true }
+      const response: AutofillResponse = { status: "unsupported", url: rawUrl }
       return HttpResponse.json(response)
     }
 
     if (rawUrl.includes("broken")) {
-      const response: AutofillResponse = { failed: true }
+      const response: AutofillResponse = { status: "failed", url: rawUrl, reason: "no_data" }
       return HttpResponse.json(response)
     }
 
     const company = fabricateCompanyName(parsed as URL)
     const response: AutofillResponse = {
-      company,
-      title: "Software Engineer",
-      location: "Remote",
-      salary: "$120,000 - $150,000",
-      date_posted: daysAgoIsoDate(3),
+      status: "parsed",
+      source,
+      fields: {
+        company,
+        title: "Software Engineer",
+        location: "Remote",
+        salary: source === "workday" ? null : "$120,000 - $150,000",
+        date_posted: daysAgoIsoDate(3),
+        job_url: rawUrl,
+        suggested_status: "applied",
+      },
     }
     return HttpResponse.json(response)
   }),

@@ -74,15 +74,12 @@ export function AnalyticsPage() {
         stats && (
           <>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <StatTile label="Total Applications" value={String(stats.total_applications)} />
-              <StatTile
-                label="Response Rate"
-                value={`${(stats.response_rate * 100).toFixed(0)}%`}
-              />
-              <StatTile label="Ghost Rate" value={`${(stats.ghost_rate * 100).toFixed(0)}%`} />
+              <StatTile label="Total Applications" value={String(stats.total)} />
+              <StatTile label="Response Rate" value={`${stats.response_rate.toFixed(0)}%`} />
+              <StatTile label="Ghost Rate" value={`${stats.ghost_rate.toFixed(0)}%`} />
               <StatTile
                 label="Avg Time to Response"
-                value={`${stats.avg_response_time_days?.toFixed(1) ?? "—"} days`}
+                value={`${stats.avg_time_to_response_days?.toFixed(1) ?? "—"} days`}
               />
             </div>
 

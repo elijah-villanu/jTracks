@@ -25,15 +25,13 @@ const url = (path: string) => new URL(path, API_BASE_URL).toString()
  * src/components/dashboard/recap-card.tsx and recap-dialog.tsx.
  *
  * Deliberately NOT reusing F7's dashboard.ts mock helpers
- * (`effectiveDate`/`isInRange`/etc.) here: those model
- * `DashboardStats`'s *different* semantics (F7's own frontend-only
- * "total_applications including saved, effective-date fallback"
- * approximation -- see the field-drift note on `DashboardStats` in
- * types/api.ts). The real backend's `compute_stats` (which
- * `compute_recap` calls into) only considers *submitted* applications
- * (a non-null `date_applied`) filtered by `date_applied` itself, with no
- * fallback to `date_saved`/`created_at` -- so this handler mirrors that
- * directly instead.
+ * (`effectiveDate`/`isInRange`/etc.) here: those window applications by
+ * an "effective date" fallback chain (`date_applied` ?? `date_saved` ??
+ * `created_at`), a frontend-only approximation. The real backend's
+ * `compute_stats` (which `compute_recap` calls into) only considers
+ * *submitted* applications (a non-null `date_applied`) filtered by
+ * `date_applied` itself, with no fallback to `date_saved`/`created_at`
+ * -- so this handler mirrors that directly instead.
  */
 
 /** Mirrors `dashboard_service.py`'s `_FUNNEL_STATUSES` (excludes `saved`). */

@@ -9,8 +9,8 @@ import type { User } from "@/types/api"
 export const USER_FIXTURE: User = {
   id: "8f14e45f-ceea-467e-99d0-1b5a35a0d9c3",
   email: "demo@jtracks.dev",
+  google_id: null,
   ghost_days_default: 14,
-  created_at: "2026-01-05T00:00:00Z",
 }
 
 /** Password accepted for the fixture account by the mock `/auth/login` handler. */

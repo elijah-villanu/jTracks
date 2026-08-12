@@ -1,7 +1,15 @@
 import { http, HttpResponse } from "msw"
 import { API_BASE_URL } from "@/lib/api-client"
 import { applicationFixtures } from "@/mocks/fixtures/applications"
-import type { Application, ApplicationStatus, ApplicationsOverTimePoint, DashboardRange, DashboardStats, StatusBreakdownEntry } from "@/types/api"
+import type {
+  Application,
+  ApplicationStatus,
+  ApplicationsOverTimePoint,
+  DashboardRange,
+  DashboardStats,
+  StatusBreakdownEntry,
+  TimeSeriesGranularity,
+} from "@/types/api"
 
 const url = (path: string) => new URL(path, API_BASE_URL).toString()
 
@@ -84,20 +92,35 @@ function buildApplicationsOverTime(
   }
 
   return Array.from(counts.entries())
-    .map(([date, count]) => ({ date, count }))
-    .sort((a, b) => a.date.localeCompare(b.date))
+    .map(([period, count]) => ({ period, count }))
+    .sort((a, b) => a.period.localeCompare(b.period))
 }
 
-function computeRates(cohort: Application[]): { response_rate: number; ghost_rate: number } {
-  const total = cohort.length
-  if (total === 0) {
-    return { response_rate: 0, ghost_rate: 0 }
-  }
+/** Bucketing granularity this mock actually produces for a given range -- see `bucketKeyFor`. */
+function granularityFor(range: DashboardRange): TimeSeriesGranularity {
+  return range === "all" ? "week" : "day"
+}
 
+/** Mirrors the real backend's `_pct`: percentage 0-100, 1 decimal, `0` if `whole` is falsy -- never a 0-1 fraction. */
+function pct(part: number, whole: number): number {
+  return whole === 0 ? 0 : Math.round((part / whole) * 1000) / 10
+}
+
+function computeRates(cohort: Application[]): {
+  response_rate: number
+  ghost_rate: number
+  rejection_rate: number
+} {
+  const total = cohort.length
   const responded = cohort.filter((application) => RESPONDED_STATUSES.includes(application.status)).length
   const ghosted = cohort.filter((application) => application.status === "ghosted").length
+  const rejected = cohort.filter((application) => application.status === "rejected").length
 
-  return { response_rate: responded / total, ghost_rate: ghosted / total }
+  return {
+    response_rate: pct(responded, total),
+    ghost_rate: pct(ghosted, total),
+    rejection_rate: pct(rejected, total),
+  }
 }
 
 /**
@@ -148,16 +171,18 @@ export const dashboardHandlers = [
     )
 
     const cohort = inRange.filter((application) => APPLIED_COHORT_STATUSES.includes(application.status))
-    const { response_rate, ghost_rate } = computeRates(cohort)
+    const { response_rate, ghost_rate, rejection_rate } = computeRates(cohort)
 
     const stats: DashboardStats = {
       range,
-      total_applications: inRange.length,
+      total: cohort.length,
       status_breakdown: buildStatusBreakdown(cohort),
       applications_over_time: buildApplicationsOverTime(inRange, range),
+      time_series_granularity: granularityFor(range),
       response_rate,
       ghost_rate,
-      avg_response_time_days: computeAvgResponseTimeDays(inRange),
+      rejection_rate,
+      avg_time_to_response_days: computeAvgResponseTimeDays(inRange),
     }
 
     return HttpResponse.json(stats)

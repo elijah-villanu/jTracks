@@ -91,15 +91,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const applyAuthResponse = useCallback((response: AuthResponse) => {
+  /**
+   * The real backend's `TokenResponse` carries no `user` field (see
+   * backend/API_SPEC_V1.md #6.3) -- every auth endpoint mints a token
+   * only, so hydrating `user` always takes a follow-up `GET /auth/me`.
+   */
+  const applyAuthResponse = useCallback(async (response: AuthResponse) => {
     storeToken(response.access_token)
-    setUser(response.user)
+    const me = await apiClient.get<User>("/auth/me")
+    setUser(me)
   }, [])
 
   const login = useCallback(
     async (email: string, password: string) => {
       const response = await apiClient.post<AuthResponse>("/auth/login", { email, password })
-      applyAuthResponse(response)
+      await applyAuthResponse(response)
     },
     [applyAuthResponse]
   )
@@ -107,7 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signup = useCallback(
     async (email: string, password: string) => {
       const response = await apiClient.post<AuthResponse>("/auth/signup", { email, password })
-      applyAuthResponse(response)
+      await applyAuthResponse(response)
     },
     [applyAuthResponse]
   )
@@ -123,7 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       provider: "google",
       id_token: "mock-google-id-token",
     })
-    applyAuthResponse(response)
+    await applyAuthResponse(response)
   }, [applyAuthResponse])
 
   const logout = useCallback(() => {

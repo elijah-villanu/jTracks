@@ -37,7 +37,7 @@ export function ApplicationsOverTimeChart({ data }: ApplicationsOverTimeChartPro
       <AreaChart data={data} margin={{ left: 8, right: 8, top: 8, bottom: 0 }}>
         <CartesianGrid vertical={false} stroke="var(--border)" />
         <XAxis
-          dataKey="date"
+          dataKey="period"
           tickFormatter={formatBucketLabel}
           tickLine={false}
           axisLine={false}
