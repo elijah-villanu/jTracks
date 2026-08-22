@@ -19,6 +19,11 @@ Same entity fields as DATABASE_TASKS.md and the same API surface as BACKEND_TASK
 those two documents — it already carries per-field comments citing `backend/API_SPEC_V1.md`, and those
 citations move to the V2 spec when BACKEND's B30 lands.
 
+**`sankey.nodes` always has all 6 non-`saved` entries (including zero-value ones), but `sankey.links` omits
+any link with `value: 0`** — expect 0–5 entries, not always 5, and expect nodes no link references at all
+(e.g. `offer` at value 0 with nothing pointing to it). Whatever renders this (F16) must handle orphan nodes
+and a variable-length `links` array without erroring or mis-laying-out the diagram.
+
 **Status vocabulary (7 values) and their display labels — FRONTEND owns the labels:**
 
 | Stored value | Display label |
@@ -50,7 +55,7 @@ in `localStorage`, verifiable by inspection" is a stated V2 success metric.
 
 ## Milestone FV1: Status vocabulary (delivery stage 1 — R1)
 
-- [ ] **F10 — Move the frontend to the V2 seven-status vocabulary** (S)
+- [x] **F10 — Move the frontend to the V2 seven-status vocabulary** (S)
   `src/types/api.ts`: `ApplicationStatus` becomes the 7 values above (`interviewing` → `interviewing_oa`,
   plus `failed`). `src/components/StatusBadge.tsx` is the single source of truth for order, label and
   color — extend `ALL_STATUSES` to the R1.3 order (`saved, applied, interviewing_oa, offer, rejected,
@@ -66,7 +71,7 @@ in `localStorage`, verifiable by inspection" is a stated V2 success metric.
   Depends on: none (types are frontend-local) — but **must ship alongside BACKEND's B19**, since from
   that point the API `422`s on `interviewing`.
 
-- [ ] **F11 — Update MSW fixtures and handlers to the V2 contract** (S)
+- [x] **F11 — Update MSW fixtures and handlers to the V2 contract** (S)
   `mocks/fixtures/applications.ts`, `mocks/handlers/applications.ts`, `handlers/dashboard.ts`,
   `handlers/recap.ts`. Replace `interviewing` rows with `interviewing_oa`, add `failed` rows, and back-date
   some `date_applied` values past a year so `year` / `all` / `custom` return visibly different data.
@@ -82,7 +87,7 @@ in `localStorage`, verifiable by inspection" is a stated V2 success metric.
 
 ## Milestone FV2: Metric display & expanded ranges (delivery stage 2 — R4, R6)
 
-- [ ] **F12 — Update dashboard types and stat tiles for the redefined metrics** (S)
+- [x] **F12 — Update dashboard types and stat tiles for the redefined metrics** (S)
   `src/types/api.ts`: rename `rejection_rate` → `rejection_fail_rate` on `DashboardStats`, widen
   `DashboardRange` to `week|month|year|all|custom`, collapse `RecapRange` into that same union (recap now
   takes the full set), note in `StatusBreakdownEntry` that all 6 non-`saved` statuses always appear
@@ -95,7 +100,7 @@ in `localStorage`, verifiable by inspection" is a stated V2 success metric.
   occupies a slot in the breakdown chart; no `rejection_rate` reference remains in `src/`.
   Depends on: F10, F11
 
-- [ ] **F13 — Expanded range control with a custom date range** (M)
+- [x] **F13 — Expanded range control with a custom date range** (M)
   R6. Replace `AnalyticsPage`'s three-button toggle and `recap-dialog.tsx`'s two-button toggle with a
   shared control offering `week | month | year | all | custom`; selecting `custom` reveals start/end date
   inputs passed through as query params by `useDashboardStats` / `useRecap`. Validate client-side before
@@ -116,7 +121,7 @@ in `localStorage`, verifiable by inspection" is a stated V2 success metric.
 > PRD's scope by design (R5.7)**. The user supplies mockups and Strava-style reference material directly.
 > This file fixes only the data, topology and behavior.
 
-- [ ] **F14 — Spike: choose a Sankey library and verify `html-to-image` export** (M, decision task)
+- [x] **F14 — Spike: choose a Sankey library and verify `html-to-image` export** (M, decision task)
   PRD open risk. Recharts is already a dependency but has **no first-class Sankey**. Evaluate: Recharts'
   limited Sankey support, a `d3-sankey` layout rendered into custom SVG, or another library. The hard
   gate is export: whatever is chosen **must serialize inside `html-to-image`** (already a dependency,
@@ -127,7 +132,7 @@ in `localStorage`, verifiable by inspection" is a stated V2 success metric.
   PNG), and the bundle-size cost of any new dependency.
   Depends on: none — **blocks F15, F16, F18.** Do it first within this milestone.
 
-- [ ] **F15 — Spike: Sankey legibility at ~375px** (S, decision task)
+- [x] **F15 — Spike: Sankey legibility at ~375px** (S, decision task)
   PRD open risk (R5.6, R8.2). Using F14's prototype and F11's fixtures, check whether a three-level
   Sankey carrying the R1.3 labels — including the deliberately long **"Failed Interview/OA"** — is
   actually readable in a 375px dashboard viewport, and separately inside the portrait Stories-format
@@ -140,7 +145,7 @@ in `localStorage`, verifiable by inspection" is a stated V2 success metric.
   chosen fallback if any.
   Depends on: F14 — **blocks F16.**
 
-- [ ] **F16 — Sankey component** (M)
+- [x] **F16 — Sankey component** (M)
   Render the backend `sankey` payload using F14's library and F15's small-viewport verdict. **Topology
   comes from the payload's explicit `nodes` and `links` — never re-derive it from `status_breakdown`**
   (R5.5). Handle R5.4 correctly: rows still in flight (`applied` / `interviewing_oa`) produce no outgoing
@@ -152,7 +157,7 @@ in `localStorage`, verifiable by inspection" is a stated V2 success metric.
   corresponding ribbon.
   Depends on: F14, F15, F11, and BACKEND's **B24**
 
-- [ ] **F17 — Sankey zero and degenerate states** (S)
+- [x] **F17 — Sankey zero and degenerate states** (S)
   R5.6 — three specific cases, all of which will occur on a real new board: `total === 0`; every
   submitted row still sitting in `applied` (nodes exist, **no links at all**); and one link carrying 100%
   of the flow. Define a real empty state — matching the existing `status-breakdown-chart.tsx` pattern
@@ -161,7 +166,7 @@ in `localStorage`, verifiable by inspection" is a stated V2 success metric.
   Acceptance: all three states render cleanly on the dashboard *and* inside the exported recap image.
   Depends on: F16
 
-- [ ] **F18 — Place the Sankey on the dashboard and in the recap image** (M)
+- [x] **F18 — Place the Sankey on the dashboard and in the recap image** (M)
   R5.1 — it appears on **both** surfaces and is **additive**: every existing highlight tile survives
   alongside it. Recap constraints carry over unchanged from V1 (R5.8): transparent background, portrait
   aspect suited to Instagram Stories, client-side render, downloadable, shareable via the native share
@@ -179,7 +184,7 @@ in `localStorage`, verifiable by inspection" is a stated V2 success metric.
 > resolved.** If B25 overrides R7.2 to cookie-borne access tokens, F19–F21 change shape substantially
 > (CSRF header/double-submit handling replaces the in-memory token store) — do not start them first.
 
-- [ ] **F19 — Move the access token into memory** (M)
+- [x] **F19 — Move the access token into memory** (M)
   R7.2. Delete the `jtracks_token` localStorage key and **both** of its touch points: `getStoredToken` /
   `storeToken` / `clearStoredToken` in `src/lib/auth-context.tsx`, and the inline
   `window.localStorage.getItem("jtracks_token")` in `src/lib/api-client.ts`'s `apiFetch`. The access token
@@ -193,7 +198,7 @@ in `localStorage`, verifiable by inspection" is a stated V2 success metric.
   Depends on: BACKEND's B25 (decision) and B29 (credentialed CORS) for the real cookie; buildable against
   MSW first.
 
-- [ ] **F20 — Single-flight refresh-on-`401` in the API client** (M)
+- [x] **F20 — Single-flight refresh-on-`401` in the API client** (M)
   R7.6. On any `401` from an authenticated call: attempt **exactly one** `POST /auth/refresh`, retry the
   original request once on success, and on failure clear auth state and route to login. Concurrent `401`s
   **must share a single in-flight refresh promise** — the dashboard fires several parallel requests, and
@@ -204,7 +209,7 @@ in `localStorage`, verifiable by inspection" is a stated V2 success metric.
   failed refresh clears state and lands on `/login` exactly once, not once per in-flight request.
   Depends on: F19
 
-- [ ] **F21 — Boot-time silent refresh and a real logout** (S)
+- [x] **F21 — Boot-time silent refresh and a real logout** (S)
   R7.6. `AuthProvider`'s `hydrate()` currently short-circuits when no stored token exists — after F19 that
   is *always*, so on boot it must instead attempt `POST /auth/refresh` first and only treat the user as
   logged out if that fails; `ProtectedRoute` redirects only after that resolves. `logout()` becomes async:
@@ -214,12 +219,26 @@ in `localStorage`, verifiable by inspection" is a stated V2 success metric.
   log out then reload and land on login; logout with an already-cleared session still resolves.
   Depends on: F19, F20, and BACKEND's **B28**
 
+  **Verified 2026-08-21 (live browser, not just code review):** `hydrate()`'s `refreshAccessToken()` →
+  `GET /auth/me` sequence, the single-flight refresh path, and "logout with no session resolves cleanly"
+  all confirmed working via real requests. **One finding, not a code defect:** in this dev setup
+  `VITE_API_URL=http://localhost:8000` is a different origin from the Vite dev server
+  (`http://localhost:5173`) the SPA and MSW's service worker run on. MSW's mocked `Set-Cookie` on
+  `POST /auth/login` gets attributed to the `5173` origin (confirmed present via `document.cookie` there),
+  not `8000` — so a genuine hard-reload's `POST /auth/refresh` to `8000` never sees the cookie and
+  correctly-per-the-mock returns `401`, landing back on `/login`. This is a byproduct of testing an
+  httpOnly-cookie flow through MSW's browser-mode service-worker interception across two dev-server
+  origins — it would not occur against a real backend (which genuinely owns its response's `Set-Cookie`
+  for its own origin) or if `VITE_API_URL` were same-origin in dev. Not fixed here since it's a dev/mock
+  infrastructure question (touches `.env`, not app code) rather than part of F21's scope — flagged for a
+  decision, not silently worked around.
+
 ## Milestone FV5: Staleness nudge & cleanup (delivery stage 5 — R3, R8)
 
 > Small; the PRD says fold these into whichever stage is convenient. F22 pairs naturally with FV1 (it
 > needs the new status), F24 with FV3 (the Sankey touches those surfaces anyway).
 
-- [ ] **F22 — 28-day staleness nudge on `interviewing_oa` rows** (S)
+- [x] **F22 — 28-day staleness nudge on `interviewing_oa` rows** (S)
   R3. Because R2 removed the automatic safety net, an interview that goes quiet would otherwise sit
   untouched forever with no prompt. Visually flag any `interviewing_oa` row whose `updated_at` is more
   than **28 days** old. Strictly **display-only** (R3.2): changes no status, writes nothing, calls no API,
@@ -232,14 +251,14 @@ in `localStorage`, verifiable by inspection" is a stated V2 success metric.
   one does not; a 60-day-old `applied` row does not (that is the ghosting sweep's job, not this).
   Depends on: F10, F11
 
-- [ ] **F23 — Delete `PlaceholderPage.tsx`** (S)
+- [x] **F23 — Delete `PlaceholderPage.tsx`** (S)
   R8.1. `frontend/src/routes/PlaceholderPage.tsx` is dead — verified, nothing imports it. Delete the file
   and confirm no reference survives.
   Acceptance: file gone; `npm run build` (`tsc -b && vite build`) and `npm run lint` (oxlint) clean; all
   routes still resolve.
   Depends on: none
 
-- [ ] **F24 — Responsive pass at ~375px on dashboard and recap** (S)
+- [x] **F24 — Responsive pass at ~375px on dashboard and recap** (S)
   R8.2 — suspected but never verified at MVP, and V2's work touches exactly these surfaces. Verify and fix
   the analytics page, the new range control **including the custom date inputs** (the most likely thing to
   overflow), the recap dialog and the recap card at a 375px viewport. The Sankey's own legibility is
@@ -247,6 +266,16 @@ in `localStorage`, verifiable by inspection" is a stated V2 success metric.
   Acceptance: no horizontal scroll and no clipped or unreachable controls at 375px across board, analytics
   and recap; the range control wraps rather than overflowing; the recap dialog's download/share buttons
   remain reachable.
+
+  **Verified 2026-08-21** in a real 372px-wide same-origin iframe (genuine layout viewport, not a devtools
+  emulation) logged into the live app: analytics page (default range and Custom-with-both-date-pickers-open),
+  the "Pipeline flow" Sankey card, the recap dialog across Week/All ranges (including the real multi-node
+  Sankey and F17's degenerate-state message), and the board/table were all checked via
+  `document.documentElement.scrollWidth` vs `innerWidth` (no page-level overflow in any state) plus visual
+  screenshots. Range control wraps cleanly to `Week Month Year All Custom` on one row with `Start`/`End`
+  pickers below; recap dialog's `Share`/`Download` buttons fully reachable; the table's own internal
+  horizontal scrollbar (pre-existing, intentional per F9) is the only scroll surface anywhere. No fixes
+  were needed — F13/F15/F18/F22's sizing work already holds up at this width.
   Depends on: F13, F18
 
 ## Notes for parallel work

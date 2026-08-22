@@ -5,23 +5,27 @@ import type { StatusBreakdownEntry } from "@/types/api"
 
 /**
  * Validated status-breakdown palette (light mode only). Order matches
- * the pipeline order this chart renders in: applied -> interviewing ->
- * offer -> rejected -> ghosted. Produced by the dataviz skill's
+ * the pipeline order this chart renders in: applied -> interviewing_oa ->
+ * offer -> rejected -> failed -> ghosted. Produced by the dataviz skill's
  * scripts/validate_palette.js (OKLCH lightness/chroma/CVD/contrast
- * checks) -- don't re-derive these. Two slots (interviewing, offer) sit
+ * checks) -- don't re-derive these. Two slots (interviewing_oa, offer) sit
  * in the sub-3:1 contrast WARN band, which is only legal because every
  * bar below carries a permanent visible count/percentage label (not a
  * hover-only tooltip). This app has no reachable dark mode yet (the
  * `.dark` class is never applied -- no toggle exists, see index.css),
  * so these are hardcoded rather than theme-aware. Dark-safe equivalents
- * exist if a toggle ever ships: interviewing #d97706, offer #059669
- * (others unchanged).
+ * exist if a toggle ever ships: interviewing_oa #d97706, offer #059669
+ * (others unchanged). `failed` uses Tailwind's pink-500 (#ec4899),
+ * deliberately distinct from `rejected`'s red so the two are never
+ * confused at a glance -- unvalidated against the dataviz script (new
+ * status, added for F10), revisit if that script is rerun.
  */
 export const STATUS_BREAKDOWN_COLORS: Record<StatusBreakdownEntry["status"], string> = {
   applied: "#3b82f6",
-  interviewing: "#f59e0b",
+  interviewing_oa: "#f59e0b",
   offer: "#10b981",
   rejected: "#ef4444",
+  failed: "#ec4899",
   ghosted: "#8b5cf6",
   saved: "#94a3b8", // never rendered -- status_breakdown excludes "saved" -- present only to satisfy the Record type
 }

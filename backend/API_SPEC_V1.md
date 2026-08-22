@@ -1,5 +1,7 @@
 # jTracks API — v1 Specification
 
+> **Superseded.** This is the historical record of the shipped MVP. The current contract of record is [`API_SPEC_V2.md`](./API_SPEC_V2.md).
+
 Reference for the jTracks FastAPI backend. Every path, status code, field name and
 constraint in this document was read out of `backend/app/**` and confirmed by executing
 the running app (see [Verification](#verification)).

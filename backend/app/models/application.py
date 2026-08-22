@@ -17,9 +17,10 @@ if TYPE_CHECKING:
 class ApplicationStatus(str, enum.Enum):
     SAVED = "saved"
     APPLIED = "applied"
-    INTERVIEWING = "interviewing"
+    INTERVIEWING_OA = "interviewing_oa"
     OFFER = "offer"
     REJECTED = "rejected"
+    FAILED = "failed"
     GHOSTED = "ghosted"
 
 

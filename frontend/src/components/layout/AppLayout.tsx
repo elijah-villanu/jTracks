@@ -46,8 +46,14 @@ export function AppLayout() {
   const [isAutofillOpen, setIsAutofillOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
-  function handleLogout() {
-    logout()
+  async function handleLogout() {
+    // Await first: `logout()` clears `user` only in its `finally`, and
+    // navigating to `/login` before that lands `GuestRoute` (which reads
+    // `user` too) mid-flight -- it would see the still-truthy `user` and
+    // immediately bounce back to `/`. Awaiting avoids that flicker; the
+    // explicit navigate below is otherwise redundant with `ProtectedRoute`'s
+    // reactive redirect-on-`user-null`, but keeps the transition instant.
+    await logout()
     navigate("/login", { replace: true })
   }
 

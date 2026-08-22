@@ -74,17 +74,48 @@ class Settings(BaseSettings):
     #     not survive a restart locally — that is intentional.
     JWT_SECRET: str = ""
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+    # V2/R7.1 — two-token model. The access token is short-lived because it is
+    # a bearer credential with no revocation path of its own; revocation lives
+    # entirely on the refresh side. 30 minutes is the top of the PRD's 15-30
+    # minute band, chosen so a working session rarely hits a mid-action refresh.
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    # Refresh lifetime. The PRD's band is 7-30 days; 14 is the middle. R7.5
+    # explicitly declines rotation and reuse detection, so this number *is* the
+    # worst-case window a stolen refresh token stays usable for if the user
+    # never logs out. Halving 30 halves that window at the cost of a login
+    # every fortnight.
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 14
     # Bound claims (audit L4). A token minted for some other service that
     # happens to share this secret won't validate here, and vice versa.
     JWT_ISSUER: str = "jtracks"
     JWT_AUDIENCE: str = "jtracks-api"
+
+    # --- Refresh cookie (V2/R7.2, see docs/decisions/cookie-topology-samesite.md) ---
+    REFRESH_COOKIE_NAME: str = "jtracks_refresh"
+    # Scoped to /auth so the cookie is only ever attached to the two endpoints
+    # that read it, which is also what confines the CSRF surface.
+    REFRESH_COOKIE_PATH: str = "/auth"
+    # `none` (not `lax`) because hosting is undecided and a cross-site
+    # frontend/API split would make a Lax cookie silently never arrive. `none`
+    # works in all three topologies. It requires `Secure` and, because the
+    # cookie then travels on cross-site requests, the custom-header CSRF check
+    # below.
+    REFRESH_COOKIE_SAMESITE: str = "none"
+    # Deliberately NOT conditional on ENVIRONMENT: a `Secure` flag that switches
+    # itself off is how these ship insecure. Chrome and Firefox both accept
+    # Secure cookies over http://localhost.
+    REFRESH_COOKIE_SECURE: bool = True
+    # CSRF defense for /auth/refresh and /auth/logout only. A cross-origin page
+    # cannot set a custom header without a CORS preflight, and the preflight is
+    # refused for any origin outside CORS_ORIGINS.
+    REFRESH_CSRF_HEADER: str = "X-Refresh-Request"
 
     # --- Rate limiting (audit H4) ---
     # Per-client-IP budgets on the endpoints an attacker hammers. Disabled by
     # the test suite; see tests/conftest.py.
     RATE_LIMIT_ENABLED: bool = True
     RATE_LIMIT_LOGIN: str = "5/minute"
+    RATE_LIMIT_REFRESH: str = "30/minute"
     RATE_LIMIT_SIGNUP: str = "3/hour"
     RATE_LIMIT_OAUTH: str = "10/minute"
     RATE_LIMIT_AUTOFILL: str = "10/minute"

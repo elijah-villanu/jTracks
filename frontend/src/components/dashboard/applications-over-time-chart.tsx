@@ -1,6 +1,6 @@
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
-import type { ApplicationsOverTimePoint } from "@/types/api"
+import type { ApplicationsOverTimePoint, TimeSeriesGranularity } from "@/types/api"
 
 /**
  * Sequential, single-series encoding (one series = application volume
@@ -17,20 +17,37 @@ const chartConfig = {
   count: { label: "Applications", color: TREND_COLOR },
 } satisfies ChartConfig
 
-const dateFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" })
+const dayFormatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" })
+const monthFormatter = new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric" })
 
-function formatBucketLabel(iso: string): string {
-  return dateFormatter.format(new Date(`${iso}T00:00:00Z`))
+/**
+ * `period` is `YYYY-MM-DD` for day buckets, `YYYY-MM` for month buckets
+ * (F13 -- `year` and long-span `custom` ranges bucket by month, see
+ * `mocks/handlers/dashboard.ts`'s `granularityFor`). Month buckets are
+ * formatted as `"Aug 2026"` rather than reusing the day formatter, which
+ * would otherwise mislabel every point as the 1st of the month.
+ */
+function formatBucketLabel(iso: string, granularity: TimeSeriesGranularity): string {
+  if (granularity === "month") {
+    // `YYYY-MM` has no day component -- append one so `Date` parses it
+    // as that month's 1st (in UTC) rather than rolling back to the
+    // previous month on non-UTC-aligned parses.
+    return monthFormatter.format(new Date(`${iso}-01T00:00:00Z`))
+  }
+  return dayFormatter.format(new Date(`${iso}T00:00:00Z`))
 }
 
 interface ApplicationsOverTimeChartProps {
   data: ApplicationsOverTimePoint[]
+  granularity: TimeSeriesGranularity
 }
 
-export function ApplicationsOverTimeChart({ data }: ApplicationsOverTimeChartProps) {
+export function ApplicationsOverTimeChart({ data, granularity }: ApplicationsOverTimeChartProps) {
   if (data.length === 0) {
     return <p className="text-sm text-muted-foreground">No applications in this range yet.</p>
   }
+
+  const formatLabel = (value: string) => formatBucketLabel(value, granularity)
 
   return (
     <ChartContainer config={chartConfig} className="aspect-auto h-64 w-full">
@@ -38,7 +55,7 @@ export function ApplicationsOverTimeChart({ data }: ApplicationsOverTimeChartPro
         <CartesianGrid vertical={false} stroke="var(--border)" />
         <XAxis
           dataKey="period"
-          tickFormatter={formatBucketLabel}
+          tickFormatter={formatLabel}
           tickLine={false}
           axisLine={false}
           stroke="var(--muted-foreground)"
@@ -52,9 +69,7 @@ export function ApplicationsOverTimeChart({ data }: ApplicationsOverTimeChartPro
         />
         <ChartTooltip
           cursor={{ stroke: "var(--border)" }}
-          content={
-            <ChartTooltipContent labelFormatter={(value) => formatBucketLabel(String(value))} />
-          }
+          content={<ChartTooltipContent labelFormatter={(value) => formatLabel(String(value))} />}
         />
         <Area
           dataKey="count"

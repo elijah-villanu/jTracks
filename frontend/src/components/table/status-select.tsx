@@ -24,7 +24,7 @@ interface StatusSelectProps {
  * (just the chevron `SelectTrigger` already renders) next to the
  * `StatusBadge`, which already shows the current status -- showing the
  * value a second time in the trigger would be redundant. Opens the
- * same list of the other five statuses; picking one round-trips
+ * same list of the other six statuses; picking one round-trips
  * through the mocked `PATCH /applications/{id}` before the row
  * visually updates.
  */

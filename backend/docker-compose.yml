@@ -4,15 +4,14 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: jtracks
-      POSTGRES_PASSWORD: jtracks
+      POSTGRES_PASSWORD: postgres
       POSTGRES_DB: jtracks
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - jtracks_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U jtracks -d jtracks"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d jtracks"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -23,7 +22,10 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+psycopg://jtracks:jtracks@db:5432/jtracks
+      # Container-to-container traffic always uses the service name (`db`) and
+      # the container's own port (5432) -- the 5433 host-side mapping above is
+      # only for reaching Postgres from outside Docker (e.g. `psql` on the host).
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/jtracks
       AUTO_CREATE_TABLES: "false"
       RUN_SCHEDULER: "true"
       # Never hardcode this. Compose refuses to start if JWT_SECRET is unset in

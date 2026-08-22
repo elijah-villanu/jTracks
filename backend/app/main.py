@@ -69,14 +69,33 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins_list,
-        # SECURITY (audit L5): auth is an `Authorization: Bearer` header from
-        # localStorage, never a cookie, so the browser has no ambient credential
-        # to attach — credentialed CORS buys nothing and would turn a
-        # mis-set origin into a serious hole. Explicit method/header lists for
-        # the same reason: `*` is wider than anything the frontend sends.
-        allow_credentials=False,
+        # B29 / PRD R7.7 — credentialed CORS, reversing the MVP's deliberate
+        # `False`. V1 could refuse credentials because the only credential was
+        # an `Authorization: Bearer` header the browser never attaches on its
+        # own. V2 adds a refresh cookie, which *is* an ambient credential, and
+        # the browser will not send it cross-origin unless this is True.
+        #
+        # This makes `config.py`'s wildcard guard load-bearing rather than
+        # advisory: the refresh cookie is `SameSite=None`, so it rides
+        # cross-site requests, and the only things standing between it and any
+        # website on the internet are this explicit origin allowlist and the
+        # `X-Refresh-Request` header check on /auth/refresh and /auth/logout
+        # (see api/deps.require_refresh_csrf_header). A `*` origin would defeat
+        # both at once, which is why startup fails hard on it.
+        #
+        # Explicit method/header lists for the same reason: `*` is wider than
+        # anything the frontend sends, and is not even legal alongside
+        # credentialed CORS.
+        allow_credentials=True,
         allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type"],
+        # `X-Refresh-Request` must be allow-listed or the preflight for
+        # /auth/refresh and /auth/logout fails and the CSRF check can never be
+        # satisfied by a legitimate browser client.
+        allow_headers=[
+            "Authorization",
+            "Content-Type",
+            settings.REFRESH_CSRF_HEADER,
+        ],
         max_age=600,
     )
     app.add_middleware(SecurityHeadersMiddleware, hsts=not settings.is_development)

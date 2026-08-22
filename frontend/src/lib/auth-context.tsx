@@ -1,12 +1,7 @@
 import { createContext, useCallback, useEffect, useState, type ReactNode } from "react"
-import { apiClient } from "@/lib/api-client"
+import { apiClient, refreshAccessToken, setSessionExpiredHandler } from "@/lib/api-client"
+import { setAccessToken } from "@/lib/token-store"
 import type { AuthResponse, User } from "@/types/api"
-
-/**
- * localStorage key for the JWT. Must match what `src/lib/api-client.ts`
- * reads when attaching the `Authorization` header to every request.
- */
-const TOKEN_STORAGE_KEY = "jtracks_token"
 
 export interface AuthContextValue {
   user: User | null
@@ -15,7 +10,7 @@ export interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>
   signup: (email: string, password: string) => Promise<void>
   loginWithGoogle: () => Promise<void>
-  logout: () => void
+  logout: () => Promise<void>
   /**
    * Sends `PATCH /settings` and merges the response back into `user` --
    * F6's settings page and F4's form (which just needs to *display* the
@@ -27,22 +22,10 @@ export interface AuthContextValue {
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
-function getStoredToken(): string | null {
-  return window.localStorage.getItem(TOKEN_STORAGE_KEY)
-}
-
-function storeToken(token: string) {
-  window.localStorage.setItem(TOKEN_STORAGE_KEY, token)
-}
-
-function clearStoredToken() {
-  window.localStorage.removeItem(TOKEN_STORAGE_KEY)
-}
-
 /**
- * Auth state provider for F2. Persists the JWT under the same
- * localStorage key `api-client.ts` already expects, and hydrates
- * `user` from `GET /auth/me` on mount if a token is present.
+ * Auth state provider for F2. The access token now lives only in the
+ * in-memory store (`src/lib/token-store.ts`, F19) -- never localStorage,
+ * never a JS-readable cookie.
  *
  * The `/auth/*` endpoints are mocked via MSW (see
  * src/mocks/handlers/auth.ts) until B2/B3 ship -- this provider's
@@ -57,26 +40,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false
 
+    // F21: the access token is no longer persisted anywhere (F19), so on
+    // every fresh page load we attempt a silent `POST /auth/refresh` --
+    // if the httpOnly `jtracks_refresh` cookie is still valid, the backend
+    // mints a fresh access token and the session is restored with no
+    // login screen flash. Uses the same single-flight `refreshAccessToken`
+    // that api-client's 401-retry path uses, rather than duplicating the
+    // fetch logic. A rejected refresh is the normal "not logged in" case
+    // for a fresh visitor -- not an error to surface to the UI.
     async function hydrate() {
-      const token = getStoredToken()
-
-      if (!token) {
-        setIsLoading(false)
-        return
-      }
-
       try {
+        await refreshAccessToken()
         const me = await apiClient.get<User>("/auth/me")
         if (!cancelled) {
           setUser(me)
         }
       } catch {
-        // Token is invalid/expired -- clear it so the app treats the
-        // user as logged out rather than retrying forever.
-        clearStoredToken()
-        if (!cancelled) {
-          setUser(null)
-        }
+        // No valid refresh cookie (or `/auth/me` failed right after) --
+        // stay logged out. `refreshAccessToken`/`performRefresh` already
+        // clears the token store and fires the session-expired handler
+        // on failure, so there's nothing else to clean up here.
       } finally {
         if (!cancelled) {
           setIsLoading(false)
@@ -91,13 +74,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  useEffect(() => {
+    // F20: api-client's single-flight refresh-on-401 logic calls this once
+    // a refresh attempt has definitively failed -- clearing `user` here is
+    // all that's needed, since `ProtectedRoute` already redirects to
+    // `/login` whenever `user` is `null` (a clean SPA-native redirect, no
+    // hard reload, no new routing logic here).
+    setSessionExpiredHandler(() => setUser(null))
+    return () => setSessionExpiredHandler(null)
+  }, [])
+
   /**
    * The real backend's `TokenResponse` carries no `user` field (see
    * backend/API_SPEC_V1.md #6.3) -- every auth endpoint mints a token
    * only, so hydrating `user` always takes a follow-up `GET /auth/me`.
    */
   const applyAuthResponse = useCallback(async (response: AuthResponse) => {
-    storeToken(response.access_token)
+    setAccessToken(response.access_token)
     const me = await apiClient.get<User>("/auth/me")
     setUser(me)
   }, [])
@@ -132,9 +125,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await applyAuthResponse(response)
   }, [applyAuthResponse])
 
-  const logout = useCallback(() => {
-    clearStoredToken()
-    setUser(null)
+  const logout = useCallback(async () => {
+    try {
+      await apiClient.post("/auth/logout")
+    } finally {
+      // Clear in-memory state unconditionally -- a network failure on the
+      // logout call must not strand the user in a half-logged-in UI (F21).
+      setAccessToken(null)
+      setUser(null)
+    }
   }, [])
 
   const updateSettings = useCallback(async (ghostDaysDefault: number) => {

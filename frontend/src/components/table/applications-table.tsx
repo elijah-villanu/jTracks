@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import { ArrowDown, ArrowUp, ArrowUpDown, Pencil } from "lucide-react"
+import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Table,
@@ -10,9 +10,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { StatusBadge, STATUS_CELL_CLASSES } from "@/components/StatusBadge"
 import { StatusSelect } from "@/components/table/status-select"
 import { useApplicationsContext } from "@/hooks/useApplicationsContext"
+import { isStaleInterview, STALE_INTERVIEW_MESSAGE } from "@/lib/staleness"
 import { cn } from "@/lib/utils"
 import type { Application, ApplicationStatus } from "@/types/api"
 
@@ -102,6 +104,22 @@ export function ApplicationsTable({
                       disabled={updatingId === application.id}
                       onChange={(status) => onStatusChange(application.id, status)}
                     />
+                    {isStaleInterview(application) && (
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <span
+                              tabIndex={0}
+                              className="inline-flex items-center text-amber-600 dark:text-amber-500"
+                              aria-label={STALE_INTERVIEW_MESSAGE}
+                            />
+                          }
+                        >
+                          <AlertTriangle className="size-3.5" aria-hidden="true" />
+                        </TooltipTrigger>
+                        <TooltipContent>{STALE_INTERVIEW_MESSAGE}</TooltipContent>
+                      </Tooltip>
+                    )}
                   </div>
                 </TableCell>
                 <TableCell>{application.location ?? "—"}</TableCell>

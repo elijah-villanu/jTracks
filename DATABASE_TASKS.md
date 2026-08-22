@@ -61,7 +61,7 @@ limitation"). Do not add one opportunistically — it changes every analytics de
 
 ## Milestone DV1: Status model (delivery stage 1 — PRD R1)
 
-- [ ] **D7 — Widen `ApplicationStatus` to the V2 seven-value enum** (S)
+- [x] **D7 — Widen `ApplicationStatus` to the V2 seven-value enum** (S)
   In `backend/app/models/application.py`: rename member `INTERVIEWING` → `INTERVIEWING_OA` with stored
   value `interviewing_oa`, and add `FAILED = "failed"`. Keep the existing `SAEnum(..., name="application_status",
   native_enum=True, values_callable=...)` configuration so the stored values stay exactly these strings.
@@ -72,7 +72,7 @@ limitation"). Do not add one opportunistically — it changes every analytics de
   Depends on: none — **blocks almost everything in the other two files.** Do this first and merge it
   early; backend and frontend both stall behind it.
 
-- [ ] **D8 — Alembic migration `0003` for the enum change** (M)
+- [x] **D8 — Alembic migration `0003` for the enum change** (M)
   PRD R1.6. Postgres: `ALTER TYPE application_status RENAME VALUE 'interviewing' TO 'interviewing_oa'`
   followed by `ALTER TYPE application_status ADD VALUE 'failed'`. **`ADD VALUE` has transaction-block
   restrictions on older Postgres** — either pin the target server version or run that statement on an
@@ -90,7 +90,7 @@ limitation"). Do not add one opportunistically — it changes every analytics de
   the DB level on Postgres.
   Depends on: D7
 
-- [ ] **D9 — Refresh the seed script for the V2 vocabulary and V2 ranges** (S)
+- [x] **D9 — Refresh the seed script for the V2 vocabulary and V2 ranges** (S)
   `backend/scripts/seed.py` currently seeds `interviewing` rows and a V1-sized date spread. Update to
   `interviewing_oa`, add `failed` rows, and spread `date_applied` across **more than 12 months** so
   `year`, `all` and `custom` ranges return visibly different data (the PRD flags "year vs all may be
@@ -105,7 +105,7 @@ limitation"). Do not add one opportunistically — it changes every analytics de
 
 ## Milestone DV2: Index coverage for expanded ranges (delivery stage 2 — PRD R6 + performance NFR)
 
-- [ ] **D10 — Verify index coverage for the `year` / `all` / `custom` scans** (S)
+- [x] **D10 — Verify index coverage for the `year` / `all` / `custom` scans** (S)
   The `all` and `year` ranges scan more rows than any V1 query did, and `custom` adds an upper bound
   (`date_applied BETWEEN start AND end`) that V1 never issued. Confirm the existing
   `ix_applications_user_id_date_applied` still serves the widened predicate, and that the single
@@ -122,7 +122,7 @@ limitation"). Do not add one opportunistically — it changes every analytics de
 > the table shape is fixed by R7.3 regardless of which cookie topology is chosen. It can be built in
 > parallel with the status-model work.
 
-- [ ] **D11 — `refresh_tokens` model** (S)
+- [x] **D11 — `refresh_tokens` model** (S)
   New model at `backend/app/models/refresh_token.py` per the shared contract above, exported from
   `app/models/__init__.py` so `Base.metadata` picks it up. `token_hash` gets a **unique** index — it is
   the lookup key on every `POST /auth/refresh`, so an unindexed column means a full scan on the hot auth
@@ -133,7 +133,7 @@ limitation"). Do not add one opportunistically — it changes every analytics de
   to their refresh tokens.
   Depends on: none
 
-- [ ] **D12 — `refresh_tokens` migration `0004`** (S)
+- [x] **D12 — `refresh_tokens` migration `0004`** (S)
   Creates the table and the unique index on `token_hash`.
   Acceptance: `alembic upgrade head` / `downgrade -1` clean on both Postgres and SQLite; inserting two
   rows with the same `token_hash` raises an integrity error; deleting the owning user removes them.
