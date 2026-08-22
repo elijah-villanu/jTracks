@@ -1,5 +1,5 @@
 import { createContext, useCallback, useEffect, useState, type ReactNode } from "react"
-import { apiClient, refreshAccessToken, setSessionExpiredHandler } from "@/lib/api-client"
+import { apiClient, performLogout, refreshAccessToken, setSessionExpiredHandler } from "@/lib/api-client"
 import { setAccessToken } from "@/lib/token-store"
 import type { AuthResponse, User } from "@/types/api"
 
@@ -127,7 +127,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
-      await apiClient.post("/auth/logout")
+      // Must use performLogout (not apiClient.post) -- /auth/logout is a
+      // cookie-reading endpoint (B25) that requires the X-Refresh-Request
+      // CSRF header, which apiClient never attaches (see performLogout).
+      await performLogout()
     } finally {
       // Clear in-memory state unconditionally -- a network failure on the
       // logout call must not strand the user in a half-logged-in UI (F21).

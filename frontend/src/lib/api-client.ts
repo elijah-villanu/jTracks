@@ -31,6 +31,9 @@ export class ApiError extends Error {
 /** Path (relative to `API_BASE_URL`) of the refresh endpoint -- a `401` from this exact endpoint must never itself trigger another refresh attempt (F20/R7.6), or it would loop forever. */
 const REFRESH_PATH = "/auth/refresh"
 
+/** Path (relative to `API_BASE_URL`) of the logout endpoint -- see `performLogout` below. */
+const LOGOUT_PATH = "/auth/logout"
+
 /**
  * `true` when `path` resolves to the refresh endpoint itself, regardless of
  * whether it was passed relative (`"/auth/refresh"`) or absolute. Used to
@@ -103,6 +106,30 @@ async function performRefresh(): Promise<string> {
     setAccessToken(null)
     sessionExpiredHandler?.()
     throw error
+  }
+}
+
+/**
+ * Performs `POST /auth/logout` -- like `performRefresh`, this is one of the
+ * two cookie-reading endpoints (B25) and requires the same `X-Refresh-Request:
+ * 1` CSRF-defense header and `credentials: "include"`. It must NOT go through
+ * `apiClient.post`/`rawFetch`, which only ever attach `Authorization` -- doing
+ * so silently fails the backend's header check with a `403` that the caller's
+ * `finally` swallows, leaving the refresh-token cookie (and the DB session it
+ * points at) un-revoked while the UI still looks logged out.
+ */
+export async function performLogout(): Promise<void> {
+  const response = await fetch(buildUrl(LOGOUT_PATH), {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Refresh-Request": "1",
+    },
+  })
+
+  if (!response.ok && response.status !== 204) {
+    throw new ApiError(response.status, response.statusText)
   }
 }
 

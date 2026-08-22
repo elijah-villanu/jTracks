@@ -99,13 +99,20 @@ export const authHandlers = [
   }),
 
   /**
-   * Mock `POST /auth/logout` for F21/R7.4: always `204`, even with no or
-   * an invalid refresh cookie present (idempotent), and clears the mock
-   * cookie so a subsequent `/auth/refresh` genuinely fails afterward --
+   * Mock `POST /auth/logout` for F21/R7.4: requires the same
+   * `X-Refresh-Request: 1` CSRF-defense header as `/auth/refresh` (B25 --
+   * logout is the other cookie-reading endpoint), mirroring the real
+   * backend's `403` on a missing header. Otherwise always `204`, even with
+   * no or an invalid refresh cookie present (idempotent), and clears the
+   * mock cookie so a subsequent `/auth/refresh` genuinely fails afterward --
    * this is what makes "log out then reload lands on login" testable
    * end-to-end rather than just asserted by inspection of in-memory state.
    */
-  http.post(url("/auth/logout"), () => {
+  http.post(url("/auth/logout"), ({ request }) => {
+    if (request.headers.get("X-Refresh-Request") !== "1") {
+      return HttpResponse.json({ message: "Missing X-Refresh-Request header." }, { status: 403 })
+    }
+
     return new HttpResponse(null, {
       status: 204,
       headers: { "Set-Cookie": CLEAR_REFRESH_COOKIE },
