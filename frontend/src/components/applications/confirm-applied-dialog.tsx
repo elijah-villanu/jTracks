@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react"
+import { useEffect, useState, type FormEvent, type RefObject } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -19,6 +19,14 @@ interface ConfirmAppliedDialogProps {
   error: string | null
   onConfirm: (dateApplied: string) => void
   onCancel: () => void
+  /**
+   * A11y (WCAG 2.4.3): where focus goes when this closes. Unlike every
+   * other dialog in the app, this one is opened from state rather than
+   * from a `DialogTrigger`, so Base UI has no trigger to restore focus to
+   * and was dropping focus to `<body>` -- dumping a keyboard user back at
+   * the top of the document and losing their place in the table.
+   */
+  finalFocusRef?: RefObject<HTMLElement | null>
 }
 
 /**
@@ -34,6 +42,7 @@ export function ConfirmAppliedDialog({
   error,
   onConfirm,
   onCancel,
+  finalFocusRef,
 }: ConfirmAppliedDialogProps) {
   const [dateApplied, setDateApplied] = useState(todayIsoDate)
 
@@ -57,7 +66,7 @@ export function ConfirmAppliedDialog({
         }
       }}
     >
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-sm" finalFocus={finalFocusRef}>
         <DialogHeader>
           <DialogTitle>Mark as applied?</DialogTitle>
           <DialogDescription>

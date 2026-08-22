@@ -77,7 +77,15 @@ export function LoginForm({
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
         <CardHeader>
-          <CardTitle>Login to your account</CardTitle>
+          {/*
+            A11y (WCAG 1.3.1 / 2.4.6): `CardTitle` renders a plain <div>, so
+            this route previously had no heading element at all. Tailwind's
+            preflight resets heading typography, so the nested <h1> is
+            visually identical to what shipped.
+          */}
+          <CardTitle>
+            <h1>Login to your account</h1>
+          </CardTitle>
           <CardDescription>
             Enter your email below to login to your account
           </CardDescription>

@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react"
-import { ALL_STATUSES } from "@/components/StatusBadge"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { ALL_STATUSES, STATUS_LABEL } from "@/components/StatusBadge"
 import { ConfirmAppliedDialog } from "@/components/applications/confirm-applied-dialog"
 import {
   ApplicationsToolbar,
@@ -10,9 +10,19 @@ import {
   type SortDirection,
   type SortKey,
 } from "@/components/table/applications-table"
+import { statusSelectId } from "@/components/table/status-select"
 import { useApplicationsContext } from "@/hooks/useApplicationsContext"
 import { ApiError } from "@/lib/api-client"
 import type { Application, ApplicationStatus } from "@/types/api"
+
+/** Human-readable column names for the sort live-region announcement. */
+const SORT_KEY_LABEL: Record<SortKey, string> = {
+  company: "Company",
+  title: "Job Title",
+  status: "Status",
+  location: "Location",
+  date_applied: "Date Applied",
+}
 
 /**
  * The Pipeline View (UXPLAN.md): a single sortable/filterable
@@ -29,6 +39,14 @@ export function ApplicationsPage() {
 
   const [actionError, setActionError] = useState<string | null>(null)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
+
+  // A11y (WCAG 4.1.3 Status Messages): every one of the interactions on
+  // this page -- picking a status, typing in search, choosing a filter,
+  // clicking a column header -- silently rewrites the table body. Sighted
+  // users see rows reflow; a screen reader user got nothing at all. These
+  // two polite live regions cover the two kinds of change: a one-shot
+  // action result, and "what does the table contain now".
+  const [actionStatus, setActionStatus] = useState("")
 
   // Saved -> Applied is the one transition the PRD requires a confirm
   // step for (it sets `date_applied`, which starts the ghosting
@@ -49,11 +67,20 @@ export function ApplicationsPage() {
   }
 
   async function applyStatusChange(id: string, patch: Partial<Application>) {
+    const company = applications.find((application) => application.id === id)?.company ?? "Application"
+
     setActionError(null)
+    setActionStatus(`Updating ${company}...`)
     setUpdatingId(id)
     try {
       await updateApplication(id, patch)
+      setActionStatus(
+        patch.status
+          ? `${company} moved to ${STATUS_LABEL[patch.status]}.`
+          : `${company} updated.`
+      )
     } catch (err) {
+      setActionStatus("")
       setActionError(
         err instanceof ApiError
           ? ((err.body as { message?: string })?.message ?? "Failed to update status.")
@@ -64,10 +91,27 @@ export function ApplicationsPage() {
     }
   }
 
+  // A11y (WCAG 2.4.3 Focus Order): ConfirmAppliedDialog is opened from
+  // state rather than from a `DialogTrigger`, so Base UI has no trigger
+  // element to hand focus back to on close -- focus was being dropped to
+  // <body>, dumping a keyboard user at the top of the document and
+  // costing them their place in the table. Point Base UI's `finalFocus`
+  // at the row's status trigger instead. Resolved lazily from the id
+  // (rather than captured from `document.activeElement` at open time,
+  // which is the *select popup item* and is unmounted by the time the
+  // dialog closes) and re-read on close, so it still works if the row
+  // re-rendered while the dialog was open.
+  const confirmFocusRef = useRef<HTMLElement | null>(null)
+
+  function trackConfirmFocusTarget(applicationId: string) {
+    confirmFocusRef.current = document.getElementById(statusSelectId(applicationId))
+  }
+
   function handleStatusChange(id: string, status: ApplicationStatus) {
     const current = applications.find((application) => application.id === id)
 
     if (current?.status === "saved" && status === "applied") {
+      trackConfirmFocusTarget(id)
       setConfirmAppliedError(null)
       setConfirmApplied({ id, company: current.company })
       return
@@ -81,11 +125,20 @@ export function ApplicationsPage() {
       return
     }
 
+    const { id, company } = confirmApplied
     setConfirmAppliedError(null)
     setIsConfirmingApplied(true)
     try {
-      await updateApplication(confirmApplied.id, { status: "applied", date_applied: dateApplied })
+      await updateApplication(id, { status: "applied", date_applied: dateApplied })
+      // Re-resolve the focus target: the row just re-rendered with its new
+      // status, so the node captured when the dialog opened may be stale.
+      trackConfirmFocusTarget(id)
       setConfirmApplied(null)
+      // This path bypasses `applyStatusChange`, so it has to do its own
+      // announcing -- otherwise the one status transition that takes an
+      // extra confirmation step was also the only one that completed
+      // silently.
+      setActionStatus(`${company} moved to Applied, dated ${dateApplied}.`)
     } catch (err) {
       setConfirmAppliedError(
         err instanceof ApiError
@@ -123,6 +176,29 @@ export function ApplicationsPage() {
     return [...filtered].sort((a, b) => direction * compareByKey(a, b, sortKey))
   }, [applications, statusFilter, search, sortKey, sortDirection])
 
+  // Announce the *result* of filtering/sorting, not the keystroke. Skipped
+  // on the initial render (the table caption already states the count when
+  // the page is first read).
+  const [tableStatus, setTableStatus] = useState("")
+  const isFirstResultRender = useRef(true)
+
+  useEffect(() => {
+    if (isFirstResultRender.current) {
+      isFirstResultRender.current = false
+      return
+    }
+
+    const sortSuffix = sortKey
+      ? `, sorted by ${SORT_KEY_LABEL[sortKey]} ${sortDirection === "asc" ? "ascending" : "descending"}`
+      : ""
+
+    setTableStatus(
+      `${visibleApplications.length} of ${applications.length} application${
+        applications.length === 1 ? "" : "s"
+      } shown${sortSuffix}.`
+    )
+  }, [visibleApplications.length, applications.length, sortKey, sortDirection])
+
   return (
     <div className="flex flex-col gap-4">
       <div>
@@ -139,8 +215,19 @@ export function ApplicationsPage() {
         </p>
       )}
 
+      {/* Two separate polite regions so an action result and a
+          filter/sort result can't clobber each other mid-announcement. */}
+      <p aria-live="polite" aria-atomic="true" className="sr-only">
+        {actionStatus}
+      </p>
+      <p aria-live="polite" aria-atomic="true" className="sr-only">
+        {tableStatus}
+      </p>
+
       {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading applications...</p>
+        <p role="status" className="text-sm text-muted-foreground">
+          Loading applications...
+        </p>
       ) : (
         <>
           <ApplicationsToolbar
@@ -167,6 +254,7 @@ export function ApplicationsPage() {
         error={confirmAppliedError}
         onConfirm={handleConfirmApplied}
         onCancel={handleCancelApplied}
+        finalFocusRef={confirmFocusRef}
       />
     </div>
   )

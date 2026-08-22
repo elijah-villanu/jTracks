@@ -55,6 +55,11 @@ export function SettingsPage() {
     const parsed = Number(value)
     if (!Number.isInteger(parsed) || parsed <= 0) {
       setFieldError("Enter a whole number of days greater than 0.")
+      // Send focus back to the field that needs fixing, so the label and
+      // the (now associated) error message are both read out.
+      requestAnimationFrame(() => {
+        document.getElementById("settings-ghost-days-default")?.focus()
+      })
       return
     }
 
@@ -82,7 +87,9 @@ export function SettingsPage() {
       </div>
 
       {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading settings...</p>
+        <p role="status" className="text-sm text-muted-foreground">
+          Loading settings...
+        </p>
       ) : !user ? (
         <p className="text-sm text-muted-foreground">Sign in to manage your settings.</p>
       ) : (
@@ -111,13 +118,24 @@ export function SettingsPage() {
                     value={value}
                     onChange={(event) => setValue(event.target.value)}
                     aria-invalid={!!fieldError}
+                    // A11y: both the explanatory hint and the validation
+                    // message were visually adjacent but programmatically
+                    // orphaned -- neither was announced when focus landed
+                    // on the input (WCAG 1.3.1 / 3.3.1).
+                    aria-describedby={
+                      fieldError
+                        ? "settings-ghost-days-hint settings-ghost-days-error"
+                        : "settings-ghost-days-hint"
+                    }
                   />
-                  <FieldDescription>
+                  <FieldDescription id="settings-ghost-days-hint">
                     Applications with no status update for this many days are automatically
                     marked Ghosted. Individual applications can override this in their own edit
                     form.
                   </FieldDescription>
-                  {fieldError && <FieldError>{fieldError}</FieldError>}
+                  {fieldError && (
+                    <FieldError id="settings-ghost-days-error">{fieldError}</FieldError>
+                  )}
                 </Field>
               </FieldGroup>
 
@@ -125,9 +143,18 @@ export function SettingsPage() {
                 <Button type="submit" disabled={isSaving}>
                   {isSaving ? "Saving..." : "Save"}
                 </Button>
-                {savedAt !== null && (
-                  <span className="text-sm text-muted-foreground">Saved.</span>
-                )}
+                {/*
+                  A11y (WCAG 4.1.3): the "Saved." confirmation appeared and
+                  auto-cleared after 2s with nothing announced -- focus stays
+                  on the submit button, whose label flickers back to "Save",
+                  so a screen reader user got no confirmation the save
+                  succeeded. This is a live region that's always in the DOM
+                  (a region only inserted at the moment it gets content is
+                  unreliably announced).
+                */}
+                <span role="status" aria-live="polite" className="text-sm text-muted-foreground">
+                  {isSaving ? "Saving..." : savedAt !== null ? "Settings saved." : ""}
+                </span>
               </div>
             </form>
           </CardContent>

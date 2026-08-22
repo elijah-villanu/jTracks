@@ -35,7 +35,7 @@ import { useApplicationsContext } from "@/hooks/useApplicationsContext"
 import { useAuth } from "@/hooks/useAuth"
 import { ApiError } from "@/lib/api-client"
 import type { ApplicationInput } from "@/lib/applications-context"
-import { todayIsoDate } from "@/lib/utils"
+import { cn, todayIsoDate } from "@/lib/utils"
 import type { Application, ApplicationStatus } from "@/types/api"
 
 const EMPTY_VALUES: ApplicationInput = {
@@ -71,6 +71,23 @@ interface FieldErrors {
   ghost_days_override?: boolean
 }
 
+/** Validated fields in DOM order, for "focus the first invalid control". */
+const INVALID_FIELD_ORDER = [
+  "company",
+  "title",
+  "status",
+  "date_applied",
+  "ghost_days_override",
+] as const satisfies readonly (keyof FieldErrors)[]
+
+const FIELD_CONTROL_ID: Record<keyof FieldErrors, string> = {
+  company: "application-company",
+  title: "application-title",
+  status: "application-status",
+  date_applied: "application-date-applied",
+  ghost_days_override: "application-ghost-days-override",
+}
+
 function extractErrorMessage(err: unknown, fallback: string): string {
   if (err instanceof ApiError) {
     return (err.body as { message?: string } | undefined)?.message ?? fallback
@@ -95,6 +112,8 @@ export function ApplicationFormDialog() {
   const isOpen = formState !== null
   const mode = formState?.mode ?? "create"
   const application = formState?.mode === "edit" ? formState.application : undefined
+  // F5 autofill outcome (parsed / unsupported / failed / network error).
+  const notice = formState?.mode === "create" ? formState.notice : undefined
 
   const [values, setValues] = useState<ApplicationInput>(EMPTY_VALUES)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
@@ -154,13 +173,18 @@ export function ApplicationFormDialog() {
     }
     setFieldErrors(errors)
 
-    if (
-      errors.company ||
-      errors.title ||
-      errors.status ||
-      errors.date_applied ||
-      errors.ghost_days_override
-    ) {
+    // A11y (WCAG 3.3.1): this dialog scrolls (`max-h-[85vh] overflow-y-auto`),
+    // so a failed submit could leave the offending field entirely off-screen
+    // with nothing but the submit button focused. Move focus to the first
+    // invalid control -- that both scrolls it into view and makes the screen
+    // reader read the field's label plus its now-associated error message.
+    const firstInvalid = INVALID_FIELD_ORDER.find((key) => errors[key])
+    if (firstInvalid) {
+      // Defer a frame so the error nodes (and their ids) exist before focus
+      // moves, otherwise `aria-describedby` resolves to nothing.
+      requestAnimationFrame(() => {
+        document.getElementById(FIELD_CONTROL_ID[firstInvalid])?.focus()
+      })
       return
     }
 
@@ -209,6 +233,29 @@ export function ApplicationFormDialog() {
           </DialogDescription>
         </DialogHeader>
 
+        {/*
+          A11y: the autofill review notice. `role="status"` (polite) rather
+          than `role="alert"` -- even the failure cases are a recoverable
+          "fill this in yourself", not an error, and the dialog is opening
+          at the same moment, so an assertive announcement would interrupt
+          the dialog title/description. Announced *and* visible, so neither
+          a screen reader user nor a sighted user has to infer the outcome
+          from which inputs happen to be blank.
+        */}
+        {notice && (
+          <p
+            role="status"
+            className={cn(
+              "rounded-md border px-3 py-2 text-sm",
+              notice.tone === "success"
+                ? "border-emerald-600/40 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100"
+                : "border-amber-600/40 bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
+            )}
+          >
+            {notice.message}
+          </p>
+        )}
+
         <form id="application-form" onSubmit={handleSubmit}>
           <FieldGroup>
             {submitError && (
@@ -220,6 +267,15 @@ export function ApplicationFormDialog() {
               </p>
             )}
 
+            {/*
+              A11y (WCAG 3.3.1 Error Identification / 1.3.1 Info and
+              Relationships): each input carried `aria-invalid` but was
+              never pointed at its own message, so a screen reader
+              announced a bare "invalid entry" with no reason -- and if
+              the user tabbed back to the field later, nothing at all.
+              Every `FieldError`/`FieldDescription` below now has a
+              stable id referenced by its input's `aria-describedby`.
+            */}
             <Field data-invalid={fieldErrors.company}>
               <FieldLabel htmlFor="application-company">Company</FieldLabel>
               <Input
@@ -227,8 +283,11 @@ export function ApplicationFormDialog() {
                 value={values.company}
                 onChange={(event) => updateField("company", event.target.value)}
                 aria-invalid={fieldErrors.company}
+                aria-describedby={fieldErrors.company ? "application-company-error" : undefined}
               />
-              {fieldErrors.company && <FieldError>Company is required.</FieldError>}
+              {fieldErrors.company && (
+                <FieldError id="application-company-error">Company is required.</FieldError>
+              )}
             </Field>
 
             <Field data-invalid={fieldErrors.title}>
@@ -238,8 +297,11 @@ export function ApplicationFormDialog() {
                 value={values.title}
                 onChange={(event) => updateField("title", event.target.value)}
                 aria-invalid={fieldErrors.title}
+                aria-describedby={fieldErrors.title ? "application-title-error" : undefined}
               />
-              {fieldErrors.title && <FieldError>Job title is required.</FieldError>}
+              {fieldErrors.title && (
+                <FieldError id="application-title-error">Job title is required.</FieldError>
+              )}
             </Field>
 
             <Field data-invalid={fieldErrors.status}>
@@ -268,8 +330,20 @@ export function ApplicationFormDialog() {
                   id="application-status"
                   className="w-full"
                   aria-invalid={fieldErrors.status}
+                  aria-describedby={fieldErrors.status ? "application-status-error" : undefined}
                 >
-                  <SelectValue />
+                  {/*
+                    A11y (WCAG 4.1.2): `<SelectValue />` on its own shows
+                    Base UI's raw value, so this trigger read "saved" /
+                    "interviewing_oa" instead of the real labels, both
+                    visually and to a screen reader. Format via
+                    STATUS_LABEL, the same map the options use.
+                  */}
+                  <SelectValue>
+                    {(value: ApplicationStatus | null) =>
+                      value ? STATUS_LABEL[value] : "Select a status"
+                    }
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {ALL_STATUSES.map((status) => (
@@ -279,7 +353,9 @@ export function ApplicationFormDialog() {
                   ))}
                 </SelectContent>
               </Select>
-              {fieldErrors.status && <FieldError>Status is required.</FieldError>}
+              {fieldErrors.status && (
+                <FieldError id="application-status-error">Status is required.</FieldError>
+              )}
             </Field>
 
             <Field>
@@ -339,9 +415,14 @@ export function ApplicationFormDialog() {
                   value={values.date_applied ?? ""}
                   onChange={(event) => updateField("date_applied", event.target.value || null)}
                   aria-invalid={fieldErrors.date_applied}
+                  aria-describedby={
+                    fieldErrors.date_applied ? "application-date-applied-error" : undefined
+                  }
                 />
                 {fieldErrors.date_applied && (
-                  <FieldError>Date applied is required once status is past Saved.</FieldError>
+                  <FieldError id="application-date-applied-error">
+                    Date applied is required once status is past Saved.
+                  </FieldError>
                 )}
               </Field>
             </div>
@@ -362,11 +443,18 @@ export function ApplicationFormDialog() {
                   updateField("ghost_days_override", raw === "" ? null : Number(raw))
                 }}
                 aria-invalid={fieldErrors.ghost_days_override}
+                aria-describedby={
+                  fieldErrors.ghost_days_override
+                    ? "application-ghost-days-override-error"
+                    : "application-ghost-days-override-hint"
+                }
               />
               {fieldErrors.ghost_days_override ? (
-                <FieldError>Enter a whole number of days greater than 0, or leave blank.</FieldError>
+                <FieldError id="application-ghost-days-override-error">
+                  Enter a whole number of days greater than 0, or leave blank.
+                </FieldError>
               ) : (
-                <FieldDescription>
+                <FieldDescription id="application-ghost-days-override-hint">
                   Leave blank to use your global default ({user?.ghost_days_default ?? 14} days).
                 </FieldDescription>
               )}

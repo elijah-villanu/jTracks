@@ -69,9 +69,21 @@ export function AnalyticsPage() {
         </p>
       )}
 
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading dashboard...</p>
-      ) : (
+      {/*
+        A11y (WCAG 4.1.3): changing the range refetches and swaps out every
+        tile and chart on the page. `role="status"` here means the wait and
+        the "results are ready" moment are both announced instead of the
+        page silently rearranging itself.
+      */}
+      <p role="status" aria-live="polite" className="text-sm text-muted-foreground">
+        {isLoading
+          ? "Loading dashboard..."
+          : stats
+            ? `Dashboard updated: ${stats.total} submitted application${stats.total === 1 ? "" : "s"} in the selected range.`
+            : ""}
+      </p>
+
+      {!isLoading &&
         stats && (
           <>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -88,7 +100,16 @@ export function AnalyticsPage() {
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
               <Card>
                 <CardHeader>
-                  <CardTitle>Status breakdown</CardTitle>
+                  {/*
+                    A11y (WCAG 1.3.1 / 2.4.10): `CardTitle` is a <div>, so
+                    the three chart titles were not headings and a screen
+                    reader user had no way to jump between the sections of
+                    this page. Tailwind preflight resets heading
+                    typography, so nesting <h2> changes nothing visually.
+                  */}
+                  <CardTitle>
+                    <h2>Status breakdown</h2>
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <StatusBreakdownChart data={stats.status_breakdown} />
@@ -97,7 +118,9 @@ export function AnalyticsPage() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Applications over time</CardTitle>
+                  <CardTitle>
+                    <h2>Applications over time</h2>
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ApplicationsOverTimeChart
@@ -110,7 +133,9 @@ export function AnalyticsPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Pipeline flow</CardTitle>
+                <CardTitle>
+                  <h2>Pipeline flow</h2>
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <SankeyChart
@@ -123,8 +148,7 @@ export function AnalyticsPage() {
               </CardContent>
             </Card>
           </>
-        )
-      )}
+        )}
     </div>
   )
 }

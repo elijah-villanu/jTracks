@@ -1,5 +1,5 @@
-import { useState } from "react"
-import { NavLink, Outlet, useNavigate } from "react-router"
+import { useEffect, useRef, useState } from "react"
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router"
 import { Briefcase, ClipboardPaste, LogOut, Menu, Plus } from "lucide-react"
 import { ApplicationFormDialog } from "@/components/applications/application-form-dialog"
 import { AutofillDialog } from "@/components/applications/autofill-dialog"
@@ -23,6 +23,13 @@ const NAV_LINKS = [
   { to: "/profile", label: "Profile" },
 ] as const
 
+/** Page title announced to screen readers after a client-side route change. */
+const ROUTE_TITLES: Record<string, string> = {
+  "/": "Applications",
+  "/analytics": "Analytics",
+  "/profile": "Settings",
+}
+
 /**
  * Base app shell: logo, nav tabs, and the "Add Job" primary action.
  * Per UXPLAN.md's Dashboard Page Structure. The add/edit application
@@ -43,8 +50,28 @@ export function AppLayout() {
   const { user, logout } = useAuth()
   const { openCreateForm } = useApplicationsContext()
   const navigate = useNavigate()
+  const location = useLocation()
   const [isAutofillOpen, setIsAutofillOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
+  // A11y: a client-side route change replaces the whole page body without
+  // moving focus or firing anything a screen reader notices -- focus stays
+  // on the nav link that was just activated and nothing is announced (WCAG
+  // 2.4.3 Focus Order / 4.1.3 Status Messages). Move focus to <main> and
+  // announce the new page title, but skip the very first render so landing
+  // directly on a URL doesn't yank focus out of the document start.
+  const mainRef = useRef<HTMLElement>(null)
+  const isFirstRender = useRef(true)
+  const [routeAnnouncement, setRouteAnnouncement] = useState("")
+
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false
+      return
+    }
+    mainRef.current?.focus()
+    setRouteAnnouncement(`${ROUTE_TITLES[location.pathname] ?? "Page"} — navigated`)
+  }, [location.pathname])
 
   async function handleLogout() {
     // Await first: `logout()` clears `user` only in its `finally`, and
@@ -59,6 +86,19 @@ export function AppLayout() {
 
   return (
     <div className="flex min-h-screen flex-col">
+      {/*
+        A11y (WCAG 2.4.1 Bypass Blocks): the header repeats 3 nav links +
+        3-4 action buttons on every page, so a keyboard-only user had to
+        tab past all of them to reach the table. Visually hidden until
+        focused.
+      */}
+      <a
+        href="#main-content"
+        className="sr-only rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50"
+      >
+        Skip to main content
+      </a>
+
       <header className="border-b border-border">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-3">
           <div className="flex items-center gap-2 font-semibold">
@@ -66,7 +106,7 @@ export function AppLayout() {
             <span>jTracks</span>
           </div>
 
-          <nav className="hidden items-center gap-1 sm:flex">
+          <nav aria-label="Main" className="hidden items-center gap-1 sm:flex">
             {NAV_LINKS.map((link) => (
               <NavLink key={link.to} to={link.to} className={navLinkClassName}>
                 {link.label}
@@ -107,7 +147,7 @@ export function AppLayout() {
                 </SheetTitle>
               </SheetHeader>
 
-              <nav className="flex flex-col gap-1 px-4">
+              <nav aria-label="Mobile" className="flex flex-col gap-1 px-4">
                 {NAV_LINKS.map((link) => (
                   <NavLink
                     key={link.to}
@@ -148,9 +188,25 @@ export function AppLayout() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
+      {/*
+        `tabIndex={-1}` makes <main> a programmatic focus target for both
+        the skip link and the route-change effect above; it is not in the
+        tab order. `outline-none` is safe here because focus is only ever
+        moved here programmatically, immediately after a user-initiated
+        navigation, and the page heading is what the user hears.
+      */}
+      <main
+        id="main-content"
+        ref={mainRef}
+        tabIndex={-1}
+        className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 outline-none"
+      >
         <Outlet />
       </main>
+
+      <p aria-live="polite" aria-atomic="true" className="sr-only">
+        {routeAnnouncement}
+      </p>
 
       <ApplicationFormDialog />
       <AutofillDialog open={isAutofillOpen} onOpenChange={setIsAutofillOpen} />

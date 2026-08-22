@@ -1,4 +1,4 @@
-import { useId } from "react"
+import { useId, useState } from "react"
 import { format } from "date-fns"
 import { CalendarIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -53,8 +53,19 @@ export function DateRangeControl({
   ariaLabel,
   error,
 }: DateRangeControlProps) {
+  // A11y: the calendar popovers are controlled so that choosing a day
+  // closes them. Previously the popover stayed open with focus parked
+  // inside the day grid -- not a trap (Escape works), but a keyboard user
+  // had to know to press Escape, and the trigger's newly-updated value
+  // was never announced. Closing on select returns focus to the trigger,
+  // which is then re-announced with the date now in its label.
+  const [openPicker, setOpenPicker] = useState<"start" | "end" | null>(null)
+
   const startId = useId()
   const endId = useId()
+  const startLabelId = `${startId}-label`
+  const endLabelId = `${endId}-label`
+  const errorId = `${startId}-error`
 
   return (
     <div className="flex flex-col gap-2">
@@ -75,11 +86,27 @@ export function DateRangeControl({
 
       {range === "custom" && (
         <div className="flex flex-wrap items-end gap-2">
+          {/*
+            A11y (WCAG 4.1.2 Name, Role, Value): `<label for>` pointing at
+            a <button> does *not* feed that button's accessible name --
+            per the accname spec a button is named by its own contents.
+            Both triggers therefore announced identically as "Pick a date,
+            button", with no way to tell Start from End. `aria-labelledby`
+            chains the visible "Start"/"End" label in front of the
+            button's own text, so it now announces "Start Pick a date" /
+            "Start Aug 1, 2026". `htmlFor` is kept so clicking the visible
+            label still opens the picker.
+          */}
           <Field className="w-auto">
-            <FieldLabel htmlFor={startId}>Start</FieldLabel>
-            <Popover>
+            <FieldLabel id={startLabelId} htmlFor={startId}>
+              Start
+            </FieldLabel>
+            <Popover open={openPicker === "start"} onOpenChange={(o) => setOpenPicker(o ? "start" : null)}>
               <PopoverTrigger
                 id={startId}
+                aria-labelledby={`${startLabelId} ${startId}`}
+                aria-describedby={error ? errorId : undefined}
+                aria-invalid={error ? true : undefined}
                 render={
                   <Button
                     type="button"
@@ -97,17 +124,25 @@ export function DateRangeControl({
                   mode="single"
                   autoFocus
                   selected={start ? isoDateStringToDate(start) : undefined}
-                  onSelect={(date) => onStartChange(date ? dateToIsoDateString(date) : null)}
+                  onSelect={(date) => {
+                    onStartChange(date ? dateToIsoDateString(date) : null)
+                    setOpenPicker(null)
+                  }}
                 />
               </PopoverContent>
             </Popover>
           </Field>
 
           <Field className="w-auto">
-            <FieldLabel htmlFor={endId}>End</FieldLabel>
-            <Popover>
+            <FieldLabel id={endLabelId} htmlFor={endId}>
+              End
+            </FieldLabel>
+            <Popover open={openPicker === "end"} onOpenChange={(o) => setOpenPicker(o ? "end" : null)}>
               <PopoverTrigger
                 id={endId}
+                aria-labelledby={`${endLabelId} ${endId}`}
+                aria-describedby={error ? errorId : undefined}
+                aria-invalid={error ? true : undefined}
                 render={
                   <Button
                     type="button"
@@ -125,7 +160,10 @@ export function DateRangeControl({
                   mode="single"
                   autoFocus
                   selected={end ? isoDateStringToDate(end) : undefined}
-                  onSelect={(date) => onEndChange(date ? dateToIsoDateString(date) : null)}
+                  onSelect={(date) => {
+                    onEndChange(date ? dateToIsoDateString(date) : null)
+                    setOpenPicker(null)
+                  }}
                 />
               </PopoverContent>
             </Popover>
@@ -134,7 +172,7 @@ export function DateRangeControl({
       )}
 
       {range === "custom" && error && (
-        <p role="alert" className="text-sm text-destructive">
+        <p id={errorId} role="alert" className="text-sm text-destructive">
           {error}
         </p>
       )}

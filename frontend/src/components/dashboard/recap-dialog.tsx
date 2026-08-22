@@ -43,6 +43,8 @@ export function RecapDialog({ open, onOpenChange }: RecapDialogProps) {
   const [customEnd, setCustomEnd] = useState<string | null>(null)
   const [isExporting, setIsExporting] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
+  /** Announced (only) to assistive tech once an export finishes. */
+  const [exportStatus, setExportStatus] = useState<string | null>(null)
   const cardRef = useRef<HTMLDivElement>(null)
 
   const { recap, isLoading, error } = useRecap(range, customStart, customEnd, open)
@@ -61,6 +63,7 @@ export function RecapDialog({ open, onOpenChange }: RecapDialogProps) {
   function handleOpenChange(nextOpen: boolean) {
     if (!nextOpen) {
       setExportError(null)
+      setExportStatus(null)
     }
     onOpenChange(nextOpen)
   }
@@ -84,6 +87,7 @@ export function RecapDialog({ open, onOpenChange }: RecapDialogProps) {
 
   async function handleDownload() {
     setExportError(null)
+    setExportStatus(null)
     setIsExporting(true)
     try {
       const blob = await exportCardToBlob()
@@ -95,6 +99,10 @@ export function RecapDialog({ open, onOpenChange }: RecapDialogProps) {
       link.click()
       link.remove()
       URL.revokeObjectURL(objectUrl)
+      // A programmatic <a download> click produces no perceivable feedback
+      // at all outside the browser's own download chrome, which many
+      // screen readers don't surface -- say so explicitly.
+      setExportStatus(`Recap image downloaded as jtracks-recap-${range}.png.`)
     } catch (err) {
       setExportError(err instanceof Error ? err.message : "Couldn't export the recap image.")
     } finally {
@@ -104,6 +112,7 @@ export function RecapDialog({ open, onOpenChange }: RecapDialogProps) {
 
   async function handleShare() {
     setExportError(null)
+    setExportStatus(null)
     setIsExporting(true)
     try {
       const blob = await exportCardToBlob()
@@ -175,6 +184,26 @@ export function RecapDialog({ open, onOpenChange }: RecapDialogProps) {
             <RecapCard ref={cardRef} recap={recap} />
           )}
         </div>
+
+        {/*
+          A11y (WCAG 4.1.3): everything interesting in this dialog happens
+          without moving focus -- the preview card swaps in when the fetch
+          lands, and Download/Share do their work with only the button
+          label changing to "Exporting...". A screen reader user got no
+          signal for either. One always-present polite region covers the
+          fetch, the export, and the export's completion.
+        */}
+        <p role="status" aria-live="polite" className="sr-only">
+          {isExporting
+            ? "Preparing your recap image..."
+            : exportStatus
+              ? exportStatus
+              : isLoading
+                ? "Loading recap..."
+                : recap
+                  ? `Recap ready: ${recap.headline}`
+                  : ""}
+        </p>
 
         {exportError && (
           <p

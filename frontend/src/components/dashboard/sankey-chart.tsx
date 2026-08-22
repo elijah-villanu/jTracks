@@ -1,6 +1,7 @@
 import { useMemo } from "react"
 import { sankey, sankeyLinkHorizontal } from "d3-sankey"
 import type { SankeyGraph, SankeyNode as D3SankeyNode } from "d3-sankey"
+import { ChartDataTable } from "@/components/dashboard/chart-data-table"
 import { STATUS_BREAKDOWN_COLORS } from "@/components/dashboard/status-breakdown-chart"
 import type { ApplicationStatus, Sankey } from "@/types/api"
 
@@ -50,15 +51,19 @@ function SankeyEmptyPlaceholder({ width, height, appliedValue, className }: Sank
     ? `All ${appliedValue} application${appliedValue === 1 ? "" : "s"} ${appliedValue === 1 ? "is" : "are"} still in flight — outcomes will appear here as they land.`
     : "No applications in this range have moved past Saved yet."
 
+  // A11y: this used to be `role="img" aria-label={message}` wrapping the
+  // very same message as text. `role="img"` makes a container's contents
+  // opaque to assistive tech, so the visible sentence was being replaced
+  // by an identical aria-label -- pure redundancy that also stopped the
+  // text from being reachable with a screen reader's normal read-next
+  // command. It's plain prose; let it be plain prose.
   return (
-    <div
-      role="img"
-      aria-label={message}
-      className={`flex items-center justify-center text-sm text-muted-foreground ${className ?? ""}`}
+    <p
+      className={`m-0 flex items-center justify-center text-center text-sm text-muted-foreground ${className ?? ""}`}
       style={{ width, height }}
     >
       {message}
-    </div>
+    </p>
   )
 }
 
@@ -135,15 +140,27 @@ export function SankeyChart({ data, width, height, marginX = 8, marginY = 8, fon
     )
   }
 
+  const nodeLabel = (key: ApplicationStatus) =>
+    data.nodes.find((node) => node.key === key)?.label ?? key
+
   return (
-    <svg
-      role="img"
-      aria-label="Sankey diagram of application pipeline flow"
-      viewBox={`0 0 ${width} ${height}`}
-      width={width}
-      height={height}
-      className={className}
-    >
+    <>
+      {/*
+        A11y (WCAG 1.1.1): the previous `role="img"` + "Sankey diagram of
+        application pipeline flow" gave the diagram a name but conveyed
+        none of its actual content -- a screen reader user learned only
+        that a diagram existed. The flow itself (which status feeds which,
+        and how many applications) is the entire point, so the SVG is now
+        hidden and the same topology is exposed as a real table below.
+      */}
+      <svg
+        aria-hidden="true"
+        focusable="false"
+        viewBox={`0 0 ${width} ${height}`}
+        width={width}
+        height={height}
+        className={className}
+      >
       <g>
         {graph.links.map((link) => {
           const source = link.source as D3SankeyNode<NodeExtra, LinkExtra>
@@ -196,6 +213,20 @@ export function SankeyChart({ data, width, height, marginX = 8, marginY = 8, fon
           )
         })}
       </g>
-    </svg>
+      </svg>
+
+      <ChartDataTable
+        caption="Application pipeline flow, stage to stage"
+        columns={["From", "To", "Applications"]}
+        rows={data.links.map((link) => [
+          nodeLabel(link.source),
+          nodeLabel(link.target),
+          link.value,
+        ])}
+        summary={`Sankey diagram of how applications moved between pipeline stages. Stage totals: ${data.nodes
+          .map((node) => `${node.label} ${node.value}`)
+          .join(", ")}. Stage-to-stage flows follow.`}
+      />
+    </>
   )
 }
