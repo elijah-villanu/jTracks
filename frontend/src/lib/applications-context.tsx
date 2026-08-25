@@ -20,8 +20,26 @@ export type ApplicationInput = Omit<Application, "id" | "user_id" | "created_at"
  * (or just the pasted URL, on the unsupported/failed/error paths) so
  * this form always opens pre-filled instead of blank.
  */
+/**
+ * A11y (F5 autofill review): the outcome of the autofill attempt, handed
+ * to the review form so it can *state* what happened. Previously all
+ * three outcomes (parsed / unsupported domain / failed parse) closed the
+ * autofill dialog and opened this same form with no explanation at all --
+ * the only difference was which inputs happened to be pre-filled, which
+ * is invisible to a screen reader user and easy to miss for a sighted
+ * one. Rendered as a `role="status"` message at the top of the form.
+ */
+export interface ApplicationFormNotice {
+  tone: "success" | "warning"
+  message: string
+}
+
 export type ApplicationFormState =
-  | { mode: "create"; initialValues?: Partial<ApplicationInput> }
+  | {
+      mode: "create"
+      initialValues?: Partial<ApplicationInput>
+      notice?: ApplicationFormNotice
+    }
   | { mode: "edit"; application: Application }
   | null
 
@@ -48,7 +66,10 @@ export interface ApplicationsContextValue {
    */
   deleteApplication: (id: string) => Promise<void>
   formState: ApplicationFormState
-  openCreateForm: (initialValues?: Partial<ApplicationInput>) => void
+  openCreateForm: (
+    initialValues?: Partial<ApplicationInput>,
+    notice?: ApplicationFormNotice
+  ) => void
   openEditForm: (application: Application) => void
   closeForm: () => void
 }
@@ -115,9 +136,12 @@ export function ApplicationsProvider({ children }: { children: ReactNode }) {
     setApplications((prev) => prev.filter((application) => application.id !== id))
   }, [])
 
-  const openCreateForm = useCallback((initialValues?: Partial<ApplicationInput>) => {
-    setFormState({ mode: "create", initialValues })
-  }, [])
+  const openCreateForm = useCallback(
+    (initialValues?: Partial<ApplicationInput>, notice?: ApplicationFormNotice) => {
+      setFormState({ mode: "create", initialValues, notice })
+    },
+    []
+  )
 
   const openEditForm = useCallback((application: Application) => {
     setFormState({ mode: "edit", application })

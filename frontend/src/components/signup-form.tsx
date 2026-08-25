@@ -13,6 +13,7 @@ import {
 import {
   Field,
   FieldDescription,
+  FieldError,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
@@ -32,6 +33,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
+  const [mismatch, setMismatch] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -39,10 +41,18 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
     setError(null)
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match.")
+      // A11y: this used to only render a generic banner at the top of the
+      // form while focus stayed on the submit button, leaving no way to
+      // tell *which* field was wrong. Now the offending field is marked
+      // invalid and focused.
+      setMismatch(true)
+      requestAnimationFrame(() => {
+        document.getElementById("confirm-password")?.focus()
+      })
       return
     }
 
+    setMismatch(false)
     setIsSubmitting(true)
 
     try {
@@ -76,7 +86,16 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
   return (
     <Card {...props}>
       <CardHeader>
-        <CardTitle>Create an account</CardTitle>
+        {/*
+          A11y (WCAG 1.3.1 / 2.4.6): `CardTitle` renders a plain <div>, so
+          this route had no heading at all -- screen reader users landing
+          here found an unstructured page with nothing to navigate by.
+          Tailwind's preflight resets heading typography, so the nested
+          <h1> is visually identical.
+        */}
+        <CardTitle>
+          <h1>Create an account</h1>
+        </CardTitle>
         <CardDescription>
           Enter your information below to create your account
         </CardDescription>
@@ -101,8 +120,15 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 required
+                aria-describedby="signup-email-hint"
               />
-              <FieldDescription>
+              {/*
+                A11y: these hints sat next to their inputs visually but were
+                never referenced by `aria-describedby`, so the password rule
+                ("at least 8 characters") was invisible to screen reader
+                users until the browser rejected the submit.
+              */}
+              <FieldDescription id="signup-email-hint">
                 We&apos;ll use this to contact you. We will not share your email
                 with anyone else.
               </FieldDescription>
@@ -116,12 +142,13 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
                 onChange={(event) => setPassword(event.target.value)}
                 required
                 minLength={8}
+                aria-describedby="signup-password-hint"
               />
-              <FieldDescription>
+              <FieldDescription id="signup-password-hint">
                 Must be at least 8 characters long.
               </FieldDescription>
             </Field>
-            <Field>
+            <Field data-invalid={mismatch}>
               <FieldLabel htmlFor="confirm-password">
                 Confirm Password
               </FieldLabel>
@@ -132,8 +159,21 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
                 onChange={(event) => setConfirmPassword(event.target.value)}
                 required
                 minLength={8}
+                aria-describedby={
+                  mismatch
+                    ? "signup-confirm-password-hint signup-confirm-password-error"
+                    : "signup-confirm-password-hint"
+                }
+                aria-invalid={mismatch || undefined}
               />
-              <FieldDescription>Please confirm your password.</FieldDescription>
+              <FieldDescription id="signup-confirm-password-hint">
+                Re-enter the same password to confirm it.
+              </FieldDescription>
+              {mismatch && (
+                <FieldError id="signup-confirm-password-error">
+                  Passwords do not match.
+                </FieldError>
+              )}
             </Field>
             <FieldGroup>
               <Field>

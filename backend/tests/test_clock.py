@@ -58,7 +58,7 @@ def test_response_time_uses_a_single_calendar(client, auth_headers):
         json={
             "company": "Northwind",
             "title": "Backend Engineer",
-            "status": "interviewing",
+            "status": "interviewing_oa",
             "date_applied": applied.isoformat(),
         },
         headers=auth_headers,

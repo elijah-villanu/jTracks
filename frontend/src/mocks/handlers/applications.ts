@@ -1,6 +1,7 @@
 import { http, HttpResponse } from "msw"
 import { API_BASE_URL } from "@/lib/api-client"
 import { applicationFixtures } from "@/mocks/fixtures/applications"
+import { requireAuth } from "@/mocks/handlers/require-auth"
 import type { Application, ApplicationStatus } from "@/types/api"
 
 const url = (path: string) => new URL(path, API_BASE_URL).toString()
@@ -30,6 +31,11 @@ interface ApplicationCreateBody {
  */
 export const applicationHandlers = [
   http.get(url("/applications"), ({ request }) => {
+    const authError = requireAuth(request)
+    if (authError) {
+      return authError
+    }
+
     const status = new URL(request.url).searchParams.get("status") as ApplicationStatus | null
 
     const applications = status
@@ -40,6 +46,11 @@ export const applicationHandlers = [
   }),
 
   http.post(url("/applications"), async ({ request }) => {
+    const authError = requireAuth(request)
+    if (authError) {
+      return authError
+    }
+
     const body = (await request.json()) as ApplicationCreateBody
 
     if (!body.company || !body.title || !body.status) {
@@ -75,6 +86,11 @@ export const applicationHandlers = [
   }),
 
   http.patch(url("/applications/:id"), async ({ params, request }) => {
+    const authError = requireAuth(request)
+    if (authError) {
+      return authError
+    }
+
     const { id } = params as { id: string }
     const index = applicationFixtures.findIndex((application) => application.id === id)
 
@@ -96,7 +112,12 @@ export const applicationHandlers = [
     return HttpResponse.json(updated)
   }),
 
-  http.delete(url("/applications/:id"), ({ params }) => {
+  http.delete(url("/applications/:id"), ({ params, request }) => {
+    const authError = requireAuth(request)
+    if (authError) {
+      return authError
+    }
+
     const { id } = params as { id: string }
     const index = applicationFixtures.findIndex((application) => application.id === id)
 

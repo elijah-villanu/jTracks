@@ -54,7 +54,19 @@ export function ApplicationsToolbar({
         onValueChange={(value) => onStatusFilterChange((value as StatusFilter) ?? "all")}
       >
         <SelectTrigger className="w-[180px]" aria-label="Filter by status">
-          <SelectValue placeholder="Filter by status" />
+          {/*
+            A11y (WCAG 4.1.2 Name, Role, Value): a bare `<SelectValue />`
+            renders Base UI's raw *value*, not the chosen item's label --
+            so picking "Interviewing / OA" left the trigger reading
+            `interviewing_oa`, and a screen reader announced the filter as
+            "Filter by status, combo box, interviewing_oa". Format the
+            value through the same STATUS_LABEL map the options use.
+          */}
+          <SelectValue placeholder="Filter by status">
+            {(value: StatusFilter | null) =>
+              !value || value === "all" ? "All statuses" : STATUS_LABEL[value]
+            }
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All statuses</SelectItem>

@@ -1,10 +1,20 @@
-"""B9 — daily auto-ghosting sweep.
+"""B9/B20 — daily auto-ghosting sweep.
 
-Flips Applied/Interviewing applications whose ghosting deadline has passed to
-Ghosted. Correctness properties (tested):
+Flips Applied applications whose ghosting deadline has passed to Ghosted.
+
+V2/R2: the sweep's scope narrowed to `applied` **only**. Once an application
+reaches `interviewing_oa` a two-week gap is normal, and silently flipping it to
+`ghosted` destroys exactly the signal the V2 status split exists to expose — so
+that call is now the user's alone (R2.3). `failed` likewise joins `offer` and
+`rejected` as a status the sweep never touches (R2.2); `failed → ghosted` stays
+a legal *manual* transition but is never an automatic one. The scope lives in
+`transitions.GHOSTABLE_STATUSES`; this module just reads it.
+
+Correctness properties (tested):
   * exactly one transition per overdue row;
   * re-running finds nothing new (idempotent) — already-Ghosted rows are excluded
-    by the status filter, and terminal Offer/Rejected are never touched.
+    by the status filter, and terminal Offer/Rejected/Failed are never touched;
+  * a long-overdue `interviewing_oa` row is never transitioned.
 
 Clock start: `date_applied` (the PRD explicitly says this date starts the
 ghosting clock). Effective limit = the row's `ghost_days_override` if set, else

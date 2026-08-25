@@ -1,5 +1,6 @@
 import { useRef, useState } from "react"
 import { toBlob } from "html-to-image"
+import { DateRangeControl } from "@/components/dashboard/date-range-control"
 import { RecapCard } from "@/components/dashboard/recap-card"
 import { Button } from "@/components/ui/button"
 import {
@@ -11,12 +12,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { useRecap } from "@/hooks/useRecap"
-import type { RecapRange } from "@/types/api"
-
-const RECAP_RANGE_OPTIONS: { value: RecapRange; label: string }[] = [
-  { value: "week", label: "Week" },
-  { value: "month", label: "Month" },
-]
+import { validateCustomRange } from "@/lib/date-range"
+import type { DashboardRange } from "@/types/api"
 
 // The on-screen card (recap-card.tsx) is 270x480 -- pixelRatio 4 exports
 // a clean 1080x1920 PNG, the standard Instagram-Stories resolution.
@@ -28,10 +25,11 @@ interface RecapDialogProps {
 }
 
 /**
- * F8's "Generate recap" flow: a week/month toggle (recap only supports
- * those two ranges per the backend contract -- deliberately its own
- * state, not coupled to AnalyticsPage's week/month/all toggle), a live
- * preview of the exportable recap sticker, and Download/Share actions.
+ * F8's "Generate recap" flow: a range toggle (F13 widens this from a
+ * week/month-only toggle to the full week/month/year/all/custom set,
+ * matching the backend's shared `DashboardRange` contract -- deliberately
+ * its own state, not coupled to AnalyticsPage's toggle), a live preview
+ * of the exportable recap sticker, and Download/Share actions.
  *
  * Client-side render per docs/decisions/recap-image-approach.md (B15):
  * `GET /dashboard/recap` (mocked in src/mocks/handlers/recap.ts until
@@ -40,12 +38,21 @@ interface RecapDialogProps {
  * html-to-image, and never touches the network.
  */
 export function RecapDialog({ open, onOpenChange }: RecapDialogProps) {
-  const [range, setRange] = useState<RecapRange>("week")
+  const [range, setRange] = useState<DashboardRange>("week")
+  const [customStart, setCustomStart] = useState<string | null>(null)
+  const [customEnd, setCustomEnd] = useState<string | null>(null)
   const [isExporting, setIsExporting] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
+  /** Announced (only) to assistive tech once an export finishes. */
+  const [exportStatus, setExportStatus] = useState<string | null>(null)
   const cardRef = useRef<HTMLDivElement>(null)
 
-  const { recap, isLoading, error } = useRecap(range, open)
+  const { recap, isLoading, error } = useRecap(range, customStart, customEnd, open)
+
+  // Recomputed locally (cheap, pure) so it can gate the inline error shown
+  // next to the date pickers -- distinct from `error` above, which also
+  // covers real fetch/server failures (surfaced in the banner below).
+  const customRangeError = range === "custom" ? validateCustomRange(customStart, customEnd) : null
 
   // Feature-detect the Web Share API's file-sharing support up front so
   // unsupported browsers (most desktops) never see a Share button that
@@ -56,6 +63,7 @@ export function RecapDialog({ open, onOpenChange }: RecapDialogProps) {
   function handleOpenChange(nextOpen: boolean) {
     if (!nextOpen) {
       setExportError(null)
+      setExportStatus(null)
     }
     onOpenChange(nextOpen)
   }
@@ -79,6 +87,7 @@ export function RecapDialog({ open, onOpenChange }: RecapDialogProps) {
 
   async function handleDownload() {
     setExportError(null)
+    setExportStatus(null)
     setIsExporting(true)
     try {
       const blob = await exportCardToBlob()
@@ -90,6 +99,10 @@ export function RecapDialog({ open, onOpenChange }: RecapDialogProps) {
       link.click()
       link.remove()
       URL.revokeObjectURL(objectUrl)
+      // A programmatic <a download> click produces no perceivable feedback
+      // at all outside the browser's own download chrome, which many
+      // screen readers don't surface -- say so explicitly.
+      setExportStatus(`Recap image downloaded as jtracks-recap-${range}.png.`)
     } catch (err) {
       setExportError(err instanceof Error ? err.message : "Couldn't export the recap image.")
     } finally {
@@ -99,6 +112,7 @@ export function RecapDialog({ open, onOpenChange }: RecapDialogProps) {
 
   async function handleShare() {
     setExportError(null)
+    setExportStatus(null)
     setIsExporting(true)
     try {
       const blob = await exportCardToBlob()
@@ -138,22 +152,18 @@ export function RecapDialog({ open, onOpenChange }: RecapDialogProps) {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex gap-1.5" role="group" aria-label="Recap range">
-          {RECAP_RANGE_OPTIONS.map((option) => (
-            <Button
-              key={option.value}
-              type="button"
-              size="sm"
-              variant={range === option.value ? "default" : "outline"}
-              aria-pressed={range === option.value}
-              onClick={() => setRange(option.value)}
-            >
-              {option.label}
-            </Button>
-          ))}
-        </div>
+        <DateRangeControl
+          range={range}
+          onRangeChange={setRange}
+          start={customStart}
+          end={customEnd}
+          onStartChange={setCustomStart}
+          onEndChange={setCustomEnd}
+          ariaLabel="Recap range"
+          error={customRangeError}
+        />
 
-        {error && (
+        {error && !customRangeError && (
           <p
             role="alert"
             className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
@@ -174,6 +184,26 @@ export function RecapDialog({ open, onOpenChange }: RecapDialogProps) {
             <RecapCard ref={cardRef} recap={recap} />
           )}
         </div>
+
+        {/*
+          A11y (WCAG 4.1.3): everything interesting in this dialog happens
+          without moving focus -- the preview card swaps in when the fetch
+          lands, and Download/Share do their work with only the button
+          label changing to "Exporting...". A screen reader user got no
+          signal for either. One always-present polite region covers the
+          fetch, the export, and the export's completion.
+        */}
+        <p role="status" aria-live="polite" className="sr-only">
+          {isExporting
+            ? "Preparing your recap image..."
+            : exportStatus
+              ? exportStatus
+              : isLoading
+                ? "Loading recap..."
+                : recap
+                  ? `Recap ready: ${recap.headline}`
+                  : ""}
+        </p>
 
         {exportError && (
           <p

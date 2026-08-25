@@ -80,6 +80,14 @@ never re-derive the topology:
 }
 ```
 
+**Zero-value links are omitted** (refinement made in B24 under R5.5, mirrored in `FRONTEND_TASKS.md`).
+`nodes` is always all six entries in the order above, including zeros; `links` therefore carries
+**0–5 entries, not always 5**. This follows from B24's own acceptance (`total = 0` returns all six
+nodes at 0 and an **empty** `links` array) and R5.6 (when every application is still in `applied`
+there are **no links at all**) — emitting five links except when total is 0 would be an arbitrary
+special case. Consequence for the renderer: nodes that no link references are normal, so the chart
+must position an orphan node without help from the link graph.
+
 **Metric contract (V2):** `status_breakdown` is exactly 6 entries (all non-`saved` statuses, fixed order
 `applied, interviewing_oa, offer, rejected, failed, ghosted`, zero counts included);
 `response_rate = (interviewing_oa + offer + rejected + failed) / total`; `ghost_rate = ghosted / total`;
@@ -95,7 +103,7 @@ the `updated_at` already returned by `GET /applications`. Do not add an endpoint
 
 ## Milestone BV1: Status model & ghosting scope (delivery stage 1 — R1, R2)
 
-- [ ] **B18 — Replace `ALLOWED_TRANSITIONS` with the V2 transition matrix** (M)
+- [x] **B18 — Replace `ALLOWED_TRANSITIONS` with the V2 transition matrix** (M)
   Rewrite `backend/app/services/transitions.py` to encode R1.5 exactly:
 
   | From ↓ / To → | `saved` | `applied` | `interviewing_oa` | `offer` | `rejected` | `failed` | `ghosted` |
@@ -118,7 +126,7 @@ the `updated_at` already returned by `GET /applications`. Do not add an endpoint
   the 7 self-transitions against the table above; `applied → failed` allowed; `offer → ghosted` refused.
   Depends on: D7
 
-- [ ] **B19 — Carry the 7-value enum through schemas and the status filter** (S)
+- [x] **B19 — Carry the 7-value enum through schemas and the status filter** (S)
   `app/schemas/application.py` and `GET /applications?status=`. No alias, no deprecation shim — a request
   sending `status=interviewing` is a `422` from pydantic, not a `400` and not a `500`.
   Acceptance: `PATCH /applications/{id}` with `status=interviewing` returns `422`; `failed` and
@@ -126,7 +134,7 @@ the `updated_at` already returned by `GET /applications`. Do not add an endpoint
   filters correctly.
   Depends on: D7
 
-- [ ] **B20 — Narrow the ghosting sweep to `applied` only** (S)
+- [x] **B20 — Narrow the ghosting sweep to `applied` only** (S)
   R2. In `transitions.py`: `GHOSTABLE_STATUSES` becomes `frozenset({S.APPLIED})`, and `FAILED` joins
   `OFFER`/`REJECTED` in `TERMINAL_STATUSES`. `app/services/ghosting.py` needs no logic change beyond
   picking up the narrowed set — keep it daily, UTC (`utc_today()`), idempotent, and driven by
@@ -143,7 +151,7 @@ the `updated_at` already returned by `GET /applications`. Do not add an endpoint
 > Backend-first by design (PRD delivery sequence): get the numbers and the windows right before anything
 > draws them.
 
-- [ ] **B21 — Redefine the dashboard metrics for the V2 status set** (M)
+- [x] **B21 — Redefine the dashboard metrics for the V2 status set** (M)
   `app/services/dashboard_service.py` + `app/schemas/dashboard.py`. Implement R4.1–R4.5 per the metric
   contract above: 6-entry fixed-order `status_breakdown` including zero counts; the widened
   `response_rate`; **rename `rejection_rate` → `rejection_fail_rate` and remove the old field outright**
@@ -157,7 +165,7 @@ the `updated_at` already returned by `GET /applications`. Do not add an endpoint
   contains a `rejection_rate` key.
   Depends on: D7, D9
 
-- [ ] **B22 — Expanded range set and custom-range validation** (M)
+- [x] **B22 — Expanded range set and custom-range validation** (M)
   R6.1–R6.5, on `GET /dashboard/stats`. Accept `week | month | year | all | custom`. For `custom`:
   `start` and `end` are both required, `start <= end`, and the **inclusive** day count
   `(end - start).days + 1` must be 1–366 (the cap accommodates a leap year) — anything else is a `422`.
@@ -170,7 +178,7 @@ the `updated_at` already returned by `GET /applications`. Do not add an endpoint
   7; **the diff contains no `date.today()` or `datetime.now()`**.
   Depends on: B21
 
-- [ ] **B23 — Put the recap on the shared range set and V2 period labels** (S)
+- [x] **B23 — Put the recap on the shared range set and V2 period labels** (S)
   `GET /dashboard/recap` currently accepts only `week|month` and carries its own `_period()` helper.
   Unify it with B22's range handling so both endpoints take an identical range set, and implement R6.3's
   labels: `"This week"`, `"This month"`, `"This year"`, `"All time"`, and for custom the actual range
@@ -182,7 +190,7 @@ the `updated_at` already returned by `GET /applications`. Do not add an endpoint
 
 ## Milestone BV3: Sankey payload (delivery stage 3 — R5)
 
-- [ ] **B24 — Emit the `sankey` object from both dashboard endpoints** (M)
+- [x] **B24 — Emit the `sankey` object from both dashboard endpoints** (M)
   R5.3/R5.5. Nodes and links exactly as in the shared contract above. Derivation, over the selected
   range's submitted applications only: `Applied` node value = all submitted; `Applied → Interviewing/OA`
   = `interviewing_oa + offer + failed`; `Applied → Rejected` = `rejected`; `Applied → Ghosted` =
@@ -205,7 +213,7 @@ the `updated_at` already returned by `GET /applications`. Do not add an endpoint
 > Independent of BV1–BV3 and parallelizable, **but B25 must land before B28/B29.** The PRD says so in
 > its own risks section: resolve the deployment-topology question *before* R7 is implemented, not after.
 
-- [ ] **B25 — Spike: deployment topology & refresh-cookie `SameSite`** (S, decision task)
+- [x] **B25 — Spike: deployment topology & refresh-cookie `SameSite`** (S, decision task)
   PRD open question. `SameSite=Lax` cookies are **not sent on cross-site requests at all**, so a
   `*.vercel.app` frontend calling a `*.fly.dev` API means the refresh cookie silently never arrives —
   auth breaks in production while working perfectly on `localhost:5173 → localhost:8000`, which is
@@ -221,7 +229,7 @@ the `updated_at` already returned by `GET /applications`. Do not add an endpoint
   attributes to implement, and whether CSRF work is in or out of scope.
   Depends on: none — **blocks B28, B29, and FRONTEND's F19–F21.** Do it first within this milestone.
 
-- [ ] **B26 — Two-token configuration and minting** (S)
+- [x] **B26 — Two-token configuration and minting** (S)
   R7.1. `core/config.py`: drop `ACCESS_TOKEN_EXPIRE_MINUTES` from its current 7 days to **15–30 minutes**,
   add a refresh lifetime (7–30 days) and the cookie name/path/samesite settings. `core/security.py`:
   mint refresh tokens as **opaque high-entropy random values, not JWTs** (they are validated against the
@@ -233,7 +241,7 @@ the `updated_at` already returned by `GET /applications`. Do not add an endpoint
   startup validation still passes.
   Depends on: none (does not need B25 — lifetimes and hashing are topology-independent)
 
-- [ ] **B27 — Refresh-token service: issue, validate, revoke** (M)
+- [x] **B27 — Refresh-token service: issue, validate, revoke** (M)
   New `app/services/refresh_token_service.py` over the D11 table. `issue(user)` creates a row and returns
   the raw token. `validate(raw)` looks the row up **by hash** and requires: exists, `expires_at` in the
   future, `revoked_at is null` — all three checked on every refresh (security NFR). `revoke(raw)` sets
@@ -244,7 +252,7 @@ the `updated_at` already returned by `GET /applications`. Do not add an endpoint
   revoking an already-revoked token is a no-op, not an error; no raw token value appears in the DB.
   Depends on: D11, D12, B26
 
-- [ ] **B28 — `/auth/refresh`, `/auth/logout`, and refresh cookies on the existing auth endpoints** (M)
+- [x] **B28 — `/auth/refresh`, `/auth/logout`, and refresh cookies on the existing auth endpoints** (M)
   R7.4. `POST /auth/refresh` reads the refresh cookie, validates via B27, returns a new access token;
   `401` on **any** failure with a single undifferentiated message (don't leak whether a token was
   unknown, expired or revoked). `POST /auth/logout` revokes the presented token and clears the cookie —
@@ -260,7 +268,7 @@ the `updated_at` already returned by `GET /applications`. Do not add an endpoint
   `HttpOnly`, `Secure`, `Path=/auth` and the `SameSite` value B25 chose.
   Depends on: B25, B27
 
-- [ ] **B29 — Credentialed CORS with a strict origin allowlist** (S)
+- [x] **B29 — Credentialed CORS with a strict origin allowlist** (S)
   R7.7. Flip `allow_credentials=False` → `True` in `app/main.py`, reversing the MVP's deliberate choice
   now that there is an ambient cookie credential. The wildcard guard in `config.py`'s
   `_validate_cors_origins` **stays** and becomes load-bearing — wildcard origins are incompatible with
@@ -272,7 +280,7 @@ the `updated_at` already returned by `GET /applications`. Do not add an endpoint
 
 ## Milestone BV5: Documentation (delivery stage 5)
 
-- [ ] **B30 — Write `backend/API_SPEC_V2.md` as the complete standalone API specification** (L)
+- [x] **B30 — Write `backend/API_SPEC_V2.md` as the complete standalone API specification** (L)
   Documentation NFR: the spec is the contract of record, and every R-series change above breaks
   `API_SPEC_V1.md`. **This is a new file, not an in-place edit and not a diff.** `API_SPEC_V2.md` must
   fully document the API *as it exists after V2* — every endpoint, every request and response shape,

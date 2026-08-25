@@ -572,9 +572,19 @@ def test_l5_wildcard_origin_is_rejected_at_startup():
         )
 
 
-def test_l5_credentialed_cors_is_off(client):
-    """Auth is a Bearer header, so nothing should invite the browser to attach
-    ambient credentials cross-origin."""
+def test_l5_credentialed_cors_is_on_and_strictly_scoped(client):
+    """CHANGED IN V2 (PRD R7.7 / B29). V1 asserted `allow_credentials=False`,
+    which was correct then: the only credential was an `Authorization: Bearer`
+    header the browser never attaches on its own, so credentialed CORS bought
+    nothing and only widened the blast radius of a mis-set origin.
+
+    V2 adds a `SameSite=None` refresh cookie, which *is* an ambient credential,
+    and the browser will not send it cross-origin without this. The audit's
+    underlying concern is unchanged and is now enforced by the two assertions
+    below plus `test_l5_wildcard_origin_rejected` above: credentials are only
+    ever granted to an explicitly allow-listed origin, and a wildcard origin
+    fails at startup rather than being silently combined with credentials.
+    """
     resp = client.options(
         "/applications",
         headers={
@@ -582,8 +592,22 @@ def test_l5_credentialed_cors_is_off(client):
             "Access-Control-Request-Method": "GET",
         },
     )
-    assert resp.headers.get("access-control-allow-credentials") is None
+    assert resp.headers.get("access-control-allow-credentials") == "true"
     assert resp.headers.get("access-control-allow-origin") == "http://localhost:5173"
+
+
+def test_l5_credentials_are_not_granted_to_a_foreign_origin(client):
+    """The half of the V1 guarantee that still has to hold: an origin outside
+    the allowlist gets no allow-origin header, so the browser blocks it before
+    `allow_credentials` is ever relevant."""
+    resp = client.options(
+        "/applications",
+        headers={
+            "Origin": "https://evil.example",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+    assert resp.headers.get("access-control-allow-origin") is None
 
 
 def test_l5_unknown_origin_is_not_reflected(client):

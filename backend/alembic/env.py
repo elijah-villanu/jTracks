@@ -10,7 +10,7 @@ from alembic import context
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from app.db.base import Base  # noqa: E402
-from app.models import Application, User  # noqa: E402, F401
+from app.models import Application, RefreshToken, User  # noqa: E402, F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

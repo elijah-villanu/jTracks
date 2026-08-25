@@ -15,6 +15,7 @@ from apscheduler.triggers.cron import CronTrigger
 from app.core.config import settings
 from app.db.session import SessionLocal
 from app.services.ghosting import run_ghosting_sweep
+from app.services.refresh_token_service import purge_expired
 
 logger = logging.getLogger("jtracks.scheduler")
 
@@ -27,6 +28,15 @@ def _job() -> None:
         run_ghosting_sweep(db)
     except Exception:  # never let a job error kill the scheduler thread
         logger.exception("Ghosting sweep failed")
+    try:
+        # B27 — expired refresh-token cleanup piggybacks on the daily sweep
+        # rather than getting a scheduler entry of its own. Housekeeping only:
+        # an expired row already fails validation, so this is purely about not
+        # growing the table forever. Its own try/except so a failure here can
+        # never suppress or be suppressed by the ghosting sweep.
+        purge_expired(db)
+    except Exception:
+        logger.exception("Expired refresh-token purge failed")
     finally:
         db.close()
 

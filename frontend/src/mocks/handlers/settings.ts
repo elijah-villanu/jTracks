@@ -1,6 +1,7 @@
 import { http, HttpResponse } from "msw"
 import { API_BASE_URL } from "@/lib/api-client"
 import { USER_FIXTURE } from "@/mocks/fixtures/user"
+import { requireAuth } from "@/mocks/handlers/require-auth"
 
 const url = (path: string) => new URL(path, API_BASE_URL).toString()
 
@@ -22,20 +23,18 @@ function isPositiveInteger(value: unknown): value is number {
  */
 export const settingsHandlers = [
   http.get(url("/settings"), ({ request }) => {
-    const authHeader = request.headers.get("Authorization")
-
-    if (!authHeader?.startsWith("Bearer ") || !authHeader.slice("Bearer ".length)) {
-      return HttpResponse.json({ message: "Unauthorized." }, { status: 401 })
+    const authError = requireAuth(request)
+    if (authError) {
+      return authError
     }
 
     return HttpResponse.json({ ghost_days_default: USER_FIXTURE.ghost_days_default })
   }),
 
   http.patch(url("/settings"), async ({ request }) => {
-    const authHeader = request.headers.get("Authorization")
-
-    if (!authHeader?.startsWith("Bearer ") || !authHeader.slice("Bearer ".length)) {
-      return HttpResponse.json({ message: "Unauthorized." }, { status: 401 })
+    const authError = requireAuth(request)
+    if (authError) {
+      return authError
     }
 
     const body = (await request.json()) as SettingsBody

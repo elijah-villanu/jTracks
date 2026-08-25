@@ -10,9 +10,10 @@
 export type ApplicationStatus =
   | "saved"
   | "applied"
-  | "interviewing"
+  | "interviewing_oa"
   | "offer"
   | "rejected"
+  | "failed"
   | "ghosted"
 
 export interface Application {
@@ -115,11 +116,11 @@ export function isAutofillFailed(response: AutofillResponse): response is Autofi
  * `saved`). See src/mocks/handlers/dashboard.ts for how the mock
  * approximates this without real status-change history.
  */
-export type DashboardRange = "week" | "month" | "all"
+export type DashboardRange = "week" | "month" | "year" | "all" | "custom"
 
 export interface StatusBreakdownEntry {
-  status: ApplicationStatus // only applied/interviewing/offer/rejected/ghosted will appear
-  count: number
+  status: ApplicationStatus // only applied/interviewing_oa/offer/rejected/failed/ghosted will appear
+  count: number // all 6 non-`saved` statuses always appear, including zero counts
   percentage: number // 0-100, share of `total`, 1 decimal
 }
 
@@ -130,16 +131,39 @@ export interface ApplicationsOverTimePoint {
 
 export type TimeSeriesGranularity = "day" | "week" | "month"
 
+/**
+ * Sankey node/link shape, mirroring BACKEND_TASKS.md's shared contract
+ * example exactly (see the `sankey` JSON block under "Both dashboard
+ * endpoints gain a `sankey` object").
+ */
+export interface SankeyNode {
+  key: ApplicationStatus
+  label: string
+  value: number
+}
+
+export interface SankeyLink {
+  source: ApplicationStatus
+  target: ApplicationStatus
+  value: number
+}
+
+export interface Sankey {
+  nodes: SankeyNode[]
+  links: SankeyLink[]
+}
+
 export interface DashboardStats {
   range: DashboardRange
   total: number // submitted applications in the window (excludes `saved`) -- not named `total_applications`
   status_breakdown: StatusBreakdownEntry[]
   applications_over_time: ApplicationsOverTimePoint[]
   time_series_granularity: TimeSeriesGranularity
-  response_rate: number // percentage 0-100: (interviewing+offer+rejected) / total -- a rejection counts as a response
+  response_rate: number // percentage 0-100: (interviewing_oa+offer+rejected) / total -- a rejection counts as a response
   ghost_rate: number // percentage 0-100: ghosted / total
-  rejection_rate: number // percentage 0-100: rejected / total
+  rejection_fail_rate: number // percentage 0-100: (rejected + failed) / total
   avg_time_to_response_days: number | null // null if there's no data to compute it from in the current range
+  sankey: Sankey
 }
 
 /**
@@ -150,17 +174,17 @@ export interface DashboardStats {
  * `DashboardStats` above, this one is deliberately kept in exact sync
  * with the real backend contract (see docs/decisions/recap-image-approach.md,
  * B15: client-side rendering) so F8 needs zero changes when B16 ships,
- * only a mock-vs-real fetch swap. Recap only supports week/month (no "all").
+ * only a mock-vs-real fetch swap. As of F12, recap shares `DashboardRange`
+ * with the dashboard stats endpoint (recap now takes the full set), though
+ * the UI only offers week/month today -- see recap-dialog.tsx.
  */
-export type RecapRange = "week" | "month"
-
 export interface RecapHighlight {
   label: string
   value: string
 }
 
 export interface DashboardRecap {
-  range: RecapRange
+  range: DashboardRange
   period_label: string // "This week" / "This month"
   period_start: string // ISO date (YYYY-MM-DD)
   period_end: string // ISO date (YYYY-MM-DD)
@@ -168,4 +192,5 @@ export interface DashboardRecap {
   headline: string
   highlights: RecapHighlight[]
   status_breakdown: StatusBreakdownEntry[]
+  sankey: Sankey
 }
