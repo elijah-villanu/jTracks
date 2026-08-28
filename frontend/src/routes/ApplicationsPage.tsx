@@ -11,6 +11,7 @@ import {
   type SortKey,
 } from "@/components/table/applications-table"
 import { statusSelectId } from "@/components/table/status-select"
+import { BlurFade } from "@/components/ui/blur-fade"
 import { useApplicationsContext } from "@/hooks/useApplicationsContext"
 import { ApiError } from "@/lib/api-client"
 import type { Application, ApplicationStatus } from "@/types/api"
@@ -201,13 +202,22 @@ export function ApplicationsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-xl font-semibold text-foreground">Applications</h1>
-        <p className="text-sm text-muted-foreground">
-          Every application in your pipeline -- filter, search, sort, and move a row through
-          its status right from the table.
-        </p>
-      </div>
+      {/*
+        Single once-per-mount entrance on the header only -- this page is
+        data-dense/interactive (filter, search, sort, per-row status
+        changes), so per docs/decisions/magicui-conventions.md's restraint
+        rule the toolbar and table are deliberately left untouched: neither
+        should re-animate on every keystroke/filter change.
+      */}
+      <BlurFade delay={0}>
+        <div>
+          <h1 className="text-xl font-semibold text-foreground">Applications</h1>
+          <p className="text-sm text-muted-foreground">
+            Every application in your pipeline -- filter, search, sort, and move a row through
+            its status right from the table.
+          </p>
+        </div>
+      </BlurFade>
 
       {(error || actionError) && (
         <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">

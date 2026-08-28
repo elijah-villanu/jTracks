@@ -5,11 +5,21 @@ import { RecapDialog } from "@/components/dashboard/recap-dialog"
 import { SankeyChart } from "@/components/dashboard/sankey-chart"
 import { StatTile } from "@/components/dashboard/stat-tile"
 import { StatusBreakdownChart } from "@/components/dashboard/status-breakdown-chart"
+import { BlurFade } from "@/components/ui/blur-fade"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useDashboardStats } from "@/hooks/useDashboardStats"
 import { validateCustomRange } from "@/lib/date-range"
 import type { DashboardRange } from "@/types/api"
+
+/**
+ * Entrance-animation stagger for this page's three content groups (stat
+ * row, chart row, pipeline flow) -- see docs/decisions/magicui-conventions.md
+ * for the timing/easing convention this follows project-wide. Kept as a
+ * named constant rather than inlined per-`BlurFade` so the stagger step is
+ * obvious and stays consistent if a fourth group is ever added here.
+ */
+const ENTRANCE_STAGGER_SECONDS = 0.08
 
 /**
  * F7's dashboard: status breakdown, applications-over-time trend, and
@@ -86,67 +96,91 @@ export function AnalyticsPage() {
       {!isLoading &&
         stats && (
           <>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-              <StatTile label="Total Applications" value={String(stats.total)} />
-              <StatTile label="Response Rate" value={`${stats.response_rate.toFixed(0)}%`} />
-              <StatTile label="Ghost Rate" value={`${stats.ghost_rate.toFixed(0)}%`} />
-              <StatTile label="Rejection/Fail Rate" value={`${stats.rejection_fail_rate.toFixed(0)}%`} />
-              <StatTile
-                label="Avg Time to Response"
-                value={`${stats.avg_time_to_response_days?.toFixed(1) ?? "—"} days`}
-              />
-            </div>
+            <BlurFade delay={0}>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                <StatTile label="Total Applications" value={String(stats.total)} numericValue={stats.total} accent />
+                <StatTile
+                  label="Response Rate"
+                  value={`${stats.response_rate.toFixed(0)}%`}
+                  numericValue={stats.response_rate}
+                  suffix="%"
+                />
+                <StatTile
+                  label="Ghost Rate"
+                  value={`${stats.ghost_rate.toFixed(0)}%`}
+                  numericValue={stats.ghost_rate}
+                  suffix="%"
+                />
+                <StatTile
+                  label="Rejection/Fail Rate"
+                  value={`${stats.rejection_fail_rate.toFixed(0)}%`}
+                  numericValue={stats.rejection_fail_rate}
+                  suffix="%"
+                />
+                <StatTile
+                  label="Avg Time to Response"
+                  value={`${stats.avg_time_to_response_days?.toFixed(1) ?? "—"} days`}
+                  numericValue={stats.avg_time_to_response_days}
+                  suffix=" days"
+                  decimalPlaces={1}
+                />
+              </div>
+            </BlurFade>
 
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            <BlurFade delay={ENTRANCE_STAGGER_SECONDS}>
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                <Card>
+                  <CardHeader>
+                    {/*
+                      A11y (WCAG 1.3.1 / 2.4.10): `CardTitle` is a <div>, so
+                      the three chart titles were not headings and a screen
+                      reader user had no way to jump between the sections of
+                      this page. Tailwind preflight resets heading
+                      typography, so nesting <h2> changes nothing visually.
+                    */}
+                    <CardTitle>
+                      <h2>Status breakdown</h2>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <StatusBreakdownChart data={stats.status_breakdown} />
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>
+                      <h2>Applications over time</h2>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ApplicationsOverTimeChart
+                      data={stats.applications_over_time}
+                      granularity={stats.time_series_granularity}
+                    />
+                  </CardContent>
+                </Card>
+              </div>
+            </BlurFade>
+
+            <BlurFade delay={ENTRANCE_STAGGER_SECONDS * 2}>
               <Card>
                 <CardHeader>
-                  {/*
-                    A11y (WCAG 1.3.1 / 2.4.10): `CardTitle` is a <div>, so
-                    the three chart titles were not headings and a screen
-                    reader user had no way to jump between the sections of
-                    this page. Tailwind preflight resets heading
-                    typography, so nesting <h2> changes nothing visually.
-                  */}
                   <CardTitle>
-                    <h2>Status breakdown</h2>
+                    <h2>Pipeline flow</h2>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <StatusBreakdownChart data={stats.status_breakdown} />
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>
-                    <h2>Applications over time</h2>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ApplicationsOverTimeChart
-                    data={stats.applications_over_time}
-                    granularity={stats.time_series_granularity}
+                  <SankeyChart
+                    data={stats.sankey}
+                    width={343}
+                    height={170}
+                    fontSize={9}
+                    className="h-auto w-full"
                   />
                 </CardContent>
               </Card>
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>
-                  <h2>Pipeline flow</h2>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <SankeyChart
-                  data={stats.sankey}
-                  width={343}
-                  height={170}
-                  fontSize={9}
-                  className="h-auto w-full"
-                />
-              </CardContent>
-            </Card>
+            </BlurFade>
           </>
         )}
     </div>

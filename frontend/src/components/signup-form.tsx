@@ -1,7 +1,10 @@
 import { useState, type FormEvent } from "react"
 import { Link, useNavigate } from "react-router"
 import { ApiError } from "@/lib/api-client"
+import { cn } from "@/lib/utils"
 import { useAuth } from "@/hooks/useAuth"
+import { BlurFade } from "@/components/ui/blur-fade"
+import { BorderBeam } from "@/components/ui/border-beam"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -25,7 +28,7 @@ import { Input } from "@/components/ui/input"
  * has no name field, so this only collects email/password + a
  * client-side password confirmation check.
  */
-export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
+export function SignupForm({ className, ...props }: React.ComponentProps<typeof Card>) {
   const { signup, loginWithGoogle } = useAuth()
   const navigate = useNavigate()
 
@@ -84,118 +87,126 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
   }
 
   return (
-    <Card {...props}>
-      <CardHeader>
-        {/*
-          A11y (WCAG 1.3.1 / 2.4.6): `CardTitle` renders a plain <div>, so
-          this route had no heading at all -- screen reader users landing
-          here found an unstructured page with nothing to navigate by.
-          Tailwind's preflight resets heading typography, so the nested
-          <h1> is visually identical.
-        */}
-        <CardTitle>
-          <h1>Create an account</h1>
-        </CardTitle>
-        <CardDescription>
-          Enter your information below to create your account
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit}>
-          <FieldGroup>
-            {error && (
-              <p
-                role="alert"
-                className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-              >
-                {error}
-              </p>
-            )}
-            <Field>
-              <FieldLabel htmlFor="email">Email</FieldLabel>
-              <Input
-                id="email"
-                type="email"
-                placeholder="m@example.com"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                required
-                aria-describedby="signup-email-hint"
-              />
-              {/*
-                A11y: these hints sat next to their inputs visually but were
-                never referenced by `aria-describedby`, so the password rule
-                ("at least 8 characters") was invisible to screen reader
-                users until the browser rejected the submit.
-              */}
-              <FieldDescription id="signup-email-hint">
-                We&apos;ll use this to contact you. We will not share your email
-                with anyone else.
-              </FieldDescription>
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="password">Password</FieldLabel>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                required
-                minLength={8}
-                aria-describedby="signup-password-hint"
-              />
-              <FieldDescription id="signup-password-hint">
-                Must be at least 8 characters long.
-              </FieldDescription>
-            </Field>
-            <Field data-invalid={mismatch}>
-              <FieldLabel htmlFor="confirm-password">
-                Confirm Password
-              </FieldLabel>
-              <Input
-                id="confirm-password"
-                type="password"
-                value={confirmPassword}
-                onChange={(event) => setConfirmPassword(event.target.value)}
-                required
-                minLength={8}
-                aria-describedby={
-                  mismatch
-                    ? "signup-confirm-password-hint signup-confirm-password-error"
-                    : "signup-confirm-password-hint"
-                }
-                aria-invalid={mismatch || undefined}
-              />
-              <FieldDescription id="signup-confirm-password-hint">
-                Re-enter the same password to confirm it.
-              </FieldDescription>
-              {mismatch && (
-                <FieldError id="signup-confirm-password-error">
-                  Passwords do not match.
-                </FieldError>
-              )}
-            </Field>
+    // Single entrance for the whole auth card + a single, slow BorderBeam
+    // accent (the card is the one thing on this page) -- see
+    // docs/decisions/magicui-conventions.md. `relative` is required so the
+    // beam's `absolute inset-0` overlay positions against the card, not the
+    // page.
+    <BlurFade delay={0}>
+      <Card className={cn("relative", className)} {...props}>
+        <BorderBeam duration={8} colorFrom="var(--foreground)" colorTo="var(--muted-foreground)" />
+        <CardHeader>
+          {/*
+            A11y (WCAG 1.3.1 / 2.4.6): `CardTitle` renders a plain <div>, so
+            this route had no heading at all -- screen reader users landing
+            here found an unstructured page with nothing to navigate by.
+            Tailwind's preflight resets heading typography, so the nested
+            <h1> is visually identical.
+          */}
+          <CardTitle>
+            <h1>Create an account</h1>
+          </CardTitle>
+          <CardDescription>
+            Enter your information below to create your account
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit}>
             <FieldGroup>
-              <Field>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? "Creating account..." : "Create Account"}
-                </Button>
-                <Button
-                  variant="outline"
-                  type="button"
-                  disabled={isSubmitting}
-                  onClick={handleGoogleSignup}
+              {error && (
+                <p
+                  role="alert"
+                  className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
                 >
-                  Sign up with Google
-                </Button>
-                <FieldDescription className="px-6 text-center">
-                  Already have an account? <Link to="/login">Sign in</Link>
+                  {error}
+                </p>
+              )}
+              <Field>
+                <FieldLabel htmlFor="email">Email</FieldLabel>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="m@example.com"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  required
+                  aria-describedby="signup-email-hint"
+                />
+                {/*
+                  A11y: these hints sat next to their inputs visually but were
+                  never referenced by `aria-describedby`, so the password rule
+                  ("at least 8 characters") was invisible to screen reader
+                  users until the browser rejected the submit.
+                */}
+                <FieldDescription id="signup-email-hint">
+                  We&apos;ll use this to contact you. We will not share your email
+                  with anyone else.
                 </FieldDescription>
               </Field>
+              <Field>
+                <FieldLabel htmlFor="password">Password</FieldLabel>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  required
+                  minLength={8}
+                  aria-describedby="signup-password-hint"
+                />
+                <FieldDescription id="signup-password-hint">
+                  Must be at least 8 characters long.
+                </FieldDescription>
+              </Field>
+              <Field data-invalid={mismatch}>
+                <FieldLabel htmlFor="confirm-password">
+                  Confirm Password
+                </FieldLabel>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  required
+                  minLength={8}
+                  aria-describedby={
+                    mismatch
+                      ? "signup-confirm-password-hint signup-confirm-password-error"
+                      : "signup-confirm-password-hint"
+                  }
+                  aria-invalid={mismatch || undefined}
+                />
+                <FieldDescription id="signup-confirm-password-hint">
+                  Re-enter the same password to confirm it.
+                </FieldDescription>
+                {mismatch && (
+                  <FieldError id="signup-confirm-password-error">
+                    Passwords do not match.
+                  </FieldError>
+                )}
+              </Field>
+              <FieldGroup>
+                <Field>
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? "Creating account..." : "Create Account"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={handleGoogleSignup}
+                  >
+                    Sign up with Google
+                  </Button>
+                  <FieldDescription className="px-6 text-center">
+                    Already have an account? <Link to="/login">Sign in</Link>
+                  </FieldDescription>
+                </Field>
+              </FieldGroup>
             </FieldGroup>
-          </FieldGroup>
-        </form>
-      </CardContent>
-    </Card>
+          </form>
+        </CardContent>
+      </Card>
+    </BlurFade>
   )
 }

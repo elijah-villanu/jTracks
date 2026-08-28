@@ -20,3 +20,8 @@ If the source you inspected via `getRegistryItem` hardcodes colors instead of us
 
 # Free-Tier Note
 This MCP server is the free tier. If a search or get call comes back empty or errors for something that looks Pro-only, treat it as unavailable rather than retrying repeatedly.
+
+# Page Cohesion (read before adding MagicUI to any page)
+`docs/decisions/magicui-conventions.md` is the living registry of every MagicUI decision made in this project — which components are approved and what each is/isn't for, the exact timing/easing/duration values in use (entrance animations, stagger step, continuous-accent duration, counter spring), the "at most one continuous/looping accent per view" restraint rule, the theming rule (never ship a MagicUI component's hardcoded default colors — override with this project's CSS variable tokens), and a per-page inventory of what's already used where. Read it before adding MagicUI anywhere, match its existing values instead of inventing new ones, and update both the relevant section and the per-page inventory table when you add or change MagicUI usage on a page — otherwise the doc goes stale and the next session re-derives everything from scratch.
+
+**Non-negotiable:** every MagicUI/Motion component must sit under the app-root `<MotionConfig reducedMotion="user">` (`frontend/src/main.tsx`) so it automatically honors the OS reduced-motion setting — this project's global CSS reduced-motion reset (`frontend/src/index.css`) cannot reach Motion-driven animations on its own. Never add a component that bypasses this provider (e.g. via a portal outside the tree, or a library that ignores `MotionConfig`) without an explicit, equivalent reduced-motion handling of its own.
