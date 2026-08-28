@@ -10,6 +10,10 @@ where V2 changes V1 behavior, V2 wins.
 [`v1/FRONTEND_TASKS.md`](./v1/FRONTEND_TASKS.md)). V2 starts at **F10**, so a reference to "F8" always
 means the same thing in both documents.
 
+**V2.1's tasks live in their own section at the end of this file** ([jump](#jtracks-v21--frontend-tasks-21))
+and continue the same sequence from **F25**. Everything between here and that heading is the V2 section,
+unchanged.
+
 ---
 
 ## Shared contract (do not diverge without updating DATABASE_TASKS.md and BACKEND_TASKS.md)
@@ -293,3 +297,584 @@ in `localStorage`, verifiable by inspection" is a stated V2 success metric.
   If the export turns out broken there, it invalidates F14's decision late. Mitigate by making F14's
   prototype export test as close to `recap-dialog.tsx`'s real usage as possible — transparent background,
   portrait aspect, same `html-to-image` call path.
+
+---
+
+# jTracks V2.1 — Frontend Tasks (2.1)
+
+**Source of truth:** [`PRD_V2_1.md`](./PRD_V2_1.md). The baseline of record is
+[`PRD_V2.md`](./PRD_V2.md) (status model, Sankey data contract, expanded ranges, session security);
+where V2.1 changes V2 behavior, V2.1 wins; where V2.1 is silent, V2 still applies. Requirement numbers
+continue V2's, so a bare "R5" or "R13" is unambiguous across both PRDs.
+
+**Owns:** everything under `frontend/`, plus `docs/decisions/`
+**Do not edit:** anything under `backend/`
+
+**Task IDs continue from V2** (F10–F24 above are the shipped V2 tasks). V2.1 starts at **F25**, so a
+reference to "F16" means the same thing across V1, V2 and V2.1.
+
+**Shared contract: N/A for V2.1 — deliberately empty.** PRD_V2_1.md is confirmed **frontend-only** (its
+Q6, resolved): no backend change, no schema change, no `backend/API_SPEC_V1.md` change, no new endpoint,
+no new field, no migration. There is nothing here for DATABASE_TASKS.md or BACKEND_TASKS.md to know about
+or diverge from. The V2 shared-contract block near the top of this file still applies verbatim and is an
+*input* to V2.1, not a subject of it — the sankey payload, the recap payload, the status enum and every
+metric definition are frozen. **If a task below appears to need an API or schema change, the task is
+wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand the contract.
+
+**Explicitly out of scope — do not create tasks for these:**
+
+- **R15 (Mobbin MCP).** Confirmed *skipped* for V2.1, not deferred-with-a-task. `.mcp.json` stays at
+  `shadcn` + `magicuidesign-mcp`. Reference material comes from the user directly into
+  `frontend/reference/` the way `strava_reference.PNG` grounded R9, and never ships in the bundle.
+- **R14.1 — the motion pass that already landed.** The MagicUI MCP server, `.claude/rules/magicui-ui.md`,
+  `docs/decisions/magicui-conventions.md`, `main.tsx`'s `<MotionConfig reducedMotion="user">`, and
+  `BlurFade`/`BorderBeam`/`NumberTicker` across Analytics, Login, Signup, the Applications header and
+  Settings are **done and merged**. Context for FV10, not scope-to-build.
+- **R14.6's motion candidates** — an offer-celebration effect, status-change transitions in the table,
+  chart draw-on animation. The PRD records these as discussed but **not approved**. Chart draw-on
+  additionally collides with R12.5's export prohibition. If one is later approved it becomes a new task,
+  not an expansion of one below.
+- **R11.5 — type scale, `--radius`, table/card density.** `[unconfirmed]` and not assumed in scope.
+  `--radius: 0.625rem` stays as it is.
+- Marketing infrastructure and any SEO program beyond a `<title>` + description meta tag.
+
+## Milestone FV6: Theming overhaul (delivery stage 1 — R11)
+
+> First stage per the PRD's delivery sequence: everything in FV7–FV10 should be *built* in the final
+> palette rather than re-themed twice. Q2 is resolved (neutral + one accent hue; light/dark/system in
+> scope) so nothing blocks this milestone. Q7's reference material has not arrived — R11.2 explicitly
+> authorizes picking a reasonable default hue rather than waiting for it.
+
+- [ ] **F25 — Theme provider: light / dark / system, persisted, with no flash on load** (M)
+  R11.1. `frontend/src/index.css` already ships a complete `.dark` token block (lines 42–74) and
+  `@custom-variant dark (&:is(.dark *))` (line 5), and components across the tree carry `dark:` variants —
+  all of it dead code, because nothing ever adds `.dark` to the document. Add
+  `frontend/src/lib/theme-context.tsx` plus `frontend/src/hooks/useTheme.ts`, mirroring the existing
+  `lib/auth-context.tsx` / `hooks/useAuth.ts` split, exposing `theme: "light" | "dark" | "system"` and
+  `setTheme`. The provider toggles `.dark` on `document.documentElement` (`.dark` on `<html>` makes every
+  `dark:*` descendant selector match) and subscribes to
+  `matchMedia("(prefers-color-scheme: dark)")` so `system` tracks live OS changes, not just the value at
+  mount. `system` is the default for a first-time visitor.
+  Persist under a `jtracks_theme` `localStorage` key. This is **not** auth material and does not violate
+  F19's "no auth material in localStorage, ever again" rule — say so in a comment so a future session
+  doesn't "fix" it. Mount the provider in `frontend/src/main.tsx` inside `<MotionConfig>` and outside
+  `<BrowserRouter>`, so `/login`, `/signup` and the later landing route are covered too, not just the
+  authenticated tree.
+  No-flash: add a small synchronous inline script in `frontend/index.html`'s `<head>`, before the
+  `/src/main.tsx` module script, that reads the same `jtracks_theme` key and `prefers-color-scheme` and
+  sets the class before first paint. Keep the key name documented in one place so the two can't drift.
+  Also set the CSS `color-scheme` property on `:root`/`.dark` so native scrollbars, form controls and the
+  canvas background follow the theme.
+  Acceptance: toggling the class by hand in DevTools is no longer the only way to see dark mode; with
+  `theme = "dark"`, a hard reload paints dark with **no light flash** (throttle CPU 6× to make a flash
+  visible if one exists); with `theme = "system"`, changing the OS appearance while the tab is open
+  updates the app without a reload; `tsc -b` and `npm run lint` clean.
+  Depends on: none — **blocks F26, F27, F28, F29** and every "verify in both themes" acceptance below.
+
+- [ ] **F26 — Theme control in the app shell** (S)
+  R11.1's "a visible control in the app shell (`AppLayout`)". `components/layout/AppLayout.tsx` has two
+  nav surfaces that both need it: the desktop action cluster (the `hidden items-center gap-3 sm:flex`
+  div holding Paste a Link / Add Job / Log out) and the mobile `Sheet` body below the `Separator`.
+  Three states, not a binary switch — a two-way toggle cannot express `system`.
+  Per `.claude/rules/shadcn-ui.md` this is structural/interactive UI, so it is shadcn, never MagicUI.
+  Two acceptable shapes: a segmented button group following the existing `dashboard/date-range-control.tsx`
+  precedent (`role="group"` + `aria-label`, one button per option), or a shadcn dropdown menu — which is
+  **not installed** (`frontend/src/components/ui/` has no `dropdown-menu.tsx`), so add it via
+  `npx shadcn@latest add dropdown-menu` from `frontend/` rather than hand-rolling a menu.
+  Build it as a standalone `components/layout/theme-toggle.tsx`: R11.1 also requires the control on the
+  landing page, and that half lands in **F43** with the landing header (the route doesn't exist yet) —
+  exporting it once means F43 drops it in instead of building a second one.
+  Acceptance: reachable and operable by keyboard at both desktop and 375px widths; all three states
+  selectable; selection survives a reload; the control has a real accessible name and announces the
+  active option (an icon-only trigger needs an `sr-only` label, like the existing "Open menu"
+  `SheetTrigger`).
+  Depends on: F25
+
+- [ ] **F27 — Give `--primary` / `--ring` a real accent hue in both token blocks** (M)
+  R11.2, confirmed direction: neutral base + one accent hue. Today both blocks in
+  `frontend/src/index.css` are entirely zero-chroma — `--primary: oklch(0.205 0 0)` light /
+  `oklch(0.922 0 0)` dark, `--ring: oklch(0.708 0 0)` / `oklch(0.556 0 0)`. Pick one hue and apply it to
+  `--primary`, `--primary-foreground`, `--ring` and the `--sidebar-primary`/`--sidebar-ring` pair in
+  **both** `:root` and `.dark`. `--chart-1`..`--chart-5` and the rest of the grayscale base are
+  deliberately **not** rethought (R11.2 is explicit) — leave them alone; status colors are F28's job.
+  Every surface currently relying on a zero-chroma `--primary`/`--ring` must be re-verified once it
+  carries chroma: `Button`'s default variant, `AppLayout`'s skip link (`bg-primary text-primary-foreground`),
+  the two `Briefcase` logo icons (`text-primary`), the global `outline-ring/50` rule in `index.css`'s
+  `@layer base`, and every explicit focus ring (`applications-table.tsx`'s `SortButton` and the staleness
+  warning both use `focus-visible:outline-ring`).
+  Acceptance: `--primary` and `--ring` carry nonzero chroma in both blocks; primary buttons, links and
+  every focus ring meet WCAG AA (4.5:1 text, 3:1 non-text) against their real backgrounds in **both**
+  themes, measured with a contrast tool and written down — not eyeballed; no color moved outside
+  `index.css`.
+  Depends on: F25
+
+- [ ] **F28 — Make the status palette theme-aware and drive it from one place** (M)
+  R11.3 + R11.4. Status color is currently defined in two disconnected places:
+  `STATUS_BREAKDOWN_COLORS` in `components/dashboard/status-breakdown-chart.tsx` (hardcoded hex, whose own
+  doc comment says *"This app has no reachable dark mode yet ... so these are hardcoded rather than
+  theme-aware. Dark-safe equivalents exist if a toggle ever ships: `interviewing_oa #d97706`,
+  `offer #059669`"*), and `STATUS_COLOR_CLASSES` / `STATUS_FOCUS_CLASSES` / `STATUS_CELL_CLASSES` in
+  `components/StatusBadge.tsx` (Tailwind palette classes that already carry `dark:` variants). F25 makes
+  that "if a toggle ever ships" condition true — apply the dark-safe values and re-check the badge maps in
+  the real dark theme rather than trusting them.
+  `STATUS_BREAKDOWN_COLORS` is consumed as raw fill/stroke strings by `dashboard/sankey-chart.tsx` (node
+  `fill`, ribbon `stroke`) as well as by the breakdown chart's `<Cell fill>`, so promoting it to CSS
+  variables (`--status-applied` … in both `:root` and `.dark`, mapped through `@theme inline`) is what
+  satisfies R11.3's "made once, in the token layer, and flow to all of them".
+  **Export caveat (R12.5 / R11.4):** `RecapCard` renders `SankeyChart` inside the `html-to-image` subtree
+  and is deliberately self-contained (its own gradient background, because the export canvas is
+  transparent). Verify a `var(--status-*)` fill actually serializes through `toBlob` at `pixelRatio: 4`.
+  If it does not, the recap path keeps resolved literal values while the token layer stays the single
+  source — and either way `RecapCard` must **not** start depending on `.dark` state, since the exported
+  PNG has no theme context.
+  R11.3's two hard constraints hold: all seven statuses stay mutually distinguishable in both themes, and
+  color is never the only carrier of meaning (WCAG 1.4.1) — `StatusBadge`'s label text, the breakdown
+  chart's permanent `LabelList`, and every `ChartDataTable` stay exactly as they are.
+  Acceptance: status colors visibly differ between light and dark and are legible in both; `rejected` and
+  `failed` remain unmistakable at a glance in both themes (F10's standing constraint); the breakdown
+  chart, the Sankey nodes/ribbons, the badges, the row cell tints and the status-select items all change
+  together from a single edit; a real recap export still shows correctly-colored nodes and ribbons.
+  Depends on: F25, F27
+
+- [ ] **F29 — Both-theme sweep, token-discipline audit, and the palette decision record** (M)
+  R11.1's "dark mode is not shipped until every route has been checked in it", R11.4, and the PRD's
+  *dark mode doubles the verification surface* risk. Open every surface that exists **today** in both
+  themes and fix what breaks: `/` (table + toolbar), `/analytics` (all five stat tiles, both Recharts
+  charts, the Sankey card, `DateRangeControl` including the open `Calendar` popovers), `/profile`,
+  `/login`, `/signup`, plus `ApplicationFormDialog`, `AutofillDialog`, `ConfirmAppliedDialog` and
+  `RecapDialog` with its card preview. Include the shipped MagicUI accents: `BorderBeam`'s
+  `colorFrom`/`colorTo` and `NumberTicker`'s className overrides (per the conventions doc) must still read
+  correctly on a dark card.
+  Token discipline: grep `src/` for hardcoded `#`, `oklch(` and `rgb(` outside `index.css`. The known
+  permitted exceptions are `recap-card.tsx`'s self-contained gradient
+  (`from-slate-900 via-slate-800 to-slate-950`, deliberate per R11.4) and whatever F28 concluded about
+  export serialization. Everything else is a finding.
+  Record the decision (per the PRD's Documentation NFR): the chosen accent hue, its oklch value, the
+  rationale, and the contrast results, in `docs/decisions/magicui-conventions.md`'s theming section —
+  which currently asserts the project is fixed at `baseColor: "neutral"` with "every existing color
+  grayscale (`oklch(... 0 0)`, zero chroma)", a claim F27 makes false.
+  Acceptance: a written checklist of every route and dialog above × light/dark with no contrast failure;
+  no unexplained hardcoded color outside `index.css`; the conventions doc no longer claims the palette is
+  grayscale and names the actual hue.
+  Depends on: F27, F28
+
+## Milestone FV7: Applications table without horizontal scroll (delivery stage 2 — R13)
+
+> **Sequencing choice: run this concurrently with FV6, not strictly after it.** The PRD proposes R13
+> second, but the two milestones share no files — FV6 owns `index.css`, `main.tsx`, the new theme context,
+> `AppLayout.tsx`, `StatusBadge.tsx` and `status-breakdown-chart.tsx`; FV7 owns `applications-table.tsx`,
+> `ApplicationsPage.tsx` and a new card-list component. The single coupling runs one way: the table (and
+> the new card rendering) *consume* the status class maps F28 rewrites, so **F33's both-theme check waits
+> on F28** while F30–F32 do not. R13 is also the highest day-to-day UX payoff in this file, and Q4 is
+> fully resolved (A + B combined), so nothing blocks starting it now.
+
+- [ ] **F30 — Kill the blanket `whitespace-nowrap` at the call site, set per-column wrap rules** (S)
+  R13.3. `frontend/src/components/ui/table.tsx` puts `whitespace-nowrap` on **both** `TableHead` (line 71)
+  and `TableCell` (line 84), so none of the six columns can wrap, and the container's `overflow-x-auto`
+  (line 9) turns that into a horizontal scrollbar. Fix at the call site in
+  `components/table/applications-table.tsx` — per-column `className`s that opt specific columns back into
+  wrapping and give Company / Job Title sane min/max widths. **Do not edit the shadcn primitive** to do
+  it: R13.3 is explicit that changing `table.tsx` would silently change behavior for every future table.
+  Optional bonus, explicitly *not* a required deliverable (R13.2 option D): the Status cell packs a
+  `StatusBadge`, a `StatusSelect` and the conditional staleness warning into one flex row, making it the
+  widest cell on the board. Dropping the redundant `StatusBadge` where `StatusSelect` already shows the
+  same status reclaims that width cheaply. Do it if convenient, skip it without guilt — and if you do,
+  leave the staleness warning's `role="img"` + `aria-label` + visually-hidden duplicate untouched.
+  Acceptance: at ~700px the table wraps long company/title text instead of extending the row;
+  `components/ui/table.tsx` is unchanged; sort, status-change and edit interactions all still behave.
+  Depends on: none
+
+- [ ] **F31 — Column-priority hiding at intermediate widths** (M)
+  R13.2 option A. Below an intermediate breakpoint (the exact value is an implementation decision — the
+  PRD deliberately doesn't fix it) drop Location, then Date Applied, from the `COLUMNS` array in
+  `applications-table.tsx` — both the `<th>` and the matching `<td>`, kept in sync so the
+  `colSpan={columnCount}` on the "No applications match your filters." empty row stays correct.
+  R13.4 is the hard part: Tailwind's `hidden` is `display:none`, which removes the cell from assistive
+  tech too, so a hidden column's value must be genuinely present elsewhere **on the same screen** — fold
+  Location / Date Applied into the Company or Job Title cell as a secondary line at those widths, or emit
+  them as visually-hidden text in the row. "It's in the edit dialog" does not satisfy R13.4 for a column
+  hidden on the primary screen.
+  The sort buttons for hidden columns disappear with their headers — confirm that leaves `sortKey` in a
+  valid state. A user can be sorted by `location` and then narrow the window; the sort must keep applying,
+  not throw and not silently reset.
+  Acceptance: at the chosen intermediate width there is no horizontal scrollbar and both hidden columns'
+  values are still readable in every row; `aria-sort` still reports correctly on the remaining columns;
+  resizing while sorted by a now-hidden column neither errors nor loses the sort.
+  Depends on: F30
+
+- [ ] **F32 — Card-list rendering below the narrow breakpoint** (L)
+  R13.2 option B. Below a narrow breakpoint (`sm`-ish), render stacked cards instead of a `<table>` — one
+  card per application carrying all five data fields plus the same status control, staleness warning and
+  edit button. Drive both renderings off the same `applications` prop and the same label source so the two
+  cannot drift.
+  R13.5 is what makes this large rather than medium: a `<table>`'s `aria-sort`, `<th scope>` semantics and
+  `TableCaption` count sentence have no automatic equivalent in a `<div>` list. The card rendering needs
+  **its own sort control that announces its state** — `applications-table.tsx`'s `SortButton` pattern
+  (accessible name is just the column name, state carried solely by the parent `<th aria-sort>`) does not
+  transfer, so a standalone control must carry the state in its own accessible name or an adjacent live
+  region — and **its own count summary** equivalent to the caption's "Showing N of M tracked
+  applications." `ApplicationsPage`'s two polite live regions (`actionStatus`, `tableStatus`) live on the
+  page rather than the table, so they should keep working for both renderings — verify that, don't assume
+  it.
+  Both renderings must go through the same `onStatusChange` → `handleStatusChange` path, so the
+  Saved→Applied `ConfirmAppliedDialog` flow and its `finalFocusRef` focus restore (which resolves the
+  target lazily via `statusSelectId(application.id)`) still work from a card. That id must stay unique:
+  switching renderings in JS mounts only one at a time, but a CSS-only `hidden` / `sm:block` swap would
+  mount both and duplicate every DOM id on the page.
+  Acceptance: at 375px there is **no horizontal scrollbar**
+  (`document.documentElement.scrollWidth === innerWidth`) and every value from all five columns is
+  visible; sorting from the card rendering works and announces its state; the count summary is present;
+  changing a card from `Saved` to `Applied` opens the confirm dialog and returns focus correctly on close;
+  no duplicate DOM ids at any width.
+  Depends on: F30, F31
+
+- [ ] **F33 — 375px and accessibility non-regression verification for the board** (M)
+  R13.1 and R13.5, plus the PRD's *a UI overhaul is the most efficient way to silently undo an
+  accessibility audit* risk. F24 above already verified the rest of the app at 372px and recorded that
+  "the table's own internal horizontal scrollbar (pre-existing, intentional per F9) is the only scroll
+  surface anywhere" — that scrollbar is exactly what R13.1 now forbids, so this task retires F24's
+  documented exception.
+  Verify at a real narrow layout viewport (a genuine ~375px window, not a devtools emulation — the F21 and
+  F24 verification notes above show the difference matters here), at the intermediate breakpoint, and at
+  desktop: no horizontal scroll on the page or the table container; `aria-sort` present and correct; the
+  sort button's accessible name still just the column name; the staleness warning keeps its `role="img"`,
+  `aria-label` and visually-hidden duplicate in **both** renderings; both polite live regions still
+  announce; axe run and compared against the pre-V2.1 baseline. Do all of it in both themes.
+  Acceptance: written results for all three widths × both themes; no new axe violation; F24's "intentional
+  internal horizontal scrollbar" exception explicitly retired in this file.
+  Depends on: F32, and **F28** (status colors must be final before the both-theme pass)
+
+## Milestone FV8: Sankey & recap visual restructure (delivery stage 3 — R12)
+
+> **⚠ Milestone-level blocker — FV8 cannot be marked complete until F34 resolves.** PRD_V2_1.md's **Q3 is
+> only partially resolved.** R12.1, R12.2 and R12.3 are confirmed; but the user has indicated there is
+> *something else* they want restructured that **has not been described yet**, and **R12.6** (whether the
+> recap card changes further beyond what R9 shipped, and what specifically still reads wrong) is
+> `[unconfirmed]`. The PRD's own risk note: *"'Restructure visually' is the vaguest item in this document
+> and, until Q3 is answered, the most likely to produce work that is thrown away."* F35–F39 below cover
+> the five **confirmed** sub-items only and are safe to build. **Do not invent the missing item to fill
+> the gap, and do not check this milestone off with F34 unchecked.**
+>
+> Depends on FV6 landing first — status colors are the chart's primary visual language (R11.3), so
+> restructuring the chart before the palette is final means making the same visual judgments twice.
+
+- [ ] **F34 — Blocker: get Q3's undescribed item and R12.6's recap scope described** (S, decision task)
+  A question for the user, not a spike resolvable by reading code. Ask for (a) the "something else" beyond
+  R12.1 / R12.2 / R12.3 that Q3 records as still-pending, and (b) whether the recap card changes further
+  beyond R9's shipped layout (three hero stats + schematic `weighted={false}` Sankey + logo/date footer in
+  `dashboard/recap-card.tsx`) — and if so, what specifically reads wrong today. Ideally grounded in
+  reference material committed to `frontend/reference/` the way `strava_reference.PNG` grounded R9; Q7
+  records that more reference material is coming but had not arrived as of the PRD revision. Reference
+  material lives in the repo so the intent is recoverable later; it never ships in the bundle.
+  Deliverable: the answer written back into `PRD_V2_1.md` — Q3 and R12.6 struck through and resolved, the
+  same way Q1/Q2/Q4/Q5/Q6 already are — **and** whatever concrete tasks it implies appended to this
+  milestone as **F48+**.
+  Acceptance: Q3 no longer reads "not yet described"; R12.6 is either scoped into named tasks in this file
+  or explicitly recorded as out of scope for V2.1.
+  Depends on: none — **blocks FV8's completion**, but not F35–F39's start (those five sub-items are
+  confirmed and independently buildable).
+
+- [ ] **F35 — Export-compatibility baseline, before touching anything** (S)
+  R12.5, and the PRD's *the recap export is the most fragile thing V2.1 touches* risk, which says
+  explicitly: verify with a real export **early, not at the end**. Before any R12 change, run
+  `dashboard/recap-dialog.tsx`'s real Download path
+  (`toBlob(cardRef.current, { pixelRatio: 4 })` — `backgroundColor` deliberately omitted so the outer
+  canvas stays transparent) and keep the resulting 1080×1920 PNG as the reference to diff F39 against.
+  Do the same for the two degenerate states F17 handles (`total === 0`, and everything still sitting in
+  `applied` — both render `SankeyEmptyPlaceholder` rather than a diagram, since `d3-sankey` returns null
+  coordinates when `links.length === 0`).
+  Also write the standing rule into the code: `recap-card.tsx` and `sankey-chart.tsx`'s `weighted={false}`
+  path sit **inside** the exported subtree, so **no Motion/MagicUI component may be placed there** — an
+  in-flight animation serializes at whatever frame it happens to be on, and Motion's inline transforms
+  aren't guaranteed to survive serialization. Decorative motion *around* the card in the dialog is fine.
+  Acceptance: a pre-change reference PNG exists at 1080×1920 with the schematic Sankey fully drawn and a
+  transparent outer canvas; both degenerate states captured too; a comment in `recap-card.tsx` states the
+  no-animation-inside-the-export rule so the next session doesn't have to rediscover it.
+  Depends on: F28 (take the baseline against the final palette, or the diff is meaningless)
+
+- [ ] **F36 — Container-measured responsive sizing instead of a scaled fixed viewBox** (M)
+  R12.1. `routes/AnalyticsPage.tsx` renders
+  `<SankeyChart data={stats.sankey} width={343} height={170} fontSize={9} className="h-auto w-full" />`,
+  and `sankey-chart.tsx` emits `viewBox="0 0 343 170"` alongside `width`/`height` — so the SVG scales to
+  the card and the "9px" labels actually render at `9 × (cardWidth / 343)` px: a different size at every
+  viewport width, divorced from the page's real type scale. Measure the container (a `ResizeObserver`, or
+  equivalent, on a wrapping element) and lay the chart out at real pixel dimensions so label size is a
+  constant, chosen value at every width.
+  Two things this must not break. First, the recap path passes explicit
+  `width={230} height={110} marginX={4} marginY={5} fontSize={6} weighted={false}` from `recap-card.tsx`
+  into a fixed 270px-wide export target — keep the explicit-size API working for that caller rather than
+  making measurement mandatory. Second, the d3-sankey layout already depends on `width`/`height` through
+  `.extent(...)` inside the `useMemo`, so re-measuring reruns the layout — make sure a resize can't thrash
+  (measure → layout → element resizes → measure again).
+  Acceptance: at 375px, ~700px and desktop the Sankey's labels render at the same computed font-size
+  (check the element inspector's computed value, not by eye); the recap card's chart is sized identically
+  to before; no resize feedback loop on a slow drag-resize.
+  Depends on: F35
+
+- [ ] **F37 — Make in-flight applications legible instead of silent blank space** (M)
+  R12.2. R5.4 deliberately gives in-flight rows no outgoing edge, and `sankey-chart.tsx` implements that
+  honestly by passing each node's `value` as d3-sankey's `fixedValue` — so a node's unfilled remainder is
+  real, correct, and completely unexplained: the user cannot tell "still open" from "chart bug". Make the
+  shortfall readable — a distinct visual treatment for the unfilled portion of the node rect, an explicit
+  annotation, or an inline caption.
+  Two hard rules. It must **not** invent a phantom node or link (R5.4/R5.5 forbid it — this is rendering
+  only; topology comes from the payload). And it must be reflected in the `ChartDataTable` text
+  alternative too, not just the SVG, since that table is the *only* thing a screen reader gets from this
+  chart. The shortfall is derivable per node as `node.value − sum(outgoing link values)` from the
+  payload's own `nodes`/`links` — never from `status_breakdown`.
+  Match the voice of the existing `SankeyEmptyPlaceholder`, which already covers the *total* in-flight
+  case ("All N applications are still in flight — outcomes will appear here as they land.") when
+  `links.length === 0`, so the two readings are consistent.
+  Acceptance: on a fixture where `applied`'s outflow is well below its value, a user can tell how many
+  applications are still open without being told (a stated V2.1 success metric); the `ChartDataTable`
+  summary/rows carry the same fact; a fixture with zero shortfall shows no annotation at all (no "0 in
+  flight" noise); no new node or link appears in the DOM.
+  Depends on: F36
+
+- [ ] **F38 — Label collision fixes plus keyboard-reachable hover/focus detail** (L)
+  R12.3 — both halves are must-have in V2.1, not nice-to-have. Today `sankey-chart.tsx` places every label
+  with `const labelOnRight = x0 < width / 2`; on a three-column layout the **middle** column satisfies
+  that test, so its label is drawn to the right, straight over the outgoing ribbons. Labels must not
+  overlap ribbons or each other at any supported width, and the middle column needs its own placement
+  rule. The deliberately long "Failed Interview/OA" is the worst case and **must not be shortened** (V2
+  shared contract, PRD R1.2).
+  Interaction: add per-node or per-link detail on hover **and** focus. This is what makes the task large —
+  the `<svg>` is `aria-hidden="true" focusable="false"` on purpose, with the real content exposed through
+  `ChartDataTable`, a deliberate WCAG 1.1.1 decision documented in the component. **Do not un-hide the SVG
+  and start bolting ARIA onto `<rect>`/`<path>` nodes**; that regresses the model F16's a11y work
+  established. Either put the keyboard-reachable affordance on real focusable elements outside the
+  `aria-hidden` subtree, or anchor shadcn's `Tooltip`/`Popover` (both already installed) appropriately —
+  per `.claude/rules/shadcn-ui.md`, an interactive affordance is shadcn's job, not a hand-rolled SVG
+  event handler.
+  Dashboard chart only: the recap's `weighted={false}` render is a static export target and gains no
+  interaction (F35's rule).
+  Acceptance: at 375px, ~700px and desktop, no label overlaps a ribbon or another label in any of F11's
+  fixtures including the all-seven-statuses case; hover shows detail; Tab reaches every detail affordance
+  and Escape dismisses it; `ChartDataTable` is unchanged in structure and still the text alternative; axe
+  reports no new violation on `/app/analytics`.
+  Depends on: F36
+
+- [ ] **F39 — Tune node/ribbon geometry and re-verify the export against F35's baseline** (M)
+  R12.4 plus R12.5's close-out. `nodeWidth(10)`, `nodePadding(12)` and `UNWEIGHTED_STROKE_WIDTH = 5`
+  landed ahead of the PRD and may be tuned further, under two invariants: the weighted dashboard chart's
+  thickness stays ∝ value (the `strokeWidth={weighted ? Math.max(1, link.width ?? 0) : …}` path), and the
+  recap's unweighted mode stays uniform. Only tune if F36–F38 actually made something read worse —
+  "no change needed" is a legitimate outcome, but record which it was and why.
+  Then re-run the real export and diff against F35's reference: 1080×1920, transparent outer canvas,
+  schematic Sankey fully drawn, no blank, missing or mid-animation regions, and both degenerate states
+  still exporting cleanly.
+  Acceptance: an updated export PNG differing from F35's baseline only in the intended ways; any geometry
+  change justified in a code comment against the two invariants; the dashboard chart's ribbon thickness
+  still verifiably tracks link values.
+  Depends on: F35, F36, F37, F38
+
+## Milestone FV9: Public landing page (delivery stage 4 — R10)
+
+> Largest new surface in V2.1, and the PRD sequences it fourth for two concrete reasons: it must be built
+> in the final palette (R11), and its product visual reuses the restructured Sankey/recap (R10.4 + R12).
+> Building it earlier means building it twice. Q1 is resolved — a genuine public marketing page, routing
+> option B. **F40 is a repo-wide change, not a new-file change**: R10.1 calls it "a repo-wide find, not a
+> single file," and it is.
+
+- [ ] **F40 — Move the authenticated app under `/app`** (M)
+  R10.1, confirmed approach B. `/` becomes unconditionally public; the board becomes `/app`, plus
+  `/app/analytics` and `/app/profile`. `/login` and `/signup` stay top-level, because a visitor reaches
+  them from the public landing page before authenticating. Every touch point, all of which hardcode bare
+  paths today:
+  - `frontend/src/App.tsx` — the `<Route index>` / `analytics` / `profile` block nested under `AppLayout`
+    gains the `/app` prefix.
+  - `frontend/src/components/ProtectedRoute.tsx` — `ProtectedRoute`'s unauthenticated redirect stays
+    `/login` (explicitly unchanged per R10.1); `GuestRoute`'s `<Navigate to="/" replace />` becomes
+    `/app`, or an already-signed-in user hitting `/login` gets bounced to the marketing page instead of
+    their board.
+  - `frontend/src/components/login-form.tsx` — `?? "/"` in
+    `const redirectTo = (location.state as { from?: Location } | null)?.from?.pathname ?? "/"` becomes
+    `?? "/app"` (it feeds both `navigate(redirectTo, { replace: true })` call sites).
+  - `frontend/src/components/signup-form.tsx` — both `navigate("/", { replace: true })` calls become
+    `/app`.
+  - `frontend/src/components/layout/AppLayout.tsx` — `NAV_LINKS`'s `{ to: "/", label: "Tracker" }`, and
+    the `ROUTE_TITLES` map keyed by `"/"` / `"/analytics"` / `"/profile"`, which feeds the route-change
+    screen-reader announcement (a stale key silently degrades it to "Page — navigated"). `handleLogout`'s
+    `navigate("/login")` is unchanged. The logo lockup is not currently a link — if F43 makes it one,
+    point it deliberately.
+  Grep `src/` (including `src/mocks/`) for any surviving bare `"/"`, `"/analytics"` or `"/profile"` before
+  calling this done.
+  Acceptance: signing in lands on `/app`; deep-linking to `/app/analytics` while logged out redirects to
+  `/login` and returns to `/app/analytics` after signing in; an authenticated user visiting `/login` lands
+  on `/app`; the route-change announcement still names the right page on all three app routes; no bare-path
+  navigation survives; `tsc -b` and `npm run lint` clean.
+  Depends on: none within FV9 — but do it **before F41**, which needs `/` free.
+
+- [ ] **F41 — Public landing route that does no authenticated work** (M)
+  R10.2. Add `frontend/src/routes/LandingPage.tsx` at `/`, declared in `App.tsx` **outside** both
+  `ProtectedRoute` and `GuestRoute` so it renders identically whether or not the visitor is signed in —
+  that stable-URL-while-signed-in property is the entire rationale for choosing routing option B. Three
+  things it must not do:
+  - **Not mount `ApplicationsProvider`.** It currently wraps `ProtectedRoute` in `App.tsx` and fires
+    `GET /applications` from a `useEffect` on mount (`lib/applications-context.tsx`).
+  - **Not call any authenticated endpoint at all.**
+  - **Not block render on the boot-time `POST /auth/refresh` (R7.6).** `AuthProvider` sits above the
+    router in `main.tsx` and holds `isLoading: true` until `hydrate()`'s refresh + `GET /auth/me` settle;
+    `ProtectedRoute` and `GuestRoute` both gate on that. The landing route must paint immediately and must
+    not read `isLoading` as a render gate. (The refresh call itself still fires — that's `AuthProvider`'s
+    job and outside R10.2's scope; what's forbidden is the landing *render* depending on it.)
+  Acceptance: logged out, load `/` with the network panel open — the page paints and **no**
+  `/applications`, `/dashboard/*` or `/settings` request is made (a stated V2.1 success metric); logged
+  in, `/` still shows the landing page and does not redirect to `/app`; with the network throttled, the
+  landing page renders fully before `/auth/refresh` resolves.
+  Depends on: F40
+
+- [ ] **F42 — Hard-coded demo data and the product visual** (M)
+  R10.2 + R10.4. Define the demo data in the landing page's own module (e.g.
+  `routes/landing/demo-data.ts`), typed against the real `Sankey` / `DashboardRecap` types in
+  `src/types/api.ts` — never a fetch, never the MSW handlers (which don't run in production anyway), never
+  another user's shape of data. The numbers must satisfy the same invariants the real payload does or the
+  chart renders something the product never would: all six non-`saved` nodes present including zero-value
+  ones, links with `value: 0` omitted, and `applied→interviewing_oa === interviewing_oa + offer + failed`
+  per the V2 shared contract above.
+  Render the **actual** `SankeyChart` (and/or `RecapCard`) against it rather than a screenshot, so the
+  landing page cannot drift from the product (R10.4). Both are already free of auth dependencies —
+  `SankeyChart` takes a plain `data` prop, `RecapCard` a plain `recap` prop — so this shouldn't require
+  contortion. If it turns out to, R10.4 permits a static asset fallback, but the regeneration obligation
+  must then be written into the component's own file, not just recorded in a task.
+  `RecapCard` renders its own dark gradient background and is deliberately theme-independent (R11.4) —
+  check it doesn't look stranded on a light landing section. A deliberate framing treatment around it is
+  fine; making the card follow `.dark` is not.
+  Acceptance: the product visual is a live render of the real component; changing a demo link value
+  visibly changes the rendered chart; nothing in the landing module imports from `src/mocks/`; the visual
+  is legible at 375px and in both themes.
+  Depends on: F41, F39 (the restructured chart is what gets shown)
+
+- [ ] **F43 — Landing sections: hero, feature trio, footer, and the landing theme control** (M)
+  R10.3 (the four-section layout is `[unconfirmed]` in the PRD — treat it as the working proposal and
+  confirm the *copy* with the user rather than re-planning the structure). Top to bottom: hero (product
+  lockup, one-line value proposition, one-sentence subhead, primary CTA → `/signup`, secondary CTA →
+  `/login`), F42's product visual, a feature trio (auto-ghosting after a configurable threshold; funnel
+  analytics that separate pre- from post-interview failure; the shareable Stories-format recap), and a
+  footer (logo lockup, a link into the app, minimal legal/attribution).
+  Copy discipline: no section may make a claim the product does not do, and the feature copy must match
+  shipped V2 behavior — in particular **"Failed Interview/OA" must not be softened to "Failed" in
+  marketing copy either** (R10.3, and the V2 shared contract above).
+  This also closes out R11.1's second half: place F26's exported theme control in the landing header. Use
+  shadcn primitives for anything interactive (`Button` with a router `Link` for the CTAs); MagicUI comes
+  later in F45, not here.
+  Acceptance: a visitor can state what jTracks does from the hero alone and reach `/signup` in one click
+  (a stated success metric); every feature claim maps to a shipped behavior; no shortened status label
+  anywhere on the page; the theme control works on `/` and its choice carries into `/app`.
+  Depends on: F41, F42, F26
+
+- [ ] **F44 — Landing accessibility, 375px responsiveness, metadata, and bundle isolation** (M)
+  R10.5, R10.6, and the PRD's Bundle-cost NFR. This is the first page a screen-reader user or a crawler
+  will ever see and it does not get a lower bar than the app.
+  - **Landmarks and headings:** real `<header>` / `<main>` / `<footer>`, exactly one `<h1>`, no skipped
+    heading levels, every CTA reachable and labeled. The app's skip link lives in `AppLayout`, which the
+    landing route does not render — decide deliberately whether `/` needs its own.
+  - **375px:** legible and unclipped, no horizontal scroll
+    (`document.documentElement.scrollWidth === innerWidth`), verified in a real narrow layout viewport.
+  - **Metadata (R10.6):** a real `<title>` and description meta tag for the landing route.
+    `frontend/index.html` currently carries only a bare `<title>jTracks</title>` and no description.
+    Route-scoped title handling is fine. Nothing beyond title + description — no OG image generation, no
+    sitemap, no structured data (Non-goals).
+  - **Bundle:** route-level code-split the landing page (`React.lazy` + `Suspense` on the `/` route) so its
+    decorative dependencies stay out of the authenticated app's critical path and vice versa. Confirm
+    against a real `vite build` chunk listing, not by assumption.
+  Acceptance: axe clean on `/` in both themes; correct landmark and heading outline; no horizontal scroll
+  at 375px; `<title>` and description present; `vite build` shows the landing page in its own chunk that
+  the `/app` entry does not pull in.
+  Depends on: F43
+
+## Milestone FV10: Motion on the new surfaces & conventions upkeep (delivery stage 5 — R14.2, R14.3, R14.5)
+
+> Last stage by design, per the PRD's delivery sequence — motion gets applied to finished layouts rather
+> than reworked as they change. R14.1's motion pass is **already shipped and is not scope-to-build here**;
+> it is the set of conventions the tasks below inherit. R14.6's candidates (offer celebration,
+> status-change transitions, chart draw-on) are **not approved** and are not scheduled — see the
+> out-of-scope list at the top of this section.
+
+- [ ] **F45 — Apply the existing motion conventions to the landing page** (M)
+  R14.2 + R14.3 + R14.4. Use the values already fixed in `docs/decisions/magicui-conventions.md` rather
+  than inventing per-page numbers: `BlurFade` at `duration 0.4s / easeOut / offset 6px / blur 6px /
+  direction down`, a `0.08s` stagger step **between sibling groups** (never within a group), `BorderBeam`
+  at `duration 8s`, `NumberTicker`'s default spring. `AnalyticsPage.tsx`'s
+  `ENTRANCE_STAGGER_SECONDS = 0.08` constant is the existing precedent to match.
+  R14.3 is the rule most likely to break here: **at most one continuous/looping accent visible per view.**
+  A marketing page is exactly where this will feel wrong in the moment; the conventions doc is the
+  tiebreaker, not taste. Entrance animations are exempt (they run once and settle); continuous ones are
+  rationed to one.
+  Any MagicUI component not already in the approved table (`border-beam`, `number-ticker`, `blur-fade`)
+  goes through the full workflow first: `searchRegistryItems` → `getRegistryItem(name, { includeSource:
+  true })` to read the real source → `npx shadcn@latest add @magicui/<name>` from `frontend/`. Never
+  hand-copy MCP source; never edit the installed `components/ui/*.tsx` to hardcode colors — override
+  MagicUI's non-neutral defaults at the call site with this project's tokens (F27's new accent included).
+  Everything must sit under `main.tsx`'s `<MotionConfig reducedMotion="user">` (R14.4) — no portal outside
+  that tree, no library that ignores it.
+  Acceptance: no more than one continuous accent visible on the landing page at a time; every timing value
+  matches the conventions doc; with the OS reduced-motion setting on, nothing on `/` animates; any newly
+  installed component was added via the CLI and ships none of MagicUI's hardcoded default colors.
+  Depends on: F44
+
+- [ ] **F46 — Update the conventions doc and its per-page inventory** (S)
+  R14.5 and the PRD's Documentation NFR — the doc is updated in the **same change** as the code, not
+  after. Two parts to `docs/decisions/magicui-conventions.md`:
+  - **Conventions.** Its "Theming — never ship MagicUI's hardcoded defaults" section currently opens by
+    stating the project is fixed at `baseColor: "neutral"` and that "every existing color is grayscale
+    (`oklch(... 0 0)`, zero chroma)" — false once F27 lands. Correct it, and confirm F29's accent-hue
+    decision record is in place alongside it.
+  - **Per-page inventory table.** Add a **Landing (`LandingPage.tsx`)** row, and revise any existing row
+    whose usage changed — Analytics' is the likeliest, since FV8 restructures the Sankey card that its
+    third `BlurFade` group wraps. The table's stated purpose is that a future session can check
+    consistency instead of re-deriving it; a stale row costs more than a missing one.
+  Acceptance: the doc contains no claim contradicted by the shipped code; the inventory has a row for
+  every page using MagicUI, including the landing page; the theming section names the actual accent hue.
+  Depends on: F45, F29
+
+- [ ] **F47 — V2.1 close-out verification across the whole matrix** (M)
+  PRD_V2_1.md's Success metrics and Non-functional requirements, run once as a single checkable pass after
+  everything else lands — the *dark mode doubles the verification surface* and *a UI overhaul silently
+  undoes an accessibility audit* risks both come due at exactly this point.
+  The matrix: every route (`/`, `/login`, `/signup`, `/app`, `/app/analytics`, `/app/profile`) plus
+  `ApplicationFormDialog`, `AutofillDialog`, `ConfirmAppliedDialog` and `RecapDialog` × light and dark ×
+  375px and desktop. Per cell: no horizontal scrollbar, no contrast failure, no new axe violation relative
+  to the pre-V2.1 baseline.
+  Three global checks on top: with the OS reduced-motion setting on, **nothing animates anywhere,
+  including the landing page**; the recap still exports to a clean 1080×1920 PNG with the Sankey fully
+  rendered (re-run F39's diff at the end); and every V2 audit fix still holds — `aria-sort` on the `<th>`,
+  the sortable-header naming pattern, the staleness warning's `role="img"` + visually-hidden duplicate,
+  every `ChartDataTable` behind an `aria-hidden` chart, the route-change focus move and announcement, the
+  skip link, and `ApplicationsPage`'s two polite live regions.
+  Acceptance: a written result for every cell of the matrix, no unresolved failure, and any finding either
+  fixed or recorded here as a known limitation with a reason — the same standard as the F21 and F24
+  verification notes above.
+  Depends on: F33, F39, F45, F46
+
+## Notes for parallel work (V2.1)
+
+- **FV6 (R11) and FV7 (R13) can run concurrently.** They share no files — FV6 owns `index.css`,
+  `main.tsx`, the new theme context, `AppLayout.tsx`, `StatusBadge.tsx` and `status-breakdown-chart.tsx`;
+  FV7 owns `applications-table.tsx`, `ApplicationsPage.tsx` and a new card-list component. The only
+  coupling runs one way: the table and the new card rendering *consume* the status class maps F28
+  rewrites, so **F33's both-theme check waits on F28** while F30–F32 do not. The PRD sequences R13 second;
+  running it alongside R11 costs nothing and it is the highest day-to-day payoff in this file.
+- **F34 is the blocking clarification in this file** — and it is a question to the user, not a spike you
+  can resolve by reading code. It does **not** block F35–F39 (those five sub-items are confirmed), but it
+  does block calling FV8 done. **Ask it at the very start of V2.1**, not when FV8 begins: the answer may
+  itself add tasks, and per the PRD's own risk note, building all of R12 before it's answered is the most
+  likely way to produce throwaway work here.
+- **F35 is a gate, not a formality.** R12.5 requires verifying the recap export with a *real* export at
+  the start of FV8. `html-to-image` at `pixelRatio: 4` is sensitive to how styles are applied, and both
+  F28 (CSS-variable status fills inside the exported subtree) and F36–F38 (sizing, annotations,
+  interaction) can break it in ways that only show up in the PNG. Discovering that after FV8 is finished
+  repeats exactly the late-invalidation risk the V2 section flagged for F14 → F18.
+- **F40 is repo-wide and worth doing in one sitting, alone.** It touches `App.tsx`, `ProtectedRoute.tsx`,
+  `login-form.tsx`, `signup-form.tsx` and `AppLayout.tsx` at once, and half-applied it produces broken
+  navigation everywhere. Don't interleave it with other work, and don't let it sit unmerged while FV6/FV7
+  are editing `AppLayout.tsx` too.
+- **The riskiest sequencing in this file is FV9's double dependency.** R10 needs both the final palette
+  (FV6) *and* the restructured chart (FV8) — and FV8 is the milestone carrying the unresolved question.
+  If F34 stalls, FV9 stalls behind it. That is the concrete reason to ask F34 immediately even though
+  FV6 and FV7 can proceed in the meantime.
+- **F30's option-D bonus (slimming the Status cell) can be done at any time** — an independent, cheap
+  change with no dependencies, good filler when blocked, and explicitly not a required deliverable
+  (R13.2). Same role F23 played in the V2 section.
+- **Nothing in V2.1 is gated on BACKEND or DATABASE.** The V2 data contract is a frozen input. If any task
+  above appears to need an endpoint, a field or a migration, the task is wrong — not the contract.
