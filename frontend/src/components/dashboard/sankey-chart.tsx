@@ -9,6 +9,9 @@ type NodeExtra = { key: ApplicationStatus; label: string }
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- intentionally the "no extra properties" case d3-sankey's own types expect (see SankeyExtraProperties)
 interface LinkExtra {}
 
+/** Ribbon thickness used for every link when `weighted={false}`, instead of d3-sankey's real value-proportional `link.width`. */
+const UNWEIGHTED_STROKE_WIDTH = 5
+
 export interface SankeyChartProps {
   data: Sankey
   width: number
@@ -18,6 +21,21 @@ export interface SankeyChartProps {
   marginY?: number
   fontSize?: number
   className?: string
+  /**
+   * `true` (default): node/link thickness is proportional to value, per
+   * R5.4 -- the dashboard's accurate, to-scale rendering.
+   *
+   * `false`: a schematic variant for the simplified recap card (see
+   * PRD_V2.md's Recap redesign addendum) -- every node still shown gets a
+   * uniform `fixedValue` and every link a uniform stroke width, so the
+   * diagram conveys *which stages the flow passed through*, not their
+   * relative volume. Zero-value nodes are dropped rather than rendered at
+   * the same uniform size, since a status nobody reached should not
+   * appear at all. Topology (which nodes/links exist) is never altered --
+   * only their rendered size -- so this still satisfies R5.5's "frontend
+   * must not re-derive the topology."
+   */
+  weighted?: boolean
 }
 
 interface SankeyEmptyPlaceholderProps {
@@ -99,7 +117,16 @@ function SankeyEmptyPlaceholder({ width, height, appliedValue, className }: Sank
  * a placeholder instead -- do not paper over the nulls with a `?? 0`
  * fallback, which would render a broken, collapsed-to-the-left diagram.
  */
-export function SankeyChart({ data, width, height, marginX = 8, marginY = 8, fontSize = 9, className }: SankeyChartProps) {
+export function SankeyChart({
+  data,
+  width,
+  height,
+  marginX = 8,
+  marginY = 8,
+  fontSize = 9,
+  className,
+  weighted = true,
+}: SankeyChartProps) {
   const hasLinks = data.links.length > 0
 
   const graph = useMemo<SankeyGraph<NodeExtra, LinkExtra> | null>(() => {
@@ -116,20 +143,27 @@ export function SankeyChart({ data, width, height, marginX = 8, marginY = 8, fon
         [Math.max(marginX + 1, width - marginX), Math.max(marginY + 1, height - marginY)],
       ])
 
+    // Unweighted: drop nodes nobody reached (a link's value>0 filter
+    // upstream guarantees every node a surviving link still references
+    // has value>0, so this can never orphan a link) and give every
+    // remaining node/link a uniform size instead of a value-proportional
+    // one -- see the `weighted` doc comment above.
+    const nodes = weighted ? data.nodes : data.nodes.filter((node) => node.value > 0)
+
     return layout({
-      nodes: data.nodes.map((node) => ({
+      nodes: nodes.map((node) => ({
         key: node.key,
         label: node.label,
         // R5.4: fixed, not derived from link sums -- see the doc comment above.
-        fixedValue: node.value,
+        fixedValue: weighted ? node.value : 1,
       })),
       links: data.links.map((link) => ({
         source: link.source,
         target: link.target,
-        value: link.value,
+        value: weighted ? link.value : 1,
       })),
     })
-  }, [data, hasLinks, width, height, marginX, marginY])
+  }, [data, hasLinks, width, height, marginX, marginY, weighted])
 
   const linkPath = useMemo(() => sankeyLinkHorizontal<NodeExtra, LinkExtra>(), [])
 
@@ -176,7 +210,7 @@ export function SankeyChart({ data, width, height, marginX = 8, marginY = 8, fon
               fill="none"
               stroke={STATUS_BREAKDOWN_COLORS[source.key]}
               strokeOpacity={0.35}
-              strokeWidth={Math.max(1, link.width ?? 0)}
+              strokeWidth={weighted ? Math.max(1, link.width ?? 0) : UNWEIGHTED_STROKE_WIDTH}
             />
           )
         })}
@@ -207,7 +241,7 @@ export function SankeyChart({ data, width, height, marginX = 8, marginY = 8, fon
                 fontSize={fontSize}
                 fill="currentColor"
               >
-                {node.label} ({node.value})
+                {weighted ? `${node.label} (${node.value})` : node.label}
               </text>
             </g>
           )

@@ -217,6 +217,11 @@ image. It is **additive** to the recap: all existing highlight tiles (Applicatio
 Offers, Response rate, Ghost rate, Avg. reply time) survive alongside it, plus the renamed
 Rejection/fail rate.
 
+> **Superseded for the recap card by [R9](#r9--recap-redesign--dashboard-sankey-sizing-addendum).**
+> The recap sticker no longer shows all highlight tiles alongside the Sankey — see R9 for the
+> current three-stat design. R5.1's "additive" rule still governs the **dashboard** placement,
+> which is unchanged.
+
 **R5.2 — Hierarchy.** Three levels. `saved` is excluded entirely; the flow starts at
 submission.
 
@@ -402,6 +407,48 @@ introspection endpoint.
 (~375px). This was suspected but never verified at MVP; the Sankey work touches these surfaces
 anyway, so verify as part of R5. If the Sankey cannot render legibly at 375px, define a
 documented fallback rather than shipping an unreadable chart.
+
+### R9 — Recap redesign & dashboard Sankey sizing (addendum, implemented)
+
+Two implementation-driven refinements made after R5/R8 initially shipped, in response to direct
+user feedback on the built product rather than PRD-planning-stage requirements. Recorded here
+per this document's own rule ("where V2 is silent... this document wins" — logging changes back
+into the PRD keeps it from going stale, per the Documentation non-functional requirement).
+
+**R9.1 — Dashboard Sankey height reduced (343×260 → 343×170), fixing R8.2's flagged risk.**
+The `Applied` node's `fixedValue` (R5.4) makes it always claim the *entire* height of its
+column, since it is the sole node there and represents the whole cohort — by construction, the
+tallest single node other statuses will ever compete with. At the original 260px height this
+produced a visually dominant, top-heavy block that read poorly, especially on narrow/vertical
+viewports. Shrinking the box's height (not touching R5.4's value-to-pixel semantics at all — no
+node's relative proportions changed) brings the diagram closer to a conventional wide/flat
+Sankey aspect ratio and reduces the effect without misrepresenting any value. The recap card's
+own Sankey sizing is a separate prop and is unaffected by this change.
+
+**R9.2 — Recap card redesign, superseding R5.1's "additive" rule for the recap only.** The recap
+sticker's previous headline sentence plus up to seven highlight tiles is replaced with a
+Strava/Year-in-Sport-style layout, per user-supplied reference material (a Strava recap
+screenshot):
+
+- Exactly **three** hero stats, stacked with dividers, in place of the full highlight grid:
+  **Applications sent**, **Interviews**, **Rejection rate**. "Rejection rate" is a display-only
+  relabel of the existing "Rejection/fail rate" highlight (R4.4) — the underlying metric and its
+  calculation are unchanged; nothing new was added to the `GET /dashboard/recap` contract.
+- A simplified, **non-value-weighted** Sankey beneath the stats (`SankeyChart`'s new
+  `weighted={false}` mode): every node/link renders at a uniform size regardless of count, so
+  the diagram reads as *which stages the flow passed through* rather than competing with the
+  hero stats for visual weight via proportional sizing. Topology is never altered by this mode —
+  R5.5's "frontend must not re-derive the topology" still holds, only rendered size changes.
+  Zero-count nodes are dropped rather than rendered at the same uniform size as populated ones,
+  so a status nobody reached still doesn't appear.
+- The footer now pairs the app's own logo lockup (the same `Briefcase` icon + "jTracks" wordmark
+  used in the app shell) with the period's date range, replacing the previous plain
+  "jtracks.app" text — directly satisfying the reference material's "logo at the bottom plus the
+  time range."
+- **Unaffected:** the dashboard's own Sankey (`AnalyticsPage`) keeps the original value-weighted,
+  to-scale rendering (R5.4 unchanged there) — only the recap card's Sankey uses
+  `weighted={false}`. `GET /dashboard/recap`'s response shape is unchanged; this is a
+  frontend-only presentation change that surfaces fewer of the existing `highlights` entries.
 
 ---
 
@@ -594,3 +641,5 @@ state.
 4. **R7 — refresh tokens and revocation.** Independent of 1–3; can be parallelized if desired,
    but resolve the deployment-topology question first (see Risks).
 5. **R3 + R8 — staleness nudge and cleanup.** Small; fold into whichever stage is convenient.
+6. **R9 — recap redesign and dashboard Sankey sizing.** Post-launch refinements made after
+   R5/R8 shipped, in response to direct feedback on the built product.

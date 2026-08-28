@@ -141,7 +141,7 @@ export function AnalyticsPage() {
                 <SankeyChart
                   data={stats.sankey}
                   width={343}
-                  height={260}
+                  height={170}
                   fontSize={9}
                   className="h-auto w-full"
                 />
