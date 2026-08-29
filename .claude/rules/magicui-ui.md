@@ -2,7 +2,7 @@
 description: Governs how AI Agents use the magicuidesign-mcp server alongside shadcn-ui so the two component systems don't clash.
 ---
 # General Rule
-MagicUI is a decorative/animation accent layer, not a replacement for shadcn/ui. shadcn/ui (Radix-based) remains the default and mandatory choice for structural, interactive, or data-bearing UI — forms, dialogs, tables, dropdowns, navigation, inputs — because it carries accessibility guarantees. Reach for the `magicuidesign-mcp` MCP server only for decorative/motion components layered on top of or around shadcn primitives: marquees, particles, animated-beam, bento-grid, dock, meteors, border-beam, shimmer effects, and similar. Never use MagicUI to reimplement something shadcn already provides for the same purpose.
+MagicUI is the third and final stage of this project's UI pipeline — **Mobbin** (`.claude/rules/mobbin-ui.md`, design reference) → **shadcn/ui** (`.claude/rules/shadcn-ui.md`, structure) → **MagicUI** (this file, accents) — and is a decorative/animation accent layer, not a replacement for shadcn/ui. shadcn/ui (Radix-based) remains the default and mandatory choice for structural, interactive, or data-bearing UI — forms, dialogs, tables, dropdowns, navigation, inputs — because it carries accessibility guarantees. Reach for the `magicuidesign-mcp` MCP server only for decorative/motion components layered on top of or around shadcn primitives: marquees, particles, animated-beam, bento-grid, dock, meteors, border-beam, shimmer effects, and similar. Never use MagicUI to reimplement something shadcn already provides for the same purpose.
 
 # Discovery Workflow
 1. Use `searchRegistryItems(query)` or `listRegistryItems(kind, query)` to find candidate MagicUI items.
