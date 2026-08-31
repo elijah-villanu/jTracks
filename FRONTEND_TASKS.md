@@ -340,7 +340,7 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
 
 ## Milestone FV6: Theming overhaul (delivery stage 1 — R11)
 
-> First stage per the PRD's delivery sequence: everything in FV7–FV10 should be *built* in the final
+> First stage per the PRD's delivery sequence: everything in FV7–FV11 should be *built* in the final
 > palette rather than re-themed twice. Q2 is resolved (neutral + one accent hue; light/dark/system in
 > scope) so nothing blocks this milestone. Q7's reference material has not arrived — R11.2 explicitly
 > authorizes picking a reasonable default hue rather than waiting for it.
@@ -546,19 +546,16 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
 
 ## Milestone FV8: Sankey & recap visual restructure (delivery stage 3 — R12)
 
-> **⚠ Milestone-level blocker — FV8 cannot be marked complete until F34 resolves.** PRD_V2_1.md's **Q3 is
-> only partially resolved.** R12.1, R12.2 and R12.3 are confirmed; but the user has indicated there is
-> *something else* they want restructured that **has not been described yet**, and **R12.6** (whether the
-> recap card changes further beyond what R9 shipped, and what specifically still reads wrong) is
-> `[unconfirmed]`. The PRD's own risk note: *"'Restructure visually' is the vaguest item in this document
-> and, until Q3 is answered, the most likely to produce work that is thrown away."* F35–F39 below cover
-> the five **confirmed** sub-items only and are safe to build. **Do not invent the missing item to fill
-> the gap, and do not check this milestone off with F34 unchecked.**
+> **F34 resolved — Q3/R12.6 answered, F48–F50 appended.** PRD_V2_1.md's Q3 and R12.6 are now fully
+> resolved: the recap becomes a three-skin selectable design (Strava/Duolingo/Beli, see R12.7), and
+> the previously-undescribed "something else" is superseded by the broader design-overhaul
+> direction recorded in R16 (Milestone FV11, this same file). F35–F39 cover the five originally-
+> confirmed sub-items; F48–F50 below cover the recap skin system.
 >
 > Depends on FV6 landing first — status colors are the chart's primary visual language (R11.3), so
 > restructuring the chart before the palette is final means making the same visual judgments twice.
 
-- [ ] **F34 — Blocker: get Q3's undescribed item and R12.6's recap scope described** (S, decision task)
+- [x] **F34 — Blocker: get Q3's undescribed item and R12.6's recap scope described** (S, decision task)
   A question for the user, not a spike resolvable by reading code. Ask for (a) the "something else" beyond
   R12.1 / R12.2 / R12.3 that Q3 records as still-pending, and (b) whether the recap card changes further
   beyond R9's shipped layout (three hero stats + schematic `weighted={false}` Sankey + logo/date footer in
@@ -571,6 +568,11 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   milestone as **F48+**.
   Acceptance: Q3 no longer reads "not yet described"; R12.6 is either scoped into named tasks in this file
   or explicitly recorded as out of scope for V2.1.
+  **Resolved:** the user confirmed the "something else" is superseded by a broader design-overhaul
+  direction (grounded in Mobbin references reviewed directly, plus `strava_reference.PNG` for the recap).
+  `PRD_V2_1.md`'s Q3, R12.6 are struck through/resolved and a new R12.7 + R16 record what it implies —
+  F48–F50 (recap skin system, this milestone) and Milestone FV11's F51–F54 (board view, entry-flow/
+  settings/stat-tile polish).
   Depends on: none — **blocks FV8's completion**, but not F35–F39's start (those five sub-items are
   confirmed and independently buildable).
 
@@ -610,6 +612,11 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   (check the element inspector's computed value, not by eye); the recap card's chart is sized identically
   to before; no resize feedback loop on a slow drag-resize.
   Depends on: F35
+
+> **Visual guidance for F37/F38 (not a separate task):** [Churnkey's flow/stat chart](https://mobbin.com/screens/3ba4f8e2-b296-454f-b5a8-c89c6f3c0ccf) — inline
+> percentage labels per branch, its stat-card-adjacent framing — is the user-curated reference for
+> this Sankey's visual treatment. Folded in here rather than a new task since this surface is
+> already F37/F38's.
 
 - [ ] **F37 — Make in-flight applications legible instead of silent blank space** (M)
   R12.2. R5.4 deliberately gives in-flight rows no outgoing edge, and `sankey-chart.tsx` implements that
@@ -667,6 +674,62 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   change justified in a code comment against the two invariants; the dashboard chart's ribbon thickness
   still verifiably tracks link values.
   Depends on: F35, F36, F37, F38
+
+- [ ] **F48 — Recap skin-selector infrastructure, plus the "Strava" skin (transparent background)** (L)
+  R12.7. Introduces a small "recap skin" concept: the same recap data rendered by one of several
+  interchangeable card designs, selected by the viewer inside `dashboard/recap-dialog.tsx`. Migrates the
+  *existing* `recap-card.tsx` design into the first skin ("Strava"), with one deliberate change: **this
+  skin's card background becomes transparent** (no `bg-gradient-to-b from-slate-900 via-slate-800
+  to-slate-950` div) instead of the current opaque dark gradient, per the user's explicit requirement and
+  the layout sketch at `frontend/reference/strava_reference.PNG` — a floating stat overlay rather than a
+  filled card. This narrows R11.4's/F28's prior "recap card gradient is a permanent exception" note to the
+  other two skins (F49, F50) only.
+  **Legibility risk, must be handled, not skipped.** The opaque gradient existed to guarantee contrast for
+  light stat text and Sankey status colors regardless of what the card is shared onto — dropping it means
+  the same text could land on a light background (e.g. a plain white Instagram Stories canvas) and become
+  unreadable. This skin needs its own legibility treatment independent of a solid backdrop (a text shadow/
+  stroke, a subtle scrim behind just the type, or similar), verified by actually exporting the card over
+  both a light and a dark test background — not assumed from the on-screen dialog view alone, since the
+  dialog's own background is not what the export composites onto.
+  **Selector mechanism.** A horizontally paged view the viewer can page through — shadcn's `carousel`
+  component (Embla-based; not yet installed — `npx shadcn@latest add carousel` from `frontend/`) is the
+  natural fit, per `.claude/rules/shadcn-ui.md`. Needs visible previous/next controls and dot-style
+  pagination (not swipe-only — touch drag is a nice-to-have on top, never the only path), each
+  keyboard-focusable with a real accessible name ("Recap design 1 of 3, Strava" style), and the current
+  selection announced so a screen-reader user knows which skin is active. Defaults to the Strava skin and
+  **remembers the last-picked skin per user** (a `jtracks_recap_skin` `localStorage` key, same
+  non-auth-material justification F25 documents for its theme key).
+  Extend F35's export-safety baseline to **one reference PNG per skin** (currently just one) so future
+  changes to any skin have something real to diff against.
+  Acceptance: exactly one skin renders in the exportable subtree at a time; Download/Share always export
+  whichever skin is currently selected, still 1080×1920 with a transparent *outer* canvas; the Strava
+  skin's card itself has a transparent background and its text/Sankey content stays legible when
+  composited over both a light and a dark test image; the selector is fully keyboard-operable with correct
+  accessible names/announcements; `tsc -b`/lint clean.
+  Depends on: F35 (needs re-baselining per skin), F28 (final status/token palette for the two skins that
+  do use it).
+
+- [ ] **F49 — "Duolingo" skin: single dominant hero stat + secondary grid** (M)
+  R12.7. Second recap skin, informed by the [Duolingo Year-in-Review reference](https://mobbin.com/screens/81b67776-4a5d-40d9-860e-9b3b4122357a): one clearly dominant stat
+  (Applications sent) rendered oversized at the top, the remaining stats (rejection rate, interviews)
+  arranged in a compact grid below it, opaque colored card background (unlike the Strava skin —
+  transparency is Strava-only), same logo/date-range footer treatment reused from the existing shell so
+  the three skins don't each reinvent that piece.
+  Acceptance: renders correctly inside the F48 selector and exports cleanly at 1080×1920 with its own
+  reference PNG; shares the same underlying recap data as the other two skins (no skin-specific data
+  fetching).
+  Depends on: F48.
+
+- [ ] **F50 — "Beli" skin: ranked-stat layout, and Download/Share button styling** (M)
+  R12.7. Third recap skin, informed by the [Beli monthly-recap reference](https://mobbin.com/screens/7fe2981e-cefd-4a7a-8e57-61ab97fb8e7f): a ranked-list-style presentation
+  of the stats, opaque card background. Also gives the dialog's existing Download/Share buttons a visual
+  treatment nodding to Beli's bottom share-icon row — styling only; **no custom per-app share buttons** are
+  added, since `navigator.share()` already hands the OS's own app-icon sheet on mobile, and a hand-rolled
+  row can't reliably deep-link into specific apps from a plain web share call the way a native sheet does.
+  Acceptance: renders correctly inside the F48 selector and exports cleanly at 1080×1920 with its own
+  reference PNG; Download/Share styling changes don't alter `handleDownload`/`handleShare` logic, only
+  their presentation.
+  Depends on: F48.
 
 ## Milestone FV9: Public landing page (delivery stage 4 — R10)
 
@@ -847,6 +910,88 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   verification notes above.
   Depends on: F33, F39, F45, F46
 
+## Milestone FV11: Pipeline board view, entry-flow/settings polish, and an analytics stat-tile nudge (R16)
+
+> New scope, added via F34's resolution (see FV8) rather than the original PRD_V2_1.md draft — recorded
+> as R16 there. Depends on FV6 (F27 accent hue, F28 status tokens) landing first, same reasoning FV7/FV8
+> already use — build against the final palette once, not twice. Independent of FV7 and FV8 otherwise; no
+> shared files besides the status color tokens/classes all three read from. Grounded in Mobbin references
+> the user reviewed and curated directly, per area (R15.2's "research aid only" allowance — nothing
+> installed, nothing shipped).
+
+- [ ] **F51 — Optional status-grouped board view for the Pipeline page** (L)
+  R16.1. Informed by [Homerun's kanban pipeline](https://mobbin.com/screens/80dfe542-7c1b-4303-a449-b4f465d615fe)
+  and [folk's pipeline board](https://mobbin.com/screens/a7d7dd46-1f6d-444b-b1c0-17681af33367). Add a
+  board/kanban-style view as an alternate rendering of the same `applications` data
+  `ApplicationsPage` already manages — a real user choice, not a replacement: a toggle (matching the
+  shadcn segmented-control precedent `dashboard/date-range-control.tsx` already sets) between "Table" and
+  "Board," defaulting to Table and **persisted** per user (a `jtracks_view_mode` `localStorage` key, same
+  non-auth-material justification F25 already documents for its theme key) so the choice sticks across
+  visits instead of resetting every load. Available at every width, including 375px — no breakpoint hides
+  it.
+  **Mobile/PWA scoping.** Board is exempt from FV7's no-horizontal-scroll guarantee: on narrow screens its
+  columns lay out with `overflow-x-auto`, the same mechanism the table currently uses before FV7 removes
+  it. This is an accepted, deliberate tradeoff because Board is opt-in — **Table is the only view FV7's
+  scroll-free requirement applies to**; picking Board at 375px means picking a horizontally-scrolling
+  multi-column layout, and that's fine. Don't try to make Board's columns reflow to avoid horizontal
+  scroll at narrow widths — that's Table/card-list's job (F32), not Board's.
+  **Bloat scoping.** Each status column gets a fixed `max-height` with its own independent vertical scroll
+  (not one page-length scroll per column) and a live count in its header (e.g. "Interviewing (6)"). To
+  keep a column with dozens/hundreds of applications from rendering every card into the DOM at once, each
+  column initially renders a capped number of cards (a plain client-side slice, not a virtualization
+  library — scope doesn't justify one yet) with a "Show N more" control to reveal the rest; no card is
+  ever hidden from filtering/search, only from the initial render.
+  Board mode groups applications into columns by status (using `ALL_STATUSES`/`STATUS_LABEL` from
+  `StatusBadge.tsx`), one card per application showing company/title/location/date, with the existing
+  `StatusSelect` as the only way to move an application between statuses — **no drag-and-drop** (the app's
+  accessibility posture leans on keyboard/screen-reader support, and a real WAI-ARIA-compliant
+  drag-and-drop reorder pattern is a substantial separate undertaking not justified here). Reuses
+  `handleStatusChange`/`applyStatusChange` and the same two live regions (`actionStatus`, `tableStatus`)
+  `ApplicationsPage` already has — verify both still fire correctly from board mode, don't assume. Column
+  header colors come from FV6's `--status-*` tokens (F28), not new hardcoded values.
+  Acceptance: toggle is present and keyboard-operable with a real accessible name/state at every width,
+  including 375px; the chosen view survives a reload; at 375px, Board renders its columns with a working
+  horizontal scroll (keyboard-reachable, not just touch/mouse-drag) while Table/card-list still shows zero
+  horizontal scroll (FV7's guarantee is unaffected); board mode shows every application from
+  `visibleApplications` in the correct column; status changes from the board use the identical code path
+  as the table (verified by one shared handler, not two); a column with 100+ applications stays a fixed
+  height with its own vertical scrollbar and a working "Show more," not an ever-growing page; empty
+  columns render sanely; `tsc -b`/lint clean; axe reports no new violation.
+  Depends on: F28, F30 (per-column status-class discipline).
+
+- [ ] **F52 — Visual polish pass on the add-application entry flow** (S)
+  R16.2. Purely visual refinement of `autofill-dialog.tsx`'s paste-URL step (informed by the
+  [Programa "Add product from URL" reference](https://mobbin.com/flows/26df0e89-6fe6-4ea2-b379-ff1349953586)
+  — e.g. clearer in-progress state, iconography on the URL field) and
+  the success/warning notice banner in `application-form-dialog.tsx`. Explicitly **not** adding a new
+  intermediate preview screen — the existing two-step flow (paste → prefilled review form) already
+  matches the reference pattern structurally, and a third step would duplicate validation/focus-management
+  work the form dialog already does correctly. No field changes, no new dialog states.
+  Acceptance: no change to `handleSubmit`/validation/focus-management logic in either file (diff should be
+  class names and copy only); both dialogs still pass their existing a11y guarantees (notice
+  `role="status"`, submitting live region, etc.).
+  Depends on: F28 (notice banner's success/warning colors should use the final tokens).
+
+- [ ] **F53 — Settings page layout refinement** (S)
+  R16.3. Visual-only refinement of `SettingsPage.tsx`'s single-field card, informed by the
+  [Fresha gift-card settings](https://mobbin.com/screens/20a4b62e-609b-40b6-a17a-4b08e38c9fd5) and
+  [Optimal Workshop settings form](https://mobbin.com/screens/db6e47ed-6dd4-4211-8be5-4125b44c96b5)
+  references' label+helper-text+value rhythm — tighter vertical rhythm, clearer visual grouping
+  of the field and its description. Scoped to what the page actually has today (one setting); does not
+  invent new settings or sections.
+  Acceptance: existing `aria-describedby` wiring, live "Settings saved." region, and validation behavior
+  unchanged; visual-only diff.
+  Depends on: F28.
+
+- [ ] **F54 — Stat-tile visual nudge toward the Monarch reference's card treatment** (S)
+  R16.4. Modest visual refinement of `stat-tile.tsx`'s card styling (border weight, padding, typographic
+  treatment), informed specifically by the [Monarch stat-card reference](https://mobbin.com/screens/92c2b32c-20a0-4487-9b6c-3f32cb464893) — not its Sankey, which this task
+  doesn't touch. Existing `NumberTicker`/`BorderBeam` usage and the "one continuous accent per view" rule
+  (`docs/decisions/magicui-conventions.md`) are unchanged; this is a styling pass on the card shell only.
+  Acceptance: no change to `numericValue`/`suffix`/`decimalPlaces`/`accent` prop behavior; visual diff
+  only; conventions doc's inventory table updated if the accent's visual presentation changes at all.
+  Depends on: F28.
+
 ## Notes for parallel work (V2.1)
 
 - **FV6 (R11) and FV7 (R13) can run concurrently.** They share no files — FV6 owns `index.css`,
@@ -855,11 +1000,9 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   coupling runs one way: the table and the new card rendering *consume* the status class maps F28
   rewrites, so **F33's both-theme check waits on F28** while F30–F32 do not. The PRD sequences R13 second;
   running it alongside R11 costs nothing and it is the highest day-to-day payoff in this file.
-- **F34 is the blocking clarification in this file** — and it is a question to the user, not a spike you
-  can resolve by reading code. It does **not** block F35–F39 (those five sub-items are confirmed), but it
-  does block calling FV8 done. **Ask it at the very start of V2.1**, not when FV8 begins: the answer may
-  itself add tasks, and per the PRD's own risk note, building all of R12 before it's answered is the most
-  likely way to produce throwaway work here.
+- **F34 is resolved.** Q3/R12.6 are answered and the answer added tasks, exactly as anticipated: F48–F50
+  (the recap skin system, this milestone) and Milestone FV11's F51–F54 (board view, entry-flow/settings/
+  stat-tile polish, recorded as R16). F48 must land before F49/F50 (skin infrastructure first).
 - **F35 is a gate, not a formality.** R12.5 requires verifying the recap export with a *real* export at
   the start of FV8. `html-to-image` at `pixelRatio: 4` is sensitive to how styles are applied, and both
   F28 (CSS-variable status fills inside the exported subtree) and F36–F38 (sizing, annotations,
@@ -869,10 +1012,11 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   `login-form.tsx`, `signup-form.tsx` and `AppLayout.tsx` at once, and half-applied it produces broken
   navigation everywhere. Don't interleave it with other work, and don't let it sit unmerged while FV6/FV7
   are editing `AppLayout.tsx` too.
-- **The riskiest sequencing in this file is FV9's double dependency.** R10 needs both the final palette
-  (FV6) *and* the restructured chart (FV8) — and FV8 is the milestone carrying the unresolved question.
-  If F34 stalls, FV9 stalls behind it. That is the concrete reason to ask F34 immediately even though
-  FV6 and FV7 can proceed in the meantime.
+- **FV9's double dependency.** R10 needs both the final palette (FV6) *and* the restructured chart (FV8).
+  Now that F34 is resolved, FV8's scope is fixed (F35–F39 plus the F48–F50 recap skin system), so this is
+  a normal sequencing dependency rather than an open-ended risk.
+- **Milestone FV11 (F51–F54) can run alongside FV7/FV8** — it shares no files with either beyond the
+  status color tokens/classes all three read from (F28). It only needs FV6's tokens (F27/F28) to be final.
 - **F30's option-D bonus (slimming the Status cell) can be done at any time** — an independent, cheap
   change with no dependencies, good filler when blocked, and explicitly not a required deliverable
   (R13.2). Same role F23 played in the V2 section.

@@ -249,7 +249,10 @@ column labels currently place themselves by `x0 < width / 2`, which can put text
 three-column layout. Labels must not overlap ribbons or each other at any supported width. Unlike
 the original draft, hover/focus affordances (per-node or per-link detail) are **confirmed in scope
 here, not nice-to-have** — they must be keyboard reachable and must not regress the existing
-`aria-hidden` SVG + `ChartDataTable` accessibility model.
+`aria-hidden` SVG + `ChartDataTable` accessibility model. Visual reference for this chart's
+flow/stat treatment: [Churnkey's flow chart + stat cards](https://mobbin.com/screens/3ba4f8e2-b296-454f-b5a8-c89c6f3c0ccf)
+(inline percentage labels per branch) — user-curated, folded in here rather than a separate
+requirement since this is already this chart's surface.
 
 **R12.4 — Node/ribbon geometry is already partly revised (see
 [Implemented](#already-implemented-in-this-iteration)).** The current values —
@@ -266,9 +269,31 @@ serializes at whatever frame it happens to be on, and Motion's inline transforms
 guaranteed to survive serialization. Decorative motion around the card in the dialog is fine; inside
 the exported subtree it is prohibited.
 
-**R12.6 — Recap card scope. [unconfirmed]** R9 already replaced the recap's headline + tile grid
-with three hero stats and a schematic Sankey. Whether V2.1 changes the recap further — and what
-specifically still reads wrong — is open. See [Q3](#open-questions--risks).
+**R12.6 — Recap card scope. Resolved: yes — a three-skin selectable recap.** R9 already replaced
+the recap's headline + tile grid with three hero stats and a schematic Sankey; that design becomes
+one of three selectable "skins" a viewer can page through inside `RecapDialog`. See R12.7 and
+[Q3](#open-questions--risks).
+
+**R12.7 — Recap skin selector: Strava, Duolingo, Beli (new, confirmed in scope).** Three
+interchangeable recap designs, chosen via a keyboard-operable paged control (a carousel) — the
+*interaction* Spotify Wrapped uses to page through multiple stat cards, not its visual style,
+which is explicitly not used here. All three render the same underlying recap data; the choice is
+remembered per user across visits (`localStorage`, non-auth material, same class as F25's theme
+key).
+- **Strava** — the existing R9 design (three hero stats + schematic Sankey), migrated to a
+  **transparent card background** (grounded in `frontend/reference/strava_reference.PNG`, a rough
+  layout sketch, not a polished screenshot) instead of the current opaque dark gradient. This
+  narrows R11.4's prior "recap card gradient is a permanent exception" note to the other two skins
+  only. With no guaranteed dark backdrop behind it anymore, this skin needs its own text/Sankey
+  legibility treatment, verified against both a light and a dark test background — not assumed.
+- **[Duolingo Year in Review](https://mobbin.com/screens/81b67776-4a5d-40d9-860e-9b3b4122357a)** —
+  one dominant hero stat plus a secondary stat grid, opaque background.
+- **[Beli monthly recap](https://mobbin.com/screens/7fe2981e-cefd-4a7a-8e57-61ab97fb8e7f)** — a
+  ranked-stat layout, opaque background; also restyles (does not rebuild) the existing
+  Download/Share buttons — `navigator.share()` already surfaces the OS's own app-icon sheet on
+  mobile, so no custom per-app share buttons are added.
+R12.5's export gate applies **per skin**: each needs its own reference export at 1080×1920, and no
+skin may place Motion/MagicUI animation inside the exported subtree.
 
 ### R13 — Applications table without horizontal scroll (must-have)
 
@@ -355,6 +380,46 @@ committed to `frontend/reference/` so the intent is recoverable later (see
 before design work begins; research aid only, never a blocker; reference material never ships) are
 recorded here as a **future option**, not a V2.1 deliverable, in case a later iteration revisits it.
 
+### R16 — Design-overhaul additions (addendum, new scope, frontend-only)
+
+Recorded per this project's convention of logging newly-scoped work into the PRD as it's decided,
+rather than letting `FRONTEND_TASKS.md` carry scope the PRD doesn't reflect (the same precedent
+`PRD_V2.md`'s R9 addendum set). Grounded in Mobbin references the user reviewed directly and
+curated per area (a research aid only, per R15.2 — nothing installed, nothing shipped). Full detail
+and acceptance criteria live in `FRONTEND_TASKS.md`'s Milestone FV11 (F51–F54).
+
+**R16.1 — Optional pipeline board view.** Informed by
+[Homerun's kanban pipeline](https://mobbin.com/screens/80dfe542-7c1b-4303-a449-b4f465d615fe) and
+[folk's pipeline board](https://mobbin.com/screens/a7d7dd46-1f6d-444b-b1c0-17681af33367). A
+status-grouped, kanban-style alternate rendering of the Pipeline page, toggled against the
+existing table (default: table), remembered per user. No
+drag-and-drop — status changes stay on the existing `StatusSelect` dropdown. Unlike R13's table,
+Board is explicitly **exempt** from the no-horizontal-scroll requirement: it may scroll
+horizontally on narrow screens, since it's an opt-in alternate view, not the default. Each status
+column caps its rendered height and initial card count (with a "show more" reveal) so the view
+doesn't degrade at the hundreds-of-applications scale this app expects.
+
+**R16.2 — Add-application entry-flow visual polish.** Informed by
+[Programa's "Add product from URL" flow](https://mobbin.com/flows/26df0e89-6fe6-4ea2-b379-ff1349953586).
+Styling-only refinement of the existing paste-a-link → autofill → review-form flow (already
+structurally close to the reference examined). No new steps, no validation/focus-management
+changes.
+
+**R16.3 — Settings page visual polish.** Informed by
+[Fresha's gift-card settings](https://mobbin.com/screens/20a4b62e-609b-40b6-a17a-4b08e38c9fd5) and
+[Optimal Workshop's settings form](https://mobbin.com/screens/db6e47ed-6dd4-4211-8be5-4125b44c96b5).
+Styling-only refinement of the existing single-field settings card. No new settings introduced.
+
+**R16.4 — Analytics stat-tile visual nudge.** Informed by
+[Monarch's stat-card treatment](https://mobbin.com/screens/92c2b32c-20a0-4487-9b6c-3f32cb464893)
+(not its Sankey — see R12.3 for the Sankey's own reference). Styling-only refinement of the
+stat-tile card shell. No change to `NumberTicker`/`BorderBeam` behavior or the
+one-continuous-accent rule.
+
+All four depend on R11's final tokens (F27/F28) landing first, and carry no new NFR beyond what's
+already stated below (accessibility non-regression, reduced motion, contrast, responsiveness,
+documentation).
+
 ---
 
 ## Already implemented in this iteration
@@ -382,7 +447,7 @@ the next session doesn't re-plan it. Descriptions are taken from the current wor
 | Sankey geometry revision | `sankey-chart.tsx` | `nodeWidth(10)`, `nodePadding(12)`, and `UNWEIGHTED_STROKE_WIDTH = 5` for the recap's `weighted={false}` mode — landed after R9, not previously documented in any PRD |
 
 **Not yet done, despite adjacent work existing:** everything in R10–R13, R11's theme provider,
-R14.2/R14.6's new-surface motion, and R15.
+R14.2/R14.6's new-surface motion, R15, and R16.
 
 ---
 
@@ -452,21 +517,21 @@ Each is a check someone can actually perform:
 
 ## Open questions / risks
 
-Q1, Q2, Q4, Q5 and Q6 (below, struck through) are **resolved** — kept for traceability. Q3 is
-**partially resolved** (two of three candidate fixes confirmed; one still open). Q7 remains fully
-open.
+Q1, Q2, Q3, Q4, Q5 and Q6 (below, struck through) are **resolved** — kept for traceability. Q7
+remains fully open.
 
 - ~~Q1 — Landing page: audience and routing.~~ **Resolved.** Genuine public marketing page;
   routing option B (`/` public, app moves to `/app`). See R10.1 and Target users.
 - ~~Q2 — Theming: how far?~~ **Resolved.** Neutral + one accent hue (not a full themed palette);
   working light/dark/system toggle **is** in scope for V2.1. See R11.1–R11.2.
-- **Q3 — "Restructure the Sankey and the recap visually" — one item still open.** Confirmed in
-  scope: fixed/intentional label sizing (R12.1) and label/ribbon-collision fixes plus hover/focus
-  detail (R12.3, now must-have rather than nice-to-have). **Still pending:** the user indicated
-  there is something *else* beyond these two and beyond R12.2's in-flight-legibility requirement —
-  not yet described. R12.6 (recap card scope beyond R9) is also still open. **R12 should not start
-  until this is described**, ideally with reference material (see Q7) the way
-  `strava_reference.PNG` grounded R9.
+- ~~Q3 — "Restructure the Sankey and the recap visually" — the undescribed item.~~ **Resolved:
+  superseded.** Confirmed in scope: fixed/intentional label sizing (R12.1) and label/ribbon-
+  collision fixes plus hover/focus detail (R12.3). The previously-undescribed "something else" and
+  R12.6's open recap scope are now both resolved by the broader design-overhaul direction the user
+  confirmed — no separate item remains. R12.6/R12.7 record the recap's concrete resolution (a
+  three-skin selector, grounded in Mobbin references plus `strava_reference.PNG`); R16 records the
+  rest of that direction (board view, entry-flow/settings/stat-tile polish) as new scope outside
+  R12.
 - ~~Q4 — Table approach.~~ **Resolved.** A (column priority hide) + B (card list at narrow
   widths), combined. D (slim the Status cell) was not selected as a required deliverable but
   remains a cheap optional bonus. C (expandable rows) is out of scope. See R13.2.
@@ -477,7 +542,7 @@ open.
   (beyond `frontend/reference/strava_reference.PNG`) for the landing page and theming direction,
   but it had not been supplied as of this revision. R11 (palette) and R10 (landing page) can
   proceed on the confirmed defaults above without it, but should incorporate it if it arrives
-  before those stages start; R12's still-open item under Q3 may itself depend on it.
+  before those stages start.
 
 **Risks:**
 
@@ -493,8 +558,9 @@ open.
 - **The landing page's product visual will drift** from the real product if it's a screenshot, and
   will couple the landing route to app internals if it's the real component (R10.4). Neither option
   is free; pick deliberately.
-- **"Restructure visually" is the vaguest item in this document** and, until Q3 is answered, the
-  most likely to produce work that is thrown away. R12 should not start before it is answered.
+- ~~**"Restructure visually" is the vaguest item in this document** and, until Q3 is answered, the
+  most likely to produce work that is thrown away. R12 should not start before it is answered.~~
+  **Resolved** — see Q3, R12.6/R12.7.
 - **MagicUI on a marketing page invites overuse.** R14.3's one-continuous-accent rule exists
   precisely for this and will feel wrong in the moment; the conventions doc is the tiebreaker, not
   taste-in-the-moment.
@@ -533,15 +599,18 @@ Proposed ordering. Each stage is independently shippable and leaves the app work
    anything else. Q4 resolved (A + B); ready to start. R13.2's option D can land immediately
    regardless if convenient.
 3. **R12 — Sankey and recap restructure.** After the palette exists, since status colors are the
-   chart's primary visual language. **Still blocked on Q3's remaining item** (the undescribed
-   "something else") — R12.1 and R12.3 could start without it, but starting all of R12 before it's
-   described risks throwaway work per the doc's own risk note. Verify the export (R12.5) at the
-   start of this stage, not the end.
+   chart's primary visual language. Q3 is now fully resolved (R12.6/R12.7's three-skin recap
+   selector); R12.7's skin infrastructure (`FRONTEND_TASKS.md` F48) must land before the Duolingo/
+   Beli skins (F49/F50). Verify the export (R12.5) at the start of this stage, not the end, and
+   again per skin once R12.7 lands.
 4. **R10 — landing page.** Largest new surface; depends on the palette and reuses the restructured
    chart/recap for its product visual. Q1 resolved (public marketing page, routing option B);
    ready to start once R11 lands.
 5. **R14.2 / R14.6 — motion on the new surfaces**, plus the conventions-doc and inventory update.
    Last, so motion is applied to finished layouts rather than being reworked as they change.
+6. **R16 — design-overhaul additions** (board view, entry-flow/settings/stat-tile polish). Depends
+   on R11's tokens landing first, same reasoning as R12/R13; otherwise independent of every other
+   stage. `FRONTEND_TASKS.md`'s Milestone FV11 (F51–F54).
 
 **R15 (Mobbin MCP)** is not a stage — if it's happening, it happens before stage 1's design work
 begins, and nothing waits on it.
