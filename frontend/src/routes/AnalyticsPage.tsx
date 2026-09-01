@@ -171,12 +171,24 @@ export function AnalyticsPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
+                  {/*
+                    F36: `width` is intentionally omitted so the chart
+                    measures its own wrapping element's content width via
+                    ResizeObserver and lays out at that real pixel value --
+                    `fontSize` then renders at a constant 9px at every
+                    breakpoint instead of scaling with a stretched viewBox.
+                    `height` stays a fixed, authored value (this card's
+                    content height doesn't need to track viewport width).
+                    `interactive` (F38) turns on the per-node hover/focus
+                    detail affordance -- dashboard-only, never passed by
+                    `RecapCard`'s static export render.
+                  */}
                   <SankeyChart
                     data={stats.sankey}
-                    width={343}
                     height={170}
                     fontSize={9}
-                    className="h-auto w-full"
+                    className="w-full"
+                    interactive
                   />
                 </CardContent>
               </Card>

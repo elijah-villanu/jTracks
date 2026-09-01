@@ -64,6 +64,20 @@ function featuredStats(highlights: RecapHighlight[]): RecapHighlight[] {
  * would bake in whichever theme is active on `<html>` at export time --
  * not what a "looks the same regardless of your current theme" export
  * card wants).
+ *
+ * **F35 standing rule — no animation inside the exported subtree.** This
+ * component and the `weighted={false}` `SankeyChart` it renders both sit
+ * inside what `recap-dialog.tsx` hands to `toBlob`, so **no Motion or
+ * MagicUI component may be placed anywhere in here** (no `BlurFade`, no
+ * `BorderBeam`, no `NumberTicker`). An in-flight animation serializes at
+ * whatever frame it happens to be on, and Motion's inline transforms are
+ * not guaranteed to survive serialization -- either way the exported PNG
+ * silently differs from what the user saw. Decorative motion *around* the
+ * card, elsewhere in the dialog, is fine; it is outside `cardRef`.
+ * R12.5 also makes this a hard gate: any change in here must be
+ * re-verified with a real export, not eyeballed in the dialog preview.
+ * Reference exports live in `frontend/reference/` (see F35 in
+ * FRONTEND_TASKS.md for how to regenerate them).
  */
 export const RecapCard = forwardRef<HTMLDivElement, RecapCardProps>(function RecapCard({ recap }, ref) {
   const stats = featuredStats(recap.highlights)

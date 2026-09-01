@@ -635,7 +635,7 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   Depends on: none — **blocks FV8's completion**, but not F35–F39's start (those five sub-items are
   confirmed and independently buildable).
 
-- [ ] **F35 — Export-compatibility baseline, before touching anything** (S)
+- [x] **F35 — Export-compatibility baseline, before touching anything** (S)
   R12.5, and the PRD's *the recap export is the most fragile thing V2.1 touches* risk, which says
   explicitly: verify with a real export **early, not at the end**. Before any R12 change, run
   `dashboard/recap-dialog.tsx`'s real Download path
@@ -651,9 +651,35 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   Acceptance: a pre-change reference PNG exists at 1080×1920 with the schematic Sankey fully drawn and a
   transparent outer canvas; both degenerate states captured too; a comment in `recap-card.tsx` states the
   no-animation-inside-the-export rule so the next session doesn't have to rediscover it.
+
+  **Done 2026-09-01.** Three baselines captured in `frontend/reference/`, all produced by the app's *real*
+  Download path (`toBlob(cardRef.current, { pixelRatio: 4 })`), taken against FV6's final palette and
+  before any R12 change:
+
+  | File | State | Bytes |
+  |---|---|---|
+  | `recap-baseline-all.png` | All-time, schematic Sankey fully drawn (6 ribbons, all 6 funnel statuses) | 1,780,269 |
+  | `recap-baseline-empty-total.png` | `total === 0` (Week range) — `SankeyEmptyPlaceholder` | 1,779,593 |
+  | `recap-baseline-inflight-only.png` | `links.length === 0` with `total > 0` — "All 17 applications are still in flight" | 1,779,520 |
+
+  Verified 1080×1920 with a transparent outer canvas. The all-time export was produced twice in separate
+  page loads and came back **byte-identical** (1,780,269 both times), which is useful for F39: a
+  pixel/byte diff against this baseline is meaningful, not noisy.
+
+  *How to regenerate (F39 and F48 will need this).* The export cannot be captured with a browser download
+  in this setup, so the bytes are POSTed to a tiny local receiver instead: run a Node HTTP server that
+  writes `POST /save?name=<n>` bodies into `frontend/reference/`, then in the page patch
+  `URL.createObjectURL` to `fetch(...)` the blob to it and no-op `HTMLAnchorElement.prototype.click` for
+  `[download]` anchors so nothing actually downloads, then click Download. Two environment gotchas, both
+  cost real time here: **(1)** run the dev server on **port 5173** — the backend's `CORS_ORIGINS` allows
+  only 5173/127.0.0.1:5173, and non-simple requests preflight past the service worker to the real backend;
+  **(2)** `toBlob` is intermittently slow in this sandbox — observed 232ms, 351ms, ~36s and ~138s for the
+  same work, and it sometimes appears to hang entirely. It is **not** broken: retry with patience (and a
+  fresh page load) rather than concluding the export path is defective. The third-state payload was
+  produced by stubbing `window.fetch` to blank `sankey.links` on the `/dashboard/recap` response.
   Depends on: F28 (take the baseline against the final palette, or the diff is meaningless)
 
-- [ ] **F36 — Container-measured responsive sizing instead of a scaled fixed viewBox** (M)
+- [x] **F36 — Container-measured responsive sizing instead of a scaled fixed viewBox** (M)
   R12.1. `routes/AnalyticsPage.tsx` renders
   `<SankeyChart data={stats.sankey} width={343} height={170} fontSize={9} className="h-auto w-full" />`,
   and `sankey-chart.tsx` emits `viewBox="0 0 343 170"` alongside `width`/`height` — so the SVG scales to
@@ -670,6 +696,22 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   Acceptance: at 375px, ~700px and desktop the Sankey's labels render at the same computed font-size
   (check the element inspector's computed value, not by eye); the recap card's chart is sized identically
   to before; no resize feedback loop on a slow drag-resize.
+
+  **Verified 2026-09-01** in a real browser: labels compute to **9px at both 296px and 1088px** measured
+  widths (read from `getComputedStyle`, not by eye), the SVG's `width`/`viewBox` track the measured
+  container 1:1, and at 375px the page still has no horizontal overflow (FV7's guarantee intact).
+
+  **Two defects found and fixed in `useMeasuredWidth` during that pass** — both invisible without a
+  browser, and the reason the chart rendered as an empty box on first load:
+  - The first measurement was only ever delivered inside `requestAnimationFrame`. A hidden or occluded
+    tab is served no frames (Chrome throttles rAF *and* `ResizeObserver` delivery there), so
+    `measuredWidth` stayed `null` and the component sat in its `effectiveWidth <= 0` placeholder branch
+    indefinitely. The width is now seeded **synchronously** from `getBoundingClientRect()` when the node
+    attaches; rAF is kept only to debounce subsequent resizes, which is what it's actually for.
+  - The observer was bound once in a `useEffect` keyed on `[enabled]`, capturing `measureRef.current`.
+    But this component *swaps its wrapper element* — the zero-width placeholder is a different `<div>`
+    than the resolved chart — so the observer went on watching a detached node and no resize after first
+    paint was ever measured. Re-bound via a callback ref, which re-attaches whenever the node changes.
   Depends on: F35
 
 > **Visual guidance for F37/F38 (not a separate task):** [Churnkey's flow/stat chart](https://mobbin.com/screens/3ba4f8e2-b296-454f-b5a8-c89c6f3c0ccf) — inline
@@ -677,7 +719,7 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
 > this Sankey's visual treatment. Folded in here rather than a new task since this surface is
 > already F37/F38's.
 
-- [ ] **F37 — Make in-flight applications legible instead of silent blank space** (M)
+- [x] **F37 — Make in-flight applications legible instead of silent blank space** (M)
   R12.2. R5.4 deliberately gives in-flight rows no outgoing edge, and `sankey-chart.tsx` implements that
   honestly by passing each node's `value` as d3-sankey's `fixedValue` — so a node's unfilled remainder is
   real, correct, and completely unexplained: the user cannot tell "still open" from "chart bug". Make the
@@ -697,7 +739,7 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   flight" noise); no new node or link appears in the DOM.
   Depends on: F36
 
-- [ ] **F38 — Label collision fixes plus keyboard-reachable hover/focus detail** (L)
+- [x] **F38 — Label collision fixes plus keyboard-reachable hover/focus detail** (L)
   R12.3 — both halves are must-have in V2.1, not nice-to-have. Today `sankey-chart.tsx` places every label
   with `const labelOnRight = x0 < width / 2`; on a three-column layout the **middle** column satisfies
   that test, so its label is drawn to the right, straight over the outgoing ribbons. Labels must not
@@ -720,7 +762,7 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   reports no new violation on `/app/analytics`.
   Depends on: F36
 
-- [ ] **F39 — Tune node/ribbon geometry and re-verify the export against F35's baseline** (M)
+- [x] **F39 — Tune node/ribbon geometry and re-verify the export against F35's baseline** (M)
   R12.4 plus R12.5's close-out. `nodeWidth(10)`, `nodePadding(12)` and `UNWEIGHTED_STROKE_WIDTH = 5`
   landed ahead of the PRD and may be tuned further, under two invariants: the weighted dashboard chart's
   thickness stays ∝ value (the `strokeWidth={weighted ? Math.max(1, link.width ?? 0) : …}` path), and the
@@ -732,6 +774,49 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   Acceptance: an updated export PNG differing from F35's baseline only in the intended ways; any geometry
   change justified in a code comment against the two invariants; the dashboard chart's ribbon thickness
   still verifiably tracks link values.
+
+  **Done 2026-09-01.** Re-exported all three states through the app's real Download path, against the same
+  MSW fixtures F35 used (17 sent / 7 interviews / 29%), so the diff is data-identical.
+
+  | State | F35 baseline | After F36–F38 | Δ |
+  |---|---|---|---|
+  | all-time | 1,780,269 | **1,781,795** | +1,526 bytes |
+  | `total === 0` | 1,779,593 | 1,779,593 | **byte-identical** (`cmp`) |
+  | `links.length === 0` | 1,779,520 | 1,779,520 | **byte-identical** (`cmp`) |
+
+  Only the state containing a real Sankey moved — the two placeholder states are bit-for-bit unchanged,
+  which localises the change to Sankey geometry and rules out collateral drift in the stats block, footer
+  or card chrome.
+
+  **The single visual difference is F38's label fix reaching the recap.** In the baseline, the middle
+  column's "Interviewing / OA" label was drawn to the *right* of its node, directly over its own outgoing
+  ribbons; it now sits above the node, clear of both the incoming and outgoing ribbons. That is the same
+  defect F38 fixed on the dashboard, inherited here because `sankey-chart.tsx` is shared — an improvement,
+  not a regression, so **the all-time baseline has been re-baselined** to the new export (old byte count
+  recorded above for traceability). The other two files were left untouched since they are identical.
+
+  **No further geometry tuning was needed** — "no change needed" per this task's own wording. `nodeWidth(10)`,
+  `nodePadding(12)` and `UNWEIGHTED_STROKE_WIDTH = 5` all still read correctly at both scales; nothing
+  F36–F38 changed made anything read worse. The one geometry value that did move (`topInset`, from
+  `marginY` to `max(marginY, fontSize + 6)` when a pass-through node exists) was required by F38's
+  above-node label placement, not a discretionary tune, and is justified in a comment at its definition.
+
+  Both invariants verified, not assumed:
+  - *Weighted dashboard thickness ∝ value* — measured `stroke-width` against link values: 7→60.53,
+    3→25.94, 3→25.94, 2→17.29, 2→17.29. Every ratio is exactly **8.647**.
+  - *Recap unweighted stays uniform* — all ribbons render at the constant `UNWEIGHTED_STROKE_WIDTH`,
+    confirmed in the exported PNG.
+
+  Export contract re-confirmed on the new file: **1080×1920**, RGBA, corner alphas `0, 0, 9, 9` (transparent
+  outer canvas; the 9s are the card's rounded-corner blend), centre opaque, schematic Sankey fully drawn,
+  no blank/missing/mid-animation regions. Exporting twice produced byte-identical output, so the export is
+  deterministic and future diffs are signal.
+
+  *Environment note that cost real time:* `toBlob` only works reliably when the Chrome window is actually
+  **visible**. With `document.visibilityState === "hidden"` the export either hangs for minutes or silently
+  yields a blank/garbage file — one run wrote 2,522 bytes of JavaScript because the capture hook grabbed a
+  Vite HMR module blob instead of the PNG. Guard any capture hook on `blob.type === "image/png"`, and
+  foreground the window before exporting. Visible, the same export takes ~300ms.
   Depends on: F35, F36, F37, F38
 
 - [ ] **F48 — Recap skin-selector infrastructure, plus the "Strava" skin (transparent background)** (L)
