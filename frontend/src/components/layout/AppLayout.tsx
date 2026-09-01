@@ -129,9 +129,20 @@ export function AppLayout() {
               ))}
             </nav>
 
-            <div className="hidden items-center gap-3 sm:flex">
+            {/*
+              F33 (R13.1): this cluster is ~534px wide -- with the logo and
+              nav it needs ~885px of viewport, but it used to appear at `sm`
+              (640px), so between roughly 640px and 885px it pushed the page
+              into a horizontal scroll. That predates V2.1 (F27's ThemeToggle
+              widened it by a further ~104px but did not cause it) and only
+              became a defect once R13.1 forbade page-level horizontal scroll
+              outright. Gated at `lg` instead, so the Sheet below -- which
+              already carries every one of these actions, ThemeToggle
+              included -- covers everything narrower.
+            */}
+            <div className="hidden items-center gap-3 lg:flex">
               {user && (
-                <span className="hidden text-sm text-muted-foreground sm:inline">
+                <span className="hidden text-sm text-muted-foreground lg:inline">
                   {user.email}
                 </span>
               )}
@@ -151,11 +162,11 @@ export function AppLayout() {
             </div>
 
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-              <SheetTrigger render={<Button size="icon" variant="outline" className="sm:hidden" />}>
+              <SheetTrigger render={<Button size="icon" variant="outline" className="lg:hidden" />}>
                 <Menu />
                 <span className="sr-only">Open menu</span>
               </SheetTrigger>
-              <SheetContent side="right" className="sm:hidden">
+              <SheetContent side="right" className="lg:hidden">
                 <SheetHeader>
                   <SheetTitle className="flex items-center gap-2">
                     <Briefcase className="size-5 text-primary" aria-hidden="true" />

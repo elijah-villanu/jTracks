@@ -5,25 +5,29 @@ import {
   ApplicationsToolbar,
   type StatusFilter,
 } from "@/components/table/applications-toolbar"
+import { ApplicationsCardList } from "@/components/table/applications-card-list"
 import {
   ApplicationsTable,
+  COLUMN_LABEL,
   type SortDirection,
   type SortKey,
 } from "@/components/table/applications-table"
 import { statusSelectId } from "@/components/table/status-select"
 import { BlurFade } from "@/components/ui/blur-fade"
 import { useApplicationsContext } from "@/hooks/useApplicationsContext"
+import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { ApiError } from "@/lib/api-client"
 import type { Application, ApplicationStatus } from "@/types/api"
 
-/** Human-readable column names for the sort live-region announcement. */
-const SORT_KEY_LABEL: Record<SortKey, string> = {
-  company: "Company",
-  title: "Job Title",
-  status: "Status",
-  location: "Location",
-  date_applied: "Date Applied",
-}
+/**
+ * F32 (R13.2 option B): below this width the table has no viable
+ * column-hiding left (see applications-table.tsx's own two breakpoints)
+ * and swaps out entirely for ApplicationsCardList. Matches Tailwind's
+ * `sm` boundary, one step narrower than that component's own two
+ * breakpoints, so the progression is: full table -> Location hidden ->
+ * Location + Date Applied hidden -> card rendering.
+ */
+const CARD_LAYOUT_QUERY = "(max-width: 639px)"
 
 /**
  * The Pipeline View (UXPLAN.md): a single sortable/filterable
@@ -37,6 +41,13 @@ export function ApplicationsPage() {
   const [search, setSearch] = useState("")
   const [sortKey, setSortKey] = useState<SortKey | null>(null)
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
+
+  // F32: JS-driven, not a CSS `hidden`/`sm:block` swap -- a CSS-only swap
+  // would mount both ApplicationsTable and ApplicationsCardList at once,
+  // duplicating every row's `statusSelectId` DOM id (ConfirmAppliedDialog's
+  // `finalFocusRef` resolves its target lazily by that id, so a duplicate
+  // would silently break focus restore).
+  const isCardLayout = useMediaQuery(CARD_LAYOUT_QUERY)
 
   const [actionError, setActionError] = useState<string | null>(null)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
@@ -65,6 +76,18 @@ export function ApplicationsPage() {
       setSortKey(key)
       setSortDirection("asc")
     }
+  }
+
+  // The card rendering's sort control (F32) is a single combobox whose
+  // value already spells out both field and direction ("Company,
+  // ascending") -- unlike the table header's click-to-toggle SortButton,
+  // it picks an exact key/direction pair directly rather than toggling.
+  // Both still land in the same `sortKey`/`sortDirection` state that
+  // drives `visibleApplications` below, so the two renderings can never
+  // disagree about the current sort.
+  function handleSortSelect(key: SortKey, direction: SortDirection) {
+    setSortKey(key)
+    setSortDirection(direction)
   }
 
   async function applyStatusChange(id: string, patch: Partial<Application>) {
@@ -190,7 +213,7 @@ export function ApplicationsPage() {
     }
 
     const sortSuffix = sortKey
-      ? `, sorted by ${SORT_KEY_LABEL[sortKey]} ${sortDirection === "asc" ? "ascending" : "descending"}`
+      ? `, sorted by ${COLUMN_LABEL[sortKey]} ${sortDirection === "asc" ? "ascending" : "descending"}`
       : ""
 
     setTableStatus(
@@ -246,15 +269,27 @@ export function ApplicationsPage() {
             search={search}
             onSearchChange={setSearch}
           />
-          <ApplicationsTable
-            applications={visibleApplications}
-            totalCount={applications.length}
-            sortKey={sortKey}
-            sortDirection={sortDirection}
-            onSort={handleSort}
-            onStatusChange={handleStatusChange}
-            updatingId={updatingId}
-          />
+          {isCardLayout ? (
+            <ApplicationsCardList
+              applications={visibleApplications}
+              totalCount={applications.length}
+              sortKey={sortKey}
+              sortDirection={sortDirection}
+              onSortChange={handleSortSelect}
+              onStatusChange={handleStatusChange}
+              updatingId={updatingId}
+            />
+          ) : (
+            <ApplicationsTable
+              applications={visibleApplications}
+              totalCount={applications.length}
+              sortKey={sortKey}
+              sortDirection={sortDirection}
+              onSort={handleSort}
+              onStatusChange={handleStatusChange}
+              updatingId={updatingId}
+            />
+          )}
         </>
       )}
 

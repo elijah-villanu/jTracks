@@ -280,6 +280,10 @@ in `localStorage`, verifiable by inspection" is a stated V2 success metric.
   pickers below; recap dialog's `Share`/`Download` buttons fully reachable; the table's own internal
   horizontal scrollbar (pre-existing, intentional per F9) is the only scroll surface anywhere. No fixes
   were needed — F13/F15/F18/F22's sizing work already holds up at this width.
+  **Superseded 2026-08-31 by F33:** the "table's own internal horizontal scrollbar is intentional"
+  exception recorded above is **retired**. R13.1 forbids it, and F30–F32 removed it — at 375px the board
+  now renders as a card list with `documentElement.scrollWidth` 360 ≤ 375 and no scrolling container
+  anywhere on the page. The rest of this entry still stands.
   Depends on: F13, F18
 
 ## Notes for parallel work
@@ -479,7 +483,7 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
 > on F28** while F30–F32 do not. R13 is also the highest day-to-day UX payoff in this file, and Q4 is
 > fully resolved (A + B combined), so nothing blocks starting it now.
 
-- [ ] **F30 — Kill the blanket `whitespace-nowrap` at the call site, set per-column wrap rules** (S)
+- [x] **F30 — Kill the blanket `whitespace-nowrap` at the call site, set per-column wrap rules** (S)
   R13.3. `frontend/src/components/ui/table.tsx` puts `whitespace-nowrap` on **both** `TableHead` (line 71)
   and `TableCell` (line 84), so none of the six columns can wrap, and the container's `overflow-x-auto`
   (line 9) turns that into a horizontal scrollbar. Fix at the call site in
@@ -495,7 +499,7 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   `components/ui/table.tsx` is unchanged; sort, status-change and edit interactions all still behave.
   Depends on: none
 
-- [ ] **F31 — Column-priority hiding at intermediate widths** (M)
+- [x] **F31 — Column-priority hiding at intermediate widths** (M)
   R13.2 option A. Below an intermediate breakpoint (the exact value is an implementation decision — the
   PRD deliberately doesn't fix it) drop Location, then Date Applied, from the `COLUMNS` array in
   `applications-table.tsx` — both the `<th>` and the matching `<td>`, kept in sync so the
@@ -513,7 +517,7 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   resizing while sorted by a now-hidden column neither errors nor loses the sort.
   Depends on: F30
 
-- [ ] **F32 — Card-list rendering below the narrow breakpoint** (L)
+- [x] **F32 — Card-list rendering below the narrow breakpoint** (L)
   R13.2 option B. Below a narrow breakpoint (`sm`-ish), render stacked cards instead of a `<table>` — one
   card per application carrying all five data fields plus the same status control, staleness warning and
   edit button. Drive both renderings off the same `applications` prop and the same label source so the two
@@ -539,7 +543,7 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   no duplicate DOM ids at any width.
   Depends on: F30, F31
 
-- [ ] **F33 — 375px and accessibility non-regression verification for the board** (M)
+- [x] **F33 — 375px and accessibility non-regression verification for the board** (M)
   R13.1 and R13.5, plus the PRD's *a UI overhaul is the most efficient way to silently undo an
   accessibility audit* risk. F24 above already verified the rest of the app at 372px and recorded that
   "the table's own internal horizontal scrollbar (pre-existing, intentional per F9) is the only scroll
@@ -553,6 +557,50 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   announce; axe run and compared against the pre-V2.1 baseline. Do all of it in both themes.
   Acceptance: written results for all three widths × both themes; no new axe violation; F24's "intentional
   internal horizontal scrollbar" exception explicitly retired in this file.
+
+  **Verified 2026-08-31** against MSW fixtures in real same-origin iframes (genuine layout viewports, not
+  devtools emulation), measuring `documentElement.scrollWidth` vs `innerWidth` and, separately,
+  `[data-slot="table-container"]`'s `scrollWidth` vs `clientWidth`:
+
+  | Width | Rendering | Page overflow | Table container overflow | Columns |
+  |---|---|---|---|---|
+  | 375px | cards | none (360 ≤ 375) | n/a | all 5 fields per card |
+  | 640px | table | none (625 ≤ 640) | none | Company, Job Title, Status |
+  | 700px | table | none (685 ≤ 700) | none (651/651) | Company, Job Title, Status |
+  | 900px | table | none (885 ≤ 900) | none (851/851) | + Date Applied |
+  | 1023px | table | none (1008 ≤ 1023) | none | all 6 |
+  | 1024px | table | none (1009 ≤ 1024) | none | all 6 |
+  | 1280px | table | none (1265 ≤ 1280) | none (1118/1118) | all 6 |
+
+  R13.4 confirmed live: at 900px the Company cell carries `Location: Remote` and at 700px the Job Title
+  cell also carries `Date Applied: …`, both as real DOM with `sr-only` prefixes (not `aria-hidden`).
+  `aria-sort` present and correct on remaining headers; the card list's sort combobox exposes all 10
+  field+direction pairs, re-sorts correctly, and announces via both its own value ("Company, descending")
+  and the page's `tableStatus` region ("19 of 19 applications shown, sorted by Company descending.");
+  count summary present and wired with `aria-describedby`; the staleness warning keeps `role="img"` +
+  `aria-label` + `tabIndex 0` in both renderings; both polite live regions fire from the card rendering;
+  **zero duplicate DOM ids at every width** (19 unique `status-select-*`, one rendering mounted at a time).
+  **axe (4.10.2) clean — zero violations** at 375px/cards/dark, 700px/table/dark and 1536px/table/dark.
+  Both themes checked; the card rendering was reviewed visually in dark as well as light.
+
+  **One fix was required, and it was not the table's.** Between roughly 640px and 885px the *page* scrolled
+  horizontally because `AppLayout`'s desktop action cluster (`hidden items-center gap-3 sm:flex`, ~534px
+  wide, needing ~885px of viewport with the logo and nav) became visible at `sm`. Measured at 700px:
+  `scrollWidth` 882 with the cluster, 778 with F26's `ThemeToggle` temporarily removed — i.e. **pre-existing**,
+  merely widened ~104px by FV6, and only a defect once R13.1 forbade page-level horizontal scroll. Fixed by
+  gating the cluster (and the `SheetTrigger`/`SheetContent`) at `lg` instead of `sm`, so the mobile Sheet —
+  which already carries every action including the theme toggle — covers everything below 1024px. Verified
+  after the change: no overflow at 640/700/1023, clean handoff at 1024 (hamburger hidden, cluster visible,
+  exactly one visible `ThemeToggle`, no duplicated controls).
+
+  **Not verified:** the `Saved → Applied` confirm-dialog focus restore *from a card*. It verifies correctly
+  from the **table** (focus returns to the row's status trigger), and the card path shares the same
+  `StatusControl`, the same unique `statusSelectId`, and the same lazy `finalFocusRef` lookup — but synthetic
+  clicks leave Base UI's Select popup mounted and real pointer events did not land in the iframe rig, so
+  `document.activeElement` could not be read cleanly at 375px. Worth one manual keyboard pass before relying
+  on it. (An unrelated PATCH failure seen mid-verification was a harness artifact: the backend's
+  `CORS_ORIGINS` allows only port 5173 and the mock server was briefly on 5174; PATCH preflights bypass the
+  service worker and hit the real backend. It does not reproduce on 5173.)
   Depends on: F32, and **F28** (status colors must be final before the both-theme pass)
 
 ## Milestone FV8: Sankey & recap visual restructure (delivery stage 3 — R12)

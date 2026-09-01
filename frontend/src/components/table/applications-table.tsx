@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, Pencil } from "lucide-react"
+import { ArrowDown, ArrowUp, ArrowUpDown, Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Table,
@@ -9,11 +9,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { StatusBadge, STATUS_CELL_CLASSES } from "@/components/StatusBadge"
-import { StatusSelect, statusSelectId } from "@/components/table/status-select"
+import { STATUS_CELL_CLASSES } from "@/components/StatusBadge"
+import { StatusControl } from "@/components/table/status-control"
 import { useApplicationsContext } from "@/hooks/useApplicationsContext"
-import { isStaleInterview, STALE_INTERVIEW_MESSAGE } from "@/lib/staleness"
+import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { cn } from "@/lib/utils"
 import type { Application, ApplicationStatus } from "@/types/api"
 
@@ -30,13 +29,45 @@ interface ApplicationsTableProps {
   updatingId: string | null
 }
 
-const COLUMNS: { key: SortKey; label: string }[] = [
+/**
+ * All five sortable columns, in display order. This is the single source
+ * of truth for column labels -- ApplicationsPage's sort-state
+ * announcement and the card rendering's own sort control (F32) both
+ * import `COLUMN_LABEL` below rather than hard-coding the strings a
+ * second time, so the wording can't drift between the three surfaces.
+ */
+export const COLUMNS: { key: SortKey; label: string }[] = [
   { key: "company", label: "Company" },
   { key: "title", label: "Job Title" },
   { key: "status", label: "Status" },
   { key: "location", label: "Location" },
   { key: "date_applied", label: "Date Applied" },
 ]
+
+export const COLUMN_LABEL: Record<SortKey, string> = COLUMNS.reduce(
+  (labels, column) => ({ ...labels, [column.key]: column.label }),
+  {} as Record<SortKey, string>
+)
+
+/**
+ * F31 breakpoints (R13.2 option A, R13 milestone). Chosen to line up
+ * with Tailwind's default `md`/`lg` boundaries -- already the pattern
+ * this app uses elsewhere (e.g. applications-toolbar.tsx switches layout
+ * at `sm`) -- rather than inventing new values:
+ * - Below `lg` (1024px) there isn't room for all six columns plus sane
+ *   wrap widths on Company/Job Title, so Location drops first. Its
+ *   value is folded into the Company cell as a secondary line so it's
+ *   still genuinely present on screen (R13.4) -- not just in the edit
+ *   dialog.
+ * - Below `md` (768px) Date Applied drops too, folded into the Job
+ *   Title cell the same way.
+ * - Below `sm` (640px) ApplicationsPage swaps this component out
+ *   entirely for the card rendering (F32/R13.2 option B) -- this table
+ *   is simply not mounted at that point, so it never has to handle
+ *   anything narrower than `sm`.
+ */
+const HIDE_LOCATION_QUERY = "(max-width: 1023px)"
+const HIDE_DATE_APPLIED_QUERY = "(max-width: 767px)"
 
 /**
  * The Job Table from UXPLAN.md's Dashboard Page Structure: Job Title,
@@ -55,7 +86,27 @@ export function ApplicationsTable({
   updatingId,
 }: ApplicationsTableProps) {
   const { openEditForm } = useApplicationsContext()
-  const columnCount = COLUMNS.length + 1
+
+  // R13.3: `table.tsx` puts a blanket `whitespace-nowrap` on every
+  // TableHead/TableCell, which combined with the container's
+  // `overflow-x-auto` is exactly what produced the horizontal scrollbar
+  // R13.1 forbids. Fixed at this call site (per-column classes below)
+  // rather than in the shadcn primitive, which would silently change
+  // every future table.
+  const hideLocation = useMediaQuery(HIDE_LOCATION_QUERY)
+  const hideDateApplied = useMediaQuery(HIDE_DATE_APPLIED_QUERY)
+
+  const visibleColumns = COLUMNS.filter((column) => {
+    if (column.key === "location") {
+      return !hideLocation
+    }
+    if (column.key === "date_applied") {
+      return !hideDateApplied
+    }
+    return true
+  })
+  // +1 for the trailing icon-only Edit column, which never hides.
+  const columnCount = visibleColumns.length + 1
 
   return (
     <div className="overflow-hidden rounded-md border border-border">
@@ -67,7 +118,7 @@ export function ApplicationsTable({
         </TableCaption>
         <TableHeader>
           <TableRow>
-            {COLUMNS.map((column) => {
+            {visibleColumns.map((column) => {
               const active = sortKey === column.key
               return (
                 // A11y: `aria-sort` belongs on the columnheader (`<th>`),
@@ -75,6 +126,13 @@ export function ApplicationsTable({
                 // support the property at all, so screen readers were
                 // silently dropping it and no column ever reported as
                 // sorted (WCAG 4.1.2 Name, Role, Value).
+                //
+                // Sort state (`sortKey`/`sortDirection`) lives one level
+                // up in ApplicationsPage and is completely independent of
+                // which columns are currently rendered here -- a column
+                // hidden at this width just stops rendering its `<th>`
+                // and `SortButton`, but sorting by it (if still active)
+                // keeps applying to `applications` exactly as before.
                 <TableHead
                   key={column.key}
                   aria-sort={active ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
@@ -103,47 +161,49 @@ export function ApplicationsTable({
           ) : (
             applications.map((application) => (
               <TableRow key={application.id}>
-                <TableCell className="font-medium">{application.company}</TableCell>
-                <TableCell>{application.title}</TableCell>
-                <TableCell className={cn("transition-colors", STATUS_CELL_CLASSES[application.status])}>
-                  <div className="flex items-center gap-2">
-                    <StatusBadge status={application.status} />
-                    <StatusSelect
-                      id={statusSelectId(application.id)}
-                      status={application.status}
-                      disabled={updatingId === application.id}
-                      onChange={(status) => onStatusChange(application.id, status)}
-                    />
-                    {isStaleInterview(application) && (
-                      // A11y: the warning was a bare focusable <span> --
-                      // a tab stop with no role, which VoiceOver/NVDA
-                      // announce as an unlabelled "group"/nothing at all.
-                      // `role="img"` + `aria-label` gives it a real name
-                      // and role, and the same text is duplicated in a
-                      // visually-hidden span so the warning is still
-                      // reachable when reading the row linearly (a
-                      // tooltip that only opens on hover/focus is not).
-                      <Tooltip>
-                        <TooltipTrigger
-                          render={
-                            <span
-                              tabIndex={0}
-                              role="img"
-                              className="inline-flex items-center rounded-sm text-amber-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring dark:text-amber-500"
-                              aria-label={STALE_INTERVIEW_MESSAGE}
-                            />
-                          }
-                        >
-                          <AlertTriangle className="size-3.5" aria-hidden="true" />
-                        </TooltipTrigger>
-                        <TooltipContent>{STALE_INTERVIEW_MESSAGE}</TooltipContent>
-                      </Tooltip>
-                    )}
-                  </div>
+                <TableCell className="min-w-36 max-w-64 align-top font-medium whitespace-normal break-words">
+                  {application.company}
+                  {hideLocation && (
+                    // R13.4: Location's own column is hidden below `lg` --
+                    // its value has to stay genuinely present on this same
+                    // screen, not just in the edit dialog, so it's folded
+                    // in here as a secondary line rather than dropped.
+                    <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                      <span className="sr-only">Location: </span>
+                      {application.location ?? "—"}
+                    </span>
+                  )}
                 </TableCell>
-                <TableCell>{application.location ?? "—"}</TableCell>
-                <TableCell>{application.date_applied ?? "—"}</TableCell>
-                <TableCell>
+                <TableCell className="min-w-40 max-w-72 align-top whitespace-normal break-words">
+                  {application.title}
+                  {hideDateApplied && (
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      <span className="sr-only">Date Applied: </span>
+                      {application.date_applied ?? "—"}
+                    </span>
+                  )}
+                </TableCell>
+                <TableCell
+                  className={cn(
+                    "align-top whitespace-normal transition-colors",
+                    STATUS_CELL_CLASSES[application.status]
+                  )}
+                >
+                  <StatusControl
+                    application={application}
+                    updatingId={updatingId}
+                    onStatusChange={onStatusChange}
+                  />
+                </TableCell>
+                {!hideLocation && (
+                  <TableCell className="align-top whitespace-normal break-words">
+                    {application.location ?? "—"}
+                  </TableCell>
+                )}
+                {!hideDateApplied && (
+                  <TableCell className="align-top">{application.date_applied ?? "—"}</TableCell>
+                )}
+                <TableCell className="align-top">
                   <Button
                     type="button"
                     variant="ghost"
