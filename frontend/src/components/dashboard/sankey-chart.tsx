@@ -22,6 +22,16 @@ export interface SankeyChartProps {
   fontSize?: number
   className?: string
   /**
+   * Status -> color map for node `fill` / ribbon `stroke`. Defaults to
+   * the theme-aware `STATUS_BREAKDOWN_COLORS` (F28), which is correct for
+   * every live, in-app instance of this chart (the CSS cascade resolves
+   * its `var(--status-*)` references against whichever theme is active).
+   * `RecapCard` passes `STATUS_LITERAL_COLORS` instead -- see that
+   * module's doc comment for why the exported instance needs fixed,
+   * theme-independent values.
+   */
+  colors?: Record<ApplicationStatus, string>
+  /**
    * `true` (default): node/link thickness is proportional to value, per
    * R5.4 -- the dashboard's accurate, to-scale rendering.
    *
@@ -125,6 +135,7 @@ export function SankeyChart({
   marginY = 8,
   fontSize = 9,
   className,
+  colors = STATUS_BREAKDOWN_COLORS,
   weighted = true,
 }: SankeyChartProps) {
   const hasLinks = data.links.length > 0
@@ -208,7 +219,7 @@ export function SankeyChart({
               key={`${source.key}-${target.key}`}
               d={d}
               fill="none"
-              stroke={STATUS_BREAKDOWN_COLORS[source.key]}
+              stroke={colors[source.key]}
               strokeOpacity={0.35}
               strokeWidth={weighted ? Math.max(1, link.width ?? 0) : UNWEIGHTED_STROKE_WIDTH}
             />
@@ -231,7 +242,7 @@ export function SankeyChart({
                 width={Math.max(1, x1 - x0)}
                 height={Math.max(1, y1 - y0)}
                 rx={2}
-                fill={STATUS_BREAKDOWN_COLORS[node.key]}
+                fill={colors[node.key]}
               />
               <text
                 x={labelOnRight ? x1 + 4 : x0 - 4}

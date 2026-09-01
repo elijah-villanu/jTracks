@@ -345,7 +345,7 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
 > scope) so nothing blocks this milestone. Q7's reference material has not arrived — R11.2 explicitly
 > authorizes picking a reasonable default hue rather than waiting for it.
 
-- [ ] **F25 — Theme provider: light / dark / system, persisted, with no flash on load** (M)
+- [x] **F25 — Theme provider: light / dark / system, persisted, with no flash on load** (M)
   R11.1. `frontend/src/index.css` already ships a complete `.dark` token block (lines 42–74) and
   `@custom-variant dark (&:is(.dark *))` (line 5), and components across the tree carry `dark:` variants —
   all of it dead code, because nothing ever adds `.dark` to the document. Add
@@ -371,7 +371,7 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   updates the app without a reload; `tsc -b` and `npm run lint` clean.
   Depends on: none — **blocks F26, F27, F28, F29** and every "verify in both themes" acceptance below.
 
-- [ ] **F26 — Theme control in the app shell** (S)
+- [x] **F26 — Theme control in the app shell** (S)
   R11.1's "a visible control in the app shell (`AppLayout`)". `components/layout/AppLayout.tsx` has two
   nav surfaces that both need it: the desktop action cluster (the `hidden items-center gap-3 sm:flex`
   div holding Paste a Link / Add Job / Log out) and the mobile `Sheet` body below the `Separator`.
@@ -390,7 +390,7 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   `SheetTrigger`).
   Depends on: F25
 
-- [ ] **F27 — Give `--primary` / `--ring` a real accent hue in both token blocks** (M)
+- [x] **F27 — Give `--primary` / `--ring` a real accent hue in both token blocks** (M)
   R11.2, confirmed direction: neutral base + one accent hue. Today both blocks in
   `frontend/src/index.css` are entirely zero-chroma — `--primary: oklch(0.205 0 0)` light /
   `oklch(0.922 0 0)` dark, `--ring: oklch(0.708 0 0)` / `oklch(0.556 0 0)`. Pick one hue and apply it to
@@ -408,7 +408,7 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   `index.css`.
   Depends on: F25
 
-- [ ] **F28 — Make the status palette theme-aware and drive it from one place** (M)
+- [x] **F28 — Make the status palette theme-aware and drive it from one place** (M)
   R11.3 + R11.4. Status color is currently defined in two disconnected places:
   `STATUS_BREAKDOWN_COLORS` in `components/dashboard/status-breakdown-chart.tsx` (hardcoded hex, whose own
   doc comment says *"This app has no reachable dark mode yet ... so these are hardcoded rather than
@@ -436,7 +436,7 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   together from a single edit; a real recap export still shows correctly-colored nodes and ribbons.
   Depends on: F25, F27
 
-- [ ] **F29 — Both-theme sweep, token-discipline audit, and the palette decision record** (M)
+- [x] **F29 — Both-theme sweep, token-discipline audit, and the palette decision record** (M)
   R11.1's "dark mode is not shipped until every route has been checked in it", R11.4, and the PRD's
   *dark mode doubles the verification surface* risk. Open every surface that exists **today** in both
   themes and fix what breaks: `/` (table + toolbar), `/analytics` (all five stat tiles, both Recharts
@@ -456,6 +456,17 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   Acceptance: a written checklist of every route and dialog above × light/dark with no contrast failure;
   no unexplained hardcoded color outside `index.css`; the conventions doc no longer claims the palette is
   grayscale and names the actual hue.
+  **Done:** sweep performed in a real browser against MSW fixtures; the checklist, measured contrast
+  numbers and the token-discipline findings are in `docs/decisions/magicui-conventions.md`'s "F29 live
+  both-theme sweep" table. Every listed route and dialog passed in both themes, including the two states
+  that need driving rather than just visiting (`ConfirmAppliedDialog` via a real `saved → applied`
+  transition, and both tones of `ApplicationFormDialog`'s notice banner via the autofill flow). Two
+  carry-overs are recorded there rather than fixed, neither a contrast failure: `--primary` used as
+  *body text* clears only 3.45:1 in light (the `link` Button/Badge variant is defined but never invoked
+  — fix before anyone uses it), and `applications-over-time-chart.tsx`'s `TREND_COLOR` still duplicates
+  `--status-applied` as a literal. One thing genuinely not re-verified: an actual `toBlob` recap export
+  (the export path runs but did not complete in this environment) — fold that into F48's per-skin
+  reference baselines.
   Depends on: F27, F28
 
 ## Milestone FV7: Applications table without horizontal scroll (delivery stage 2 — R13)

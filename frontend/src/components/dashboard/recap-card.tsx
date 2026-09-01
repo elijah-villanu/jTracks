@@ -1,6 +1,7 @@
 import { forwardRef } from "react"
 import { Briefcase } from "lucide-react"
 import { SankeyChart } from "@/components/dashboard/sankey-chart"
+import { STATUS_LITERAL_COLORS } from "@/components/dashboard/status-breakdown-chart"
 import type { DashboardRecap, RecapHighlight } from "@/types/api"
 
 interface RecapCardProps {
@@ -53,6 +54,16 @@ function featuredStats(highlights: RecapHighlight[]): RecapHighlight[] {
  * from the same `GET /dashboard/recap` payload as before -- nothing new
  * was added to the contract, this only changes which fields the card
  * surfaces and how.
+ *
+ * F28: this card's `SankeyChart` is passed `STATUS_LITERAL_COLORS`
+ * (fixed hex), not the default theme-aware `STATUS_BREAKDOWN_COLORS` --
+ * deliberately, so the export never depends on `.dark` state. See
+ * status-breakdown-chart.tsx's doc comment on `STATUS_LITERAL_COLORS`
+ * for the full reasoning (html-to-image's clone step resolves
+ * `var(--status-*)` via `getComputedStyle` before serializing, which
+ * would bake in whichever theme is active on `<html>` at export time --
+ * not what a "looks the same regardless of your current theme" export
+ * card wants).
  */
 export const RecapCard = forwardRef<HTMLDivElement, RecapCardProps>(function RecapCard({ recap }, ref) {
   const stats = featuredStats(recap.highlights)
@@ -84,6 +95,7 @@ export const RecapCard = forwardRef<HTMLDivElement, RecapCardProps>(function Rec
           marginX={4}
           marginY={5}
           fontSize={6}
+          colors={STATUS_LITERAL_COLORS}
           weighted={false}
         />
       </div>

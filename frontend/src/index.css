@@ -5,6 +5,12 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  /*
+    F25: native form controls, scrollbars and the UA's default canvas
+    background follow whichever theme is actually painted, not just our
+    own token values.
+  */
+  color-scheme: light;
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -12,8 +18,25 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
+  /*
+    F27: teal accent hue (~195), the one major hue the status palette
+    (below) doesn't already occupy -- see status-breakdown-chart.tsx's
+    STATUS_BREAKDOWN_COLORS doc comment for the other six hues. Values
+    measured with a WCAG contrast calculator against this file's real
+    surfaces (see docs/decisions/magicui-conventions.md's theming
+    section for the full numbers):
+      - --primary-foreground is near-black (not the previous near-white)
+        in *both* themes -- at this hue/chroma, primary's lightness reads
+        better with dark text in both modes (5.75:1 light, 9.31:1 dark;
+        white-ish text would have failed both, 3.29:1 / 2.04:1).
+      - --ring is tuned to L=0.60 here (down from an initial L=0.66,
+        which only cleared 2.97:1 against this theme's white
+        background/card -- just under the 3:1 non-text AA floor). L=0.66
+        is kept for .dark, where it clears 6:1+ against both dark
+        surfaces.
+  */
+  --primary: oklch(0.62 0.11 195);
+  --primary-foreground: oklch(0.145 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
@@ -23,7 +46,7 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --ring: oklch(0.60 0.10 195);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -31,23 +54,40 @@
   --chart-5: oklch(0.269 0 0);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.62 0.11 195);
+  --sidebar-primary-foreground: oklch(0.145 0 0);
   --sidebar-accent: oklch(0.97 0 0);
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar-ring: oklch(0.60 0.10 195);
+
+  /*
+    F28: status palette, promoted from status-breakdown-chart.tsx's
+    hardcoded hex into the token layer so the breakdown chart's <Cell>,
+    the Sankey nodes/ribbons and (via @theme inline below) any Tailwind
+    utility all read from one place, per R11.3. Light-mode values are
+    the original, already-validated hexes (see
+    status-breakdown-chart.tsx) -- unchanged here.
+  */
+  --status-saved: #94a3b8;
+  --status-applied: #3b82f6;
+  --status-interviewing-oa: #f59e0b;
+  --status-offer: #10b981;
+  --status-rejected: #ef4444;
+  --status-failed: #ec4899;
+  --status-ghosted: #8b5cf6;
 }
 
 .dark {
+  color-scheme: dark;
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  --primary: oklch(0.75 0.11 195);
+  --primary-foreground: oklch(0.145 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
@@ -57,7 +97,7 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --ring: oklch(0.66 0.10 195);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -65,12 +105,33 @@
   --chart-5: oklch(0.269 0 0);
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.75 0.11 195);
+  --sidebar-primary-foreground: oklch(0.145 0 0);
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-ring: oklch(0.66 0.10 195);
+
+  /*
+    F28 dark-mode status set: applied/rejected/failed/ghosted are the
+    same hex as light (measured 4.6:1-5.6:1 against both dark
+    --background and --card -- see the decision doc). interviewing_oa and
+    offer swap to the darker "dark-safe" pair this file's history already
+    proposed (#d97706 / #059669) -- measured 6.2:1 / 5.3:1 against dark
+    --background (5.6:1 / 4.75:1 against --card), both comfortably clear
+    of AA. Note: the *undimmed* light hexes actually measure even higher
+    contrast on a dark background (9.2:1 / 7.8:1) -- the swap isn't
+    required by contrast math, it's kept for the reduced-glare/saturation
+    reasoning the original comment intended. Either way this is a WCAG
+    AA pass, not a fail being fixed.
+  */
+  --status-saved: #94a3b8;
+  --status-applied: #3b82f6;
+  --status-interviewing-oa: #d97706;
+  --status-offer: #059669;
+  --status-rejected: #ef4444;
+  --status-failed: #ec4899;
+  --status-ghosted: #8b5cf6;
 }
 
 @theme inline {
@@ -105,6 +166,15 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* F28: exposes the status tokens above as Tailwind utilities (e.g. `fill-status-applied`) for any future className-based consumer -- the chart/Sankey code below reads the raw `--status-*` custom properties directly via `var()` since it needs plain strings for SVG fill/stroke props, not classNames. */
+  --color-status-saved: var(--status-saved);
+  --color-status-applied: var(--status-applied);
+  --color-status-interviewing-oa: var(--status-interviewing-oa);
+  --color-status-offer: var(--status-offer);
+  --color-status-rejected: var(--status-rejected);
+  --color-status-failed: var(--status-failed);
+  --color-status-ghosted: var(--status-ghosted);
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);

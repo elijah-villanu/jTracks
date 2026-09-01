@@ -6,6 +6,7 @@ import { AutofillDialog } from "@/components/applications/autofill-dialog"
 import { BlurFade } from "@/components/ui/blur-fade"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
+import { ThemeToggle } from "@/components/layout/theme-toggle"
 import {
   Sheet,
   SheetClose,
@@ -134,6 +135,7 @@ export function AppLayout() {
                   {user.email}
                 </span>
               )}
+              <ThemeToggle />
               <Button size="sm" variant="outline" onClick={() => setIsAutofillOpen(true)}>
                 <ClipboardPaste />
                 Paste a Link
@@ -179,6 +181,7 @@ export function AppLayout() {
                 <Separator className="my-1" />
 
                 <div className="flex flex-col gap-3 px-4">
+                  <ThemeToggle />
                   {user && (
                     <span className="text-sm text-muted-foreground">{user.email}</span>
                   )}

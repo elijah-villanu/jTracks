@@ -5,6 +5,34 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>jTracks</title>
+    <script>
+      // F25 no-flash: synchronously apply the theme class before first
+      // paint, so a hard reload with theme = "dark" never paints a light
+      // frame first. Runs before /src/main.tsx's module script (module
+      // scripts are deferred; this plain script is not), and reads the
+      // *same* "jtracks_theme" localStorage key the ThemeProvider uses
+      // (src/lib/theme-context.tsx's THEME_STORAGE_KEY) -- keep these two
+      // in sync by hand if that key name ever changes, since this script
+      // can't import a TS constant.
+      (function () {
+        try {
+          var stored = window.localStorage.getItem("jtracks_theme");
+          var isDark =
+            stored === "dark" ||
+            (stored !== "light" &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          var root = document.documentElement;
+          if (isDark) {
+            root.classList.add("dark");
+          }
+          root.style.colorScheme = isDark ? "dark" : "light";
+        } catch (e) {
+          // localStorage/matchMedia unavailable (e.g. privacy mode) --
+          // fall back to the light default rather than throwing before
+          // the app has even started loading.
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
