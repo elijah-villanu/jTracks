@@ -470,7 +470,9 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   — fix before anyone uses it), and `applications-over-time-chart.tsx`'s `TREND_COLOR` still duplicates
   `--status-applied` as a literal. One thing genuinely not re-verified: an actual `toBlob` recap export
   (the export path runs but did not complete in this environment) — fold that into F48's per-skin
-  reference baselines.
+  reference baselines. **Resolved by F35/F39/F48:** the export path is fine; it only needs the Chrome
+  window *visible*, and five real 1080×1920 baselines now exist. F48 additionally measured the exported
+  card's contrast off the PNG itself.
   Depends on: F27, F28
 
 ## Milestone FV7: Applications table without horizontal scroll (delivery stage 2 — R13)
@@ -666,6 +668,13 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   page loads and came back **byte-identical** (1,780,269 both times), which is useful for F39: a
   pixel/byte diff against this baseline is meaningful, not noisy.
 
+  > **Superseded by F48 (2026-09-03).** The recap is now three selectable skins, so a single all-time
+  > baseline no longer identifies what it is a baseline *of*. `recap-baseline-all.png` was deleted and
+  > replaced by one file per skin (`recap-baseline-strava.png`, `-duolingo.png`, `-beli.png`); the two
+  > degenerate-state files kept their names but were re-shot against the Strava skin, whose card
+  > background F48 made transparent. Byte counts in the table above are therefore historical — see F48
+  > for the current set. The regeneration recipe below is unchanged and still correct.
+
   *How to regenerate (F39 and F48 will need this).* The export cannot be captured with a browser download
   in this setup, so the bytes are POSTed to a tiny local receiver instead: run a Node HTTP server that
   writes `POST /save?name=<n>` bodies into `frontend/reference/`, then in the page patch
@@ -819,7 +828,7 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   foreground the window before exporting. Visible, the same export takes ~300ms.
   Depends on: F35, F36, F37, F38
 
-- [ ] **F48 — Recap skin-selector infrastructure, plus the "Strava" skin (transparent background)** (L)
+- [x] **F48 — Recap skin-selector infrastructure, plus the "Strava" skin (transparent background)** (L)
   R12.7. Introduces a small "recap skin" concept: the same recap data rendered by one of several
   interchangeable card designs, selected by the viewer inside `dashboard/recap-dialog.tsx`. Migrates the
   *existing* `recap-card.tsx` design into the first skin ("Strava"), with one deliberate change: **this
@@ -853,7 +862,91 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   Depends on: F35 (needs re-baselining per skin), F28 (final status/token palette for the two skins that
   do use it).
 
-- [ ] **F49 — "Duolingo" skin: single dominant hero stat + secondary grid** (M)
+  **Done 2026-09-03.** New `components/dashboard/recap-skins/` package: `types.ts` (ids + the props every
+  skin takes), `shared.tsx` (`RECAP_LITERAL_COLORS`, `featuredStats`, the shared `RecapFooter`/eyebrow),
+  one file per skin, and `index.ts` holding the `RECAP_SKINS` registry that the slide order, dots,
+  accessible names and default all derive from — adding a fourth skin is one entry plus one baseline, and
+  touches neither the dialog nor `recap-card.tsx`. `recap-card.tsx` is now a dispatcher over that
+  registry; the design that used to live in it is `recap-skins/strava-skin.tsx`. Persistence is
+  `hooks/useRecapSkin.ts` on `jtracks_recap_skin`, guarded by `isRecapSkinId` so a stale or hand-edited
+  value falls back to the default rather than rendering `undefined`. Selector is shadcn `carousel`
+  (installed via `npx shadcn@latest add carousel`) with real Previous/Next buttons and a dot row — drag is
+  additive, never the only path.
+
+  *Export target.* All three cards mount so Embla can measure them; `exportCardToBlob` reads
+  `cardRefs.current[skinId]`, so exactly one skin is ever inside the subtree handed to `toBlob`. Download
+  filenames are now skin-qualified (`jtracks-recap-all-strava.png`) so exporting several designs doesn't
+  overwrite one file.
+
+  *Two real defects found by measuring rather than eyeballing.* **(1)** The carousel blew the dialog out to
+  842px inside its own 384px cap: `DialogContent` is a `grid`, and Embla's flex track of `basis-full`
+  slides gave the column a three-cards-wide max-content minimum. `min-w-0` floors it (384 / 352 viewport /
+  270 card, no page overflow). **(2)** The stored skin was being destroyed on *every* dialog open — Embla
+  emits its first `select` before it has measured, an unmeasured carousel reports snap 0, and that 0 flowed
+  into `setSkinId` and wrote "strava" over the user's choice with no interaction of their own. Fixed with a
+  restore guard (`hasRestoredStoredSkin`) that ignores Embla's selects until it has actually landed on the
+  remembered skin, re-attempted on `reInit`. Verified end-to-end: picked Beli, full reload + re-login, and
+  the dialog reopened on Beli having jumped straight there.
+
+  *Reduced motion.* Embla writes an inline `transform` from its own rAF loop, so it is reached by neither
+  the app-root `<MotionConfig reducedMotion="user">` (Motion components only) nor `index.css`'s global
+  reduced-motion reset (CSS only) — it would have animated regardless of the OS setting, which
+  `.claude/rules/magicui-ui.md` forbids. Now `opts={{ duration: 0 }}` under `prefers-reduced-motion`.
+
+  *Strava legibility without a backdrop — measured off real 1080×1920 exports, not the dialog preview.*
+  The card background is transparent; each block of content keeps a scrim beneath just the type. Sampling
+  the flat scrim from the PNG and compositing it over both extremes:
+
+  | Element | over white | over black |
+  |---|---|---|
+  | Stat values (#ffffff) | **14.48:1** | 18.17:1 |
+  | Muted labels (#cbd5e1) | **9.76:1** | 12.24:1 |
+  | Sankey labels (#f8fafc) | **13.84:1** | 17.36:1 |
+  | Ribbon vs scrim | 1.60:1 | 1.65:1 |
+
+  Sanity-checked the helper against black-on-white = 21.00 first, because the FV6 pass had a contrast
+  routine silently mis-parse `oklch()` and report 1.79 for everything.
+  The scrim alpha is **0.92, and it is the Sankey that sets it, not the text** — text clears AA at ~0.72,
+  but the ribbons are drawn by the shared chart at `strokeOpacity={0.35}`, so a light backdrop bleeding
+  through cost them most of their separation (1.63:1 over black vs **1.23:1** over white at 0.72). At 0.92
+  they are 1.60/1.65, i.e. the chart looks the same whatever it is shared onto. Done in the skin rather
+  than by raising the chart's stroke opacity, which the dashboard (F37/F38) also renders. One alpha for
+  every panel: a denser scrim behind only the chart read as two mismatched greys over a light background.
+  Ribbon separation stays low in absolute terms, but it is unchanged from the opaque gradient and the
+  ribbons carry nothing alone — nodes are full-opacity colour and `ChartDataTable` exposes every flow as
+  text.
+
+  *A11y.* Tab order Week/Month/Year/All/Custom → 3 dots → Next → Download → Share → Close (Previous absent
+  only because correctly disabled on slide 1). Dots measure exactly 24×24 (WCAG 2.5.8) around an 8px
+  visual dot. Arrow keys page correctly (right → Duolingo, left → Strava). Selection announces through its
+  own polite region ("Recap design 2 of 3: Duolingo. One oversized headline stat over a two-tile grid."),
+  kept separate from the existing export/fetch region so the two can't overwrite each other. The carousel
+  stays mounted during a refetch — each slide swaps its own card for a same-sized placeholder — so changing
+  the range can't drop focus.
+
+  *Narrow width.* Checked at a 372px viewport via a same-origin iframe (`resize_window` is a no-op in this
+  environment): no horizontal scroll (scrollWidth 357 ≤ clientWidth 372), dialog 325 / viewport 293, and
+  the 270px card, control row and share row all fit.
+
+  Baselines in `frontend/reference/`, all 1080×1920, colour type 6 (RGBA), all four corner alphas 0:
+
+  | File | State | Bytes |
+  |---|---|---|
+  | `recap-baseline-strava.png` | Strava, all-time | 170,618 |
+  | `recap-baseline-duolingo.png` | Duolingo, all-time | 977,351 |
+  | `recap-baseline-beli.png` | Beli, all-time | 147,865 |
+  | `recap-baseline-empty-total.png` | Strava, `total === 0` | 155,398 |
+  | `recap-baseline-inflight-only.png` | Strava, `links.length === 0` | 158,335 |
+
+  Each re-exported twice and SHA-256-compared: byte-identical, so future diffs are signal. `recap-baseline-all.png` deleted (superseded).
+
+  *Trap worth repeating from F39:* exports only work with the Chrome window **visible**. Hidden, `toBlob`
+  hung long enough to take the CDP channel down at 45s; visible, the same export is ~300–600ms. Also
+  beware stubbing `window.fetch` to force a degenerate state — restoring the original does **not** refetch,
+  and re-exporting against the stale state silently overwrote a good baseline with a placeholder render
+  here. Change the range to force a real refetch and assert on the card's text before trusting the export.
+
+- [x] **F49 — "Duolingo" skin: single dominant hero stat + secondary grid** (M)
   R12.7. Second recap skin, informed by the [Duolingo Year-in-Review reference](https://mobbin.com/screens/81b67776-4a5d-40d9-860e-9b3b4122357a): one clearly dominant stat
   (Applications sent) rendered oversized at the top, the remaining stats (rejection rate, interviews)
   arranged in a compact grid below it, opaque colored card background (unlike the Strava skin —
@@ -864,7 +957,24 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   fetching).
   Depends on: F48.
 
-- [ ] **F50 — "Beli" skin: ranked-stat layout, and Download/Share button styling** (M)
+  **Done 2026-09-03.** `recap-skins/duolingo-skin.tsx`. Took the reference's *hierarchy* — one figure big
+  enough to be the whole point of the card, everything else deliberately secondary — not its palette or
+  mascot art; the card is painted in the app's own teal accent family (F27) rather than Duolingo's blue.
+  Applications sent renders at 80px (sized against a four-digit value so a busy year can't wrap the one
+  element the skin is built around), with Interviews and Rejection rate demoted to a two-tile grid of light
+  tiles beneath. Opaque background, as F48 scoped transparency to Strava alone, so it needs no scrim.
+  Reuses the shared `RecapFooter`, per this task's requirement that the three skins not each reinvent it.
+
+  First pass left the hero panel reading as a number stranded in empty space — the reference pairs its
+  figure with a one-line claim, so this now shows the payload's own `headline` beneath the caption. That
+  needed no new data: `headline` was already on the recap response and already spoken by the dialog's live
+  region. No skin-specific fetching — every skin receives only `RecapSkinProps`, which carries the one
+  payload and nothing else, so the constraint is enforced by the type rather than by convention.
+  Exports at 1080×1920 RGBA, deterministic across two runs; baseline `recap-baseline-duolingo.png`
+  (977,351 bytes — much larger than the other two because the card is a full-bleed gradient rather than
+  mostly flat colour or transparency).
+
+- [x] **F50 — "Beli" skin: ranked-stat layout, and Download/Share button styling** (M)
   R12.7. Third recap skin, informed by the [Beli monthly-recap reference](https://mobbin.com/screens/7fe2981e-cefd-4a7a-8e57-61ab97fb8e7f): a ranked-list-style presentation
   of the stats, opaque card background. Also gives the dialog's existing Download/Share buttons a visual
   treatment nodding to Beli's bottom share-icon row — styling only; **no custom per-app share buttons** are
@@ -874,6 +984,35 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   reference PNG; Download/Share styling changes don't alter `handleDownload`/`handleShare` logic, only
   their presentation.
   Depends on: F48.
+
+  **Done 2026-09-03.** `recap-skins/beli-skin.tsx`. Warm paper card — deliberately the light one of the
+  three, which gives the selector a real choice at a glance and also demonstrates the export is genuinely
+  theme-independent (it stays paper-coloured with the app in dark mode). Heavy display headline
+  (`"{period_label} in applications"`), a pair of label-above-number stat columns, then the ranked list
+  that gives this skin its reason to exist.
+
+  *The ranking is real data, not a re-arrangement of the same three figures.* It comes from
+  `status_breakdown`, already on the `GET /dashboard/recap` payload — a different projection of the same
+  response, not a second request, which is what this task's "no skin-specific data fetching" acceptance
+  asks for. Zero-count statuses are dropped (an outcome nobody reached shouldn't hold a rank), the rest
+  ordered by count, capped at 5.
+
+  Took two passes to get the list right in a 9:16 frame. Bunched under the stat columns it left the bottom
+  third of the card empty; spread with `justify-between` each hairline sat tucked under its own row above a
+  void, reading as an underline rather than a separator. Each row is now an equal-height band (`flex-1`)
+  with centred text, which puts the rules at even intervals and lets a sparse list still read as a list.
+  Contrast checked against this skin's own fixed background (#fdf4e9): headline #c2381c at 4.97:1, stat
+  numbers and rows #14425a at 9.83:1, muted labels #4a5b66 at 6.48:1 — all past AA. (The initial coral was
+  #e8492b at 3.56:1, which only passed as large text; darkened rather than relying on the size exemption.)
+
+  *Download/Share (styling only).* Centred row of icon-over-label actions with 44px circular targets,
+  nodding to the reference's bottom share row. `handleDownload`/`handleShare`, the `supportsShare` feature
+  gate and the disabled conditions are untouched — the diff is class names and markup around the existing
+  calls. Deliberately **not** per-app share buttons: `navigator.share()` already hands the OS its own
+  app-icon sheet on mobile, and a hand-rolled row can't reliably deep-link into those apps from a plain web
+  share call. Both actions verified still working end-to-end (the export announcements read back
+  "Recap image downloaded as jtracks-recap-all-strava.png").
+  Baseline `recap-baseline-beli.png`, 1080×1920 RGBA, 147,865 bytes, deterministic across two runs.
 
 ## Milestone FV9: Public landing page (delivery stage 4 — R10)
 

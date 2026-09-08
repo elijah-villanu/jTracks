@@ -37,6 +37,19 @@ for anything installed through the normal MagicUI CLI workflow. If a future Magi
 doesn't respect `MotionConfig` (rare — check its source via `getRegistryItem` first), that's a
 signal to reconsider using it, not to work around it locally.
 
+**Scope of "never re-implement this per-component": it means Motion components.** A library that
+animates *without* Motion falls through both safety nets at once — `MotionConfig` only governs
+`motion.*` elements, and `index.css`'s reduced-motion block only governs CSS
+`animation`/`transition`. Anything that moves by writing inline styles from its own
+`requestAnimationFrame` loop is reached by neither and **does** need explicit local handling.
+
+The live case is **Embla**, behind shadcn's `carousel` in `recap-dialog.tsx` (F48): it slides by
+writing an inline `transform` from its own rAF loop, so it animated regardless of the OS setting
+until given `opts={{ duration: 0 }}` under `useMediaQuery("(prefers-reduced-motion: reduce)")`.
+That branch is required, not redundant — don't delete it as a violation of the rule above. If you
+add another non-Motion animated dependency, it needs the same treatment, and it belongs in the
+inventory table with a note saying so.
+
 ## Approved components (so far)
 
 Only what's actually been used and verified in this project. This list grows as real pages adopt
@@ -347,4 +360,5 @@ already used where," so a future session can check for consistency instead of re
 | Signup (`SignupPage.tsx` / `signup-form.tsx`) | `BlurFade` (1 group: the whole auth `Card`), `BorderBeam` (1x, on the same `Card`) | Same treatment as Login for consistency between the two auth routes. `SignupForm` now destructures `className` and merges it via `cn("relative", className)` instead of spreading it straight onto `Card`, so a future caller-supplied `className` still composes correctly. |
 | Applications / Tracker (`ApplicationsPage.tsx`) | `BlurFade` (1 group: the page header title+description only) | Highest-risk page (real data table + toolbar wired to filter/search/sort state). Deliberately minimal: only the static header text is wrapped. The toolbar and table are explicitly left unanimated — both live inside the `isLoading` branch and update on every keystroke/filter/sort/status change, which the "don't re-trigger on state changes" rule for `BlurFade` and the "no marquee/no per-row wrapping" guidance both rule out. No `BorderBeam`: there's no single most-important element to crown on a page that's entirely about scanning/editing rows. |
 | Settings / Profile (`SettingsPage.tsx`) | `BlurFade` (1 group: the settings form `Card`) | No numeric KPI on this page (the ghost-days value is an editable form input, not a displayed stat), so no `NumberTicker`. No `BorderBeam` either — no headline stat to justify a continuous accent, unlike Analytics' "Total Applications" tile. Page title header left static, matching Analytics' convention of only animating content groups, not the title. |
+| Recap dialog (`dashboard/recap-dialog.tsx` + `dashboard/recap-skins/*`) | **None** — and none may be added to the card itself | Listed precisely because it must stay empty. F35's standing rule: the skin components sit inside the subtree handed to `toBlob`, so no MagicUI/Motion component may appear anywhere in them — an in-flight animation serializes at whatever frame it happens to be on, and Motion's inline transforms aren't guaranteed to survive serialization, so the PNG would silently differ from what the user saw. Motion *around* the card, elsewhere in the dialog, would be outside the export refs and is permitted, but nothing has needed it. The one animated thing here is the skin carousel, which is **Embla, not MagicUI** — see the reduced-motion carve-out above for why it carries its own `duration: 0` branch. |
 | App shell (`AppLayout.tsx`) | `BlurFade` (1 group: the whole `<header>` — logo, desktop nav, action buttons, and the mobile Sheet trigger together) | Requested explicitly (user asked to animate the header). Revisits the prior pass's "no `BlurFade`" reasoning: `AppLayout` wraps `<Outlet />` rather than being remounted by it, so the header itself only mounts once per authenticated session (login/refresh) — it does *not* re-enter on every client-side route change the way page content does, so the "don't re-trigger on state changes" concern doesn't actually apply here. Component defaults unchanged (`duration=0.4s`, `ease="easeOut"`, `offset=6px`, `direction="down"`, `blur="6px"`), `delay={0}`, matching every other single-group usage. Wrapped as one group (not staggered per nav link/button) per the "don't stagger individual items within a group" rule. Still no `BorderBeam`: it would be a second simultaneous continuous accent alongside the one already on the current page's own headline element (Analytics' stat tile, Login/Signup's card), and the "one continuous accent per view" rule is scoped to the whole view, not per-component. Structural markup (`Link`/`Button`/`Sheet`/mobile-menu logic) untouched. |

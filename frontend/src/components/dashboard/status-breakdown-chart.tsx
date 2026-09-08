@@ -27,7 +27,7 @@ import type { StatusBreakdownEntry } from "@/types/api"
  * against whichever of `:root`/`.dark` is active on `<html>`, so this
  * object needs no theme-aware branching of its own; the browser's normal
  * CSS cascade does that. The one place that does NOT want this live
- * cascade behavior is `RecapCard`'s exported Sankey instance -- see
+ * cascade behavior is the recap skins' exported Sankey instance -- see
  * `STATUS_LITERAL_COLORS` below and recap-card.tsx's doc comment for why.
  */
 export const STATUS_BREAKDOWN_COLORS: Record<StatusBreakdownEntry["status"], string> = {
@@ -42,12 +42,19 @@ export const STATUS_BREAKDOWN_COLORS: Record<StatusBreakdownEntry["status"], str
 
 /**
  * Fixed, theme-*independent* literal-color mirror of the map above, for
- * `RecapCard`'s exported Sankey instance only (see recap-card.tsx).
+ * the recap skins' exported Sankey instance only (see recap-card.tsx and
+ * recap-skins/strava-skin.tsx, currently the one skin that draws a
+ * Sankey).
  *
- * `RecapCard` is deliberately not supposed to depend on `.dark` state --
- * the exported PNG has no theme context, and its own card chrome is a
- * fixed dark gradient regardless of the app's current theme (see
- * recap-card.tsx's doc comment). If its Sankey used the `var(--status-*)`
+ * The recap card is deliberately not supposed to depend on `.dark` state
+ * -- the exported PNG has no theme context, and every skin paints its own
+ * fixed chrome regardless of the app's current theme (see
+ * recap-skins/shared.tsx's `RECAP_LITERAL_COLORS`). F48 narrowed the
+ * "card chrome is a fixed dark gradient" half of that: the Strava skin's
+ * card background is now transparent by design, and it keeps this same
+ * theme independence through per-block scrims instead of a gradient. The
+ * Duolingo and Beli skins still paint opaque backgrounds. If the Sankey
+ * used the `var(--status-*)`
  * map above, the color actually baked into the export would silently
  * follow whichever theme happened to be active on `<html>` at export
  * time (html-to-image's clone step resolves `var()` via
