@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react"
 import { BlurFade } from "@/components/ui/blur-fade"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { useAuth } from "@/hooks/useAuth"
@@ -99,9 +99,25 @@ export function SettingsPage() {
         // justify a BorderBeam accent; see
         // docs/decisions/magicui-conventions.md.
         <BlurFade delay={0}>
-          <Card className="max-w-md">
-            <CardContent>
-              <form onSubmit={handleSubmit}>
+          {/*
+            F53 (R16.3): visual-only refinement, following the
+            label/helper-text/value rhythm of the Fresha and Optimal
+            Workshop settings references -- a titled card section, a rule
+            between that title and the field, and the action pinned in
+            its own footer strip instead of floating under the input.
+            The <form> moved out to wrap the whole card interior purely
+            so the submit control can live in `CardFooter`; every id,
+            `aria-describedby` string, validation branch, focus-restore
+            `requestAnimationFrame` and the "Settings saved." live region
+            are unchanged.
+          */}
+          <Card className="max-w-xl">
+            <form onSubmit={handleSubmit}>
+              <CardHeader className="border-b">
+                <CardTitle>Ghosting</CardTitle>
+              </CardHeader>
+
+              <CardContent>
                 <FieldGroup>
                   {submitError && (
                     <p
@@ -116,6 +132,12 @@ export function SettingsPage() {
                     <FieldLabel htmlFor="settings-ghost-days-default">
                       Default ghost days
                     </FieldLabel>
+                    {/*
+                      The value is a small integer, so a full-width number
+                      input read as an unbounded text field. Capping it
+                      keeps the label -> control -> helper column tight,
+                      which is the whole point of the reference rhythm.
+                    */}
                     <Input
                       id="settings-ghost-days-default"
                       type="number"
@@ -133,8 +155,9 @@ export function SettingsPage() {
                           ? "settings-ghost-days-hint settings-ghost-days-error"
                           : "settings-ghost-days-hint"
                       }
+                      className="max-w-28 tabular-nums"
                     />
-                    <FieldDescription id="settings-ghost-days-hint">
+                    <FieldDescription id="settings-ghost-days-hint" className="max-w-prose text-xs">
                       Applications with no status update for this many days are automatically
                       marked Ghosted. Individual applications can override this in their own edit
                       form.
@@ -144,26 +167,28 @@ export function SettingsPage() {
                     )}
                   </Field>
                 </FieldGroup>
+              </CardContent>
 
-                <div className="mt-4 flex items-center gap-3">
-                  <Button type="submit" disabled={isSaving}>
-                    {isSaving ? "Saving..." : "Save"}
-                  </Button>
-                  {/*
-                    A11y (WCAG 4.1.3): the "Saved." confirmation appeared and
-                    auto-cleared after 2s with nothing announced -- focus stays
-                    on the submit button, whose label flickers back to "Save",
-                    so a screen reader user got no confirmation the save
-                    succeeded. This is a live region that's always in the DOM
-                    (a region only inserted at the moment it gets content is
-                    unreliably announced).
-                  */}
-                  <span role="status" aria-live="polite" className="text-sm text-muted-foreground">
-                    {isSaving ? "Saving..." : savedAt !== null ? "Settings saved." : ""}
-                  </span>
-                </div>
-              </form>
-            </CardContent>
+              <CardFooter className="justify-between gap-3">
+                {/*
+                  A11y (WCAG 4.1.3): the "Saved." confirmation appeared and
+                  auto-cleared after 2s with nothing announced -- focus stays
+                  on the submit button, whose label flickers back to "Save",
+                  so a screen reader user got no confirmation the save
+                  succeeded. This is a live region that's always in the DOM
+                  (a region only inserted at the moment it gets content is
+                  unreliably announced). It now sits opposite the button
+                  instead of beside it, but is otherwise untouched -- same
+                  role, same aria-live, same content expression.
+                */}
+                <span role="status" aria-live="polite" className="text-sm text-muted-foreground">
+                  {isSaving ? "Saving..." : savedAt !== null ? "Settings saved." : ""}
+                </span>
+                <Button type="submit" disabled={isSaving}>
+                  {isSaving ? "Saving..." : "Save"}
+                </Button>
+              </CardFooter>
+            </form>
           </Card>
         </BlurFade>
       )}

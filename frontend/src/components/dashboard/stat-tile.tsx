@@ -1,6 +1,7 @@
 import { BorderBeam } from "@/components/ui/border-beam"
 import { Card, CardContent } from "@/components/ui/card"
 import { NumberTicker } from "@/components/ui/number-ticker"
+import { cn } from "@/lib/utils"
 
 interface StatTileProps {
   label: string
@@ -47,12 +48,28 @@ export function StatTile({ label, value, numericValue, suffix, decimalPlaces, ac
   const isAnimated = typeof numericValue === "number" && Number.isFinite(numericValue)
 
   return (
-    <Card className={accent ? "relative" : undefined}>
+    // F54 (R16.4): card-shell styling only, nudged toward the Monarch
+    // stat-card reference -- roomier padding (`--card-spacing` 4 -> 5,
+    // i.e. 16px -> 20px) and the reference's quieter, uppercase,
+    // letter-spaced caption sitting *under* the figure. The BorderBeam
+    // wiring below is untouched (`duration={24}`, the project-wide value
+    // per docs/decisions/magicui-conventions.md), as is every one of the
+    // `numericValue`/`suffix`/`decimalPlaces`/`accent` props.
+    <Card className={cn("[--card-spacing:--spacing(5)]", accent && "relative")}>
       {accent && <BorderBeam duration={24} colorFrom="var(--foreground)" colorTo="var(--muted-foreground)" />}
       <CardContent>
-        <dl className="flex flex-col gap-1">
-          <dt className="text-sm text-muted-foreground">{label}</dt>
-          <dd className="m-0 text-2xl font-semibold text-foreground tabular-nums">
+        {/*
+          `flex-col-reverse` flips only the *visual* order so the number
+          reads first, the way the reference's cards do. The DOM keeps
+          the required <dt>-then-<dd> sequence, so a screen reader still
+          hears "Total Applications, 128" rather than a bare number, and
+          nothing here is focusable, so no tab order is affected.
+        */}
+        <dl className="flex flex-col-reverse gap-1.5">
+          <dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+            {label}
+          </dt>
+          <dd className="m-0 text-2xl leading-none font-semibold tracking-tight text-foreground tabular-nums">
             {isAnimated ? (
               <>
                 <NumberTicker

@@ -233,8 +233,10 @@ deliberate exception is `RecapCard`'s self-contained gradient (it renders its ow
 because the export canvas is transparent) — if it is re-themed it must stay self-contained and must
 not start depending on `.dark` state, since the exported PNG has no theme context. **[see R12.5]**
 
-**R11.5 — Typography, radius, density. [unconfirmed]** Whether V2.1 also changes the type scale,
-`--radius` (currently `0.625rem`), or table/card density is open. Not assumed in scope.
+**R11.5 — Radius, density. [unconfirmed]** Whether V2.1 also changes `--radius` (currently
+`0.625rem`) or table/card density is open. Not assumed in scope. Typography is no longer part of
+this open item — see [R17](#r17--typeface-overhaul-must-have), which resolves it into its own
+requirement.
 
 ### R12 — Sankey & recap visual restructure (must-have)
 
@@ -442,6 +444,75 @@ All four depend on R11's final tokens (F27/F28) landing first, and carry no new 
 already stated below (accessibility non-regression, reduced motion, contrast, responsiveness,
 documentation).
 
+### R17 — Typeface overhaul (must-have)
+
+New scope, added after R11–R13 shipped and R10/R12 were substantially built. `frontend/src/index.css`
+defines no custom `font-family`/`@theme` font tokens today — the entire app, including the new
+landing page, rides Tailwind's default `font-sans` stack. This is deliberately in scope now, and
+distinct from R11.5's still-open radius/density question: the goal is a typeface that reads as
+chosen, not as an unstyled default.
+
+**R17.1 — Structure. Confirmed: a Display + Text pairing**, not a single family. A distinct Display
+family carries hero/section headings, the logo wordmark, and the large stat/recap numbers; a
+separate Text family carries body copy, buttons, tables, forms, and general UI chrome. Proposed role
+mapping, derived from the sizes/weights already in use across the shipped app (subject to revision
+once real font choices are in hand):
+
+| Role | Surface | Family | Weight(s) in use today |
+|---|---|---|---|
+| Hero H1 | `LandingPage.tsx` | Display | 600 |
+| Section H2 | `LandingPage.tsx` | Display | 600 |
+| Logo wordmark ("jTracks") | `AppLayout.tsx`, footers, recap cards | Display | 600 |
+| Stat-tile numbers (`NumberTicker`) | `stat-tile.tsx` | Display | 600 |
+| Recap hero stats | `strava-skin.tsx`, `duolingo-skin.tsx`, and the Beli skin once it lands | Display | 700 |
+| App page H1 (Applications/Analytics/Settings/Login/Signup) | route headers | Text | 600 |
+| Hero eyebrow, feature-card H3, footer nav H2 | `LandingPage.tsx` | Text | 500 |
+| Body copy | paragraphs, subheads | Text | 400 |
+| UI chrome (buttons, table, form labels, badges) | app-wide, shadcn defaults | Text | 400–500 |
+| Meta/caption | table caption, timestamps | Text | 400 |
+
+**R17.2 — Weights to source.** Display needs **600 (Semibold)** required and **700 (Bold)**
+required for the recap hero stats (R12.7) — 2 static weights, or one variable-font file covering
+that range. Text needs **400 (Regular)**, **500 (Medium)**, and **600 (Semibold)** — 3 static
+weights, or one variable-font file. No italic is used anywhere in the shipped app; no dedicated
+monospace family is needed (the only `font-mono` reference is internal to shadcn's chart-tooltip
+component and is not required to change). Both families must provide clean tabular/lining figures —
+`stat-tile.tsx` and the recap hero stats already rely on `tabular-nums`, and this must keep working
+against whatever ships.
+
+**R17.3 — Token discipline, matching R11.4.** Fonts are self-hosted (the user supplies the font
+files — never a runtime Google Fonts `<link>`/`@import`, which would violate R10's landing bundle-
+cost NFR by pulling a third-party network request into the critical path). `@font-face` declarations
+and two new tokens (`--font-display`, `--font-sans` — expand the existing `@theme inline` mapping so
+`font-display`/`font-sans` become real Tailwind utilities) go in `frontend/src/index.css`, the same
+single source of truth R11.4 already establishes for color. No component hardcodes a font-family
+string; role-to-token mapping happens via the table in R17.1.
+
+**R17.4 — Recap export compatibility is a hard gate, extending R12.5.** `RecapCard` and its skins
+render inside the `html-to-image`-captured subtree. A custom web font that hasn't finished loading
+by the time `toBlob` fires will silently export with the browser's fallback font baked into the
+PNG — the same class of serialization risk R12.5 already treats seriously for animation, but for
+fonts instead of motion. The export path must explicitly await `document.fonts.ready` (or an
+equivalent guaranteed-loaded check) before capture, and this must be verified against a real
+export, not assumed — re-run F35's baseline-comparison approach with the new typeface in place, for
+all three recap skins.
+
+**R17.5 — No new flash-of-fallback-font policy needed beyond standard `font-display: swap`.**
+Unlike R11.1's theme flash (which needed an inline pre-paint script because the *wrong* theme is
+visibly jarring), a brief fallback-font flash on first load is standard web behavior and acceptable
+for this single-developer portfolio project — **default: `font-display: swap`** unless later
+revised. This is a deliberate default per this PRD's convention (see R11.2's hue pick), not an
+open question.
+
+**R17.6 — Re-verification, not a rebuild.** Because R10 (landing), R12.7 (recap skins), and R13
+(table) are already substantially or fully built, this requirement is a token swap applied
+retroactively across existing surfaces, not new layout work. Re-check after landing the fonts:
+375px responsiveness (a Display/Text font's metrics can reflow differently than the system stack
+that was used to verify R10.5/R13.1/F33), legibility at the smallest sizes in use (`text-xs` meta/
+caption text, per R17.1's table), and contrast (font weight/shape can visually affect perceived
+contrast even when the token color is unchanged) — in both themes, per the existing Accessibility
+non-regression NFR.
+
 ---
 
 ## Already implemented in this iteration
@@ -471,7 +542,8 @@ the next session doesn't re-plan it. Descriptions are taken from the current wor
 | Mobbin usage rule + design pipeline | `.claude/rules/mobbin-ui.md` (new); `.claude/rules/shadcn-ui.md`'s "Design Pipeline"/"Visual Liberty" sections; `.claude/rules/magicui-ui.md`'s pipeline note | Written — Mobbin (reference) → shadcn (structure) → MagicUI (accents), auto-loaded |
 
 **Not yet done, despite adjacent work existing:** everything in R10–R13, R11's theme provider,
-R14.2/R14.6's new-surface motion, and R16. **R15 is now done** — see above and R15's own text.
+R14.2/R14.6's new-surface motion, R16, and **R17 (typeface overhaul, new)**. **R15 is now done** —
+see above and R15's own text.
 
 ---
 
@@ -639,6 +711,10 @@ Proposed ordering. Each stage is independently shippable and leaves the app work
 6. **R16 — design-overhaul additions** (board view, entry-flow/settings/stat-tile polish). Depends
    on R11's tokens landing first, same reasoning as R12/R13; otherwise independent of every other
    stage. `FRONTEND_TASKS.md`'s Milestone FV11 (F51–F54).
+7. **R17 — typeface overhaul.** Last, deliberately: it's a token swap applied retroactively across
+   R10/R12/R13's already-built surfaces (R17.6), not new layout work, so it lands once those
+   surfaces — including R12.7's recap skins — are stable rather than re-verifying it mid-flight.
+   Waits on the user supplying the actual font files (R17.2).
 
 **R15 (Mobbin MCP)** is not a stage — it was adopted ahead of stage 4's landing-page design work
 (R10.3), and no stage waited on it.

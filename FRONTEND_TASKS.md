@@ -1782,7 +1782,7 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
 > the user reviewed and curated directly, per area (R15.2's "research aid only" allowance — nothing
 > installed, nothing shipped).
 
-- [ ] **F51 — Optional status-grouped board view for the Pipeline page** (L)
+- [x] **F51 — Optional status-grouped board view for the Pipeline page** (L)
   R16.1. Informed by [Homerun's kanban pipeline](https://mobbin.com/screens/80dfe542-7c1b-4303-a449-b4f465d615fe)
   and [folk's pipeline board](https://mobbin.com/screens/a7d7dd46-1f6d-444b-b1c0-17681af33367). Add a
   board/kanban-style view as an alternate rendering of the same `applications` data
@@ -1822,7 +1822,216 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   columns render sanely; `tsc -b`/lint clean; axe reports no new violation.
   Depends on: F28, F30 (per-column status-class discipline).
 
-- [ ] **F52 — Visual polish pass on the add-application entry flow** (S)
+  **Default view is now width-dependent (2026-09-09, user's call).** This task specified "defaulting to
+  Table" above, on the reasoning that Board was an opt-in alternate rather than a replacement. The user
+  asked to land on Board where there is room for it and Table where there isn't, so
+  `hooks/useViewMode.ts` picks the starting view from `BOARD_DEFAULT_VIEWPORT_QUERY`
+  (`(min-width: 1024px)` — about three 288px columns plus page padding). Recorded here rather than
+  edited into the requirement above, so the original intent and the decision that overrode it both stay
+  visible.
+  **The width is read once, at mount, and deliberately never watched.** It is a bare `matchMedia` call
+  inside `useState`'s lazy initializer, *not* `useMediaQuery` — that hook subscribes to `change` and
+  re-renders, which would swap the view out from under someone who rotated a phone or dragged a window,
+  losing their place mid-task. The user asked for width to affect the default only. There is a comment
+  in the hook saying so; don't refactor it into `useMediaQuery`.
+  Precedence is unchanged: a **stored** choice still beats the width default entirely
+  (`readStoredViewMode`), so anyone who has already picked a view keeps it, and the default only ever
+  applies to a viewer with no `jtracks_view_mode` value. Choosing a default does not write to storage,
+  so it stays width-sensitive until an explicit pick.
+  *Verified in a browser (2026-09-09).* Starting view by width, nothing stored: 375px → Table,
+  768px → Table, 1023px → Table, **1024px → Board**, 1440px → Board — the threshold lands exactly where
+  the query says. Stored choice wins both ways: `stored=table` at 1440px opens Table, `stored=board` at
+  375px opens Board. Resize does **not** change the view, tested in both directions: loaded at 1440px on
+  Board then resized to 375 → 800 → 1440 stayed Board throughout (with the media query flipping to
+  `false` in between), and loaded at 375px on Table then grown to 1440px stayed Table.
+  **Independent browser verification (2026-09-09) — one defect found and fixed.**
+
+  **Defect: Board caused a second, page-level horizontal scrollbar.** Opening Board scrolled the *whole
+  app* sideways — the header slid off-screen (measured `left: -505px`) leaving blank page beside the
+  board, with two horizontal scrollbars stacked: the board's own (correct) and the document's (wrong).
+  Reproduced at **both** 375px and 1536px, and in a top-level tab as well as an iframe, so not a harness
+  artifact: `documentElement.scrollWidth` 2026 against a 1521px viewport, and `window.scrollTo(3000,0)`
+  really moved `scrollX`.
+  *Root cause,* isolated by hiding subtrees until the overflow disappeared: each card renders
+  visually-hidden `<dt>` labels, and `sr-only` is `position: absolute`. An absolutely-positioned element
+  is clipped by an ancestor's `overflow` **only when its containing block is inside that ancestor**. The
+  scroller was `position: static`, so those 38 `<dt>`s resolved against a containing block outside it,
+  escaped the `overflow-x-auto` clip, and stretched the document to the full 7-column strip. Hiding just
+  those `<dt>`s dropped `scrollWidth` 2026 → 1536 (exactly the viewport), confirming them as the sole
+  cause.
+  *Fix:* one class — `relative` on the scroller in `applications-board.tsx`, making it the containing
+  block for its own `sr-only` descendants. Re-measured after the fix: `docScrollWidth === clientWidth` in
+  all 8 board cells, `scrollTo(3000,0)` leaves `scrollX` at 0, and the board's own scroll is unaffected
+  (`scrollWidth 2088` vs `clientWidth 1105`). The `sr-only` labels are untouched, so nothing changed for
+  screen readers. F51 exempts the *board* from FV7's no-scroll rule; it never exempted the page.
+
+  **Everything else passed, observed rather than reasoned:**
+  - **Toggle:** two native `<button>`s carrying `aria-pressed`, inside `role="group"` labelled
+    "Application view", both `tabIndex 0` and enabled. Defaults to Table; nothing is written to
+    `localStorage` until a choice is made.
+  - **Persistence:** choosing Board writes `jtracks_view_mode: "board"` and a fresh load restores it
+    (`Board: aria-pressed=true`, no `<table>` rendered).
+  - **375px scroll contract, both halves:** Board's scroller reports `scrollWidth 2088 / clientWidth 328`,
+    is focusable (`tabIndex 0`) and labelled "Application board, scrolls horizontally"; Table at the same
+    width stays at `scrollWidth 360 === clientWidth 360` with **0** overflowing elements, so FV7's
+    guarantee is intact.
+  - **One shared handler, verified two ways:** source shows a single `handleStatusChange`/
+    `applyStatusChange` pair passed by reference to all three renderings, and the board never calls
+    `updateApplication`. Live: changing a card's status from the board announced
+    "Globex moved to Rejected." in the `actionStatus` region while column counts updated in place
+    (Applied 4→3, Rejected 3→4) — both live regions fire from board mode.
+  - **100+ column, exercised with real data** (API response seeded to 149 applications, 134 in one
+    column): renders 12 (`BOARD_INITIAL_CARD_LIMIT`), offers "Show 122 more" with the accessible name
+    "Show 122 more Applied applications", and the column holds `max-height: 416px` with its own vertical
+    scroll. After expanding, all 134 render and the column is *still* 416px (`scrollHeight` 20367) — the
+    page neither grows nor scrolls sideways.
+  - **axe:** 0 violations on Board at 375px and 1280px × light and dark; 0 contrast violations. The 6-12
+    `incomplete` contrast nodes are the column headers (`elmPartiallyObscured` from the status accent
+    bar); measured by hand instead of assumed — labels **19.8:1 light / 18.97:1 dark**, counts
+    **4.74:1 / 7.66:1**, all clearing AA.
+  - **F52/F53/F54 surfaces:** AutofillDialog, ApplicationFormDialog, Settings and Analytics all report 0
+    axe violations and 0 contrast violations in both themes, with no page-level horizontal scroll.
+
+  **Done 2026-09-09.** Three new files — `frontend/src/hooks/useViewMode.ts`,
+  `frontend/src/components/board/applications-board.tsx`,
+  `frontend/src/components/board/view-mode-toggle.tsx` — plus edits to
+  `frontend/src/routes/ApplicationsPage.tsx` and one additive prop on
+  `frontend/src/components/table/status-control.tsx`. `applications-table.tsx` and
+  `applications-card-list.tsx` were **not** touched, so FV7's guarantees are untouched by
+  construction, not by re-testing.
+
+  *Mobbin, first.* Both references named in the task were pulled and actually looked at:
+  [Homerun's kanban pipeline](https://mobbin.com/screens/80dfe542-7c1b-4303-a449-b4f465d615fe)
+  (plain text column header + muted count, fixed-width columns, cards carrying a name, a muted
+  secondary line and a small chip) and a
+  [folk pipeline board](https://mobbin.com/screens/1f3db9ff-0daa-4c79-8468-0f29252295b4)
+  (colored status chip *as* the column header, count beside it, cards that are a title plus a
+  short stack of small icon+value metadata rows). What was extracted: header = label + count in
+  one line with the status color carried by a small dedicated element rather than by the text
+  itself; card = company/title on top, metadata rows below with leading icons, control at the
+  bottom; columns fixed-width and never reflowing. What was not taken: folk's per-card avatars
+  (this app has no per-application image), and both apps' drag-and-drop.
+
+  *One shared handler, not two — the acceptance criterion, and how it is actually enforced.*
+  `ApplicationsPage` still defines exactly one `handleStatusChange` and one `applyStatusChange`
+  (grep confirms a single definition of each), and all three renderings now receive the *same
+  function reference*:
+
+  ```
+  onStatusChange={handleStatusChange}   x3  (board, card list, table)
+  ```
+
+  The board does not call `updateApplication` and does not import
+  `useApplicationsContext`'s mutation surface for status at all — its cards render the shared
+  `StatusControl`, which is the same component the table cell and the card-list card render, so
+  the chain is `StatusSelect` → `StatusControl`'s `onStatusChange` → `handleStatusChange` →
+  (`ConfirmAppliedDialog` for `saved → applied`, else) `applyStatusChange`. That means both live
+  regions fire from board mode for structural reasons rather than by duplication:
+  `actionStatus` is written inside `applyStatusChange` ("Updating Acme…" → "Acme moved to
+  Offer."), which the board reaches through the shared handler; `tableStatus` is written by a
+  `useEffect` keyed on `visibleApplications.length` / `applications.length` / `sortKey` /
+  `sortDirection`, none of which are view-mode-dependent, so a filter or a status change
+  re-announces the count identically in either view. **Reasoned from the code path, not observed
+  in a screen reader** — see the "not verified" list at the end.
+
+  `ConfirmAppliedDialog`'s focus restore also keeps working for the same reason: `StatusControl`
+  renders `StatusSelect` with `id={statusSelectId(application.id)}`, and `finalFocusRef` resolves
+  that id lazily from the document. Exactly one of table/card-list/board is ever mounted (the
+  view-mode branch sits *outside* the narrow-width `isCardLayout` branch), so the ids stay unique
+  — the same duplicate-id trap F32 documents.
+
+  *Persistence.* `jtracks_view_mode`, `"table" | "board"`, defaulting to `"table"`. The read is a
+  `useState` initializer so a reload restores the choice on the first paint rather than swapping
+  after mount, and both the read and the write are wrapped in `try/catch` exactly the way
+  `useRecapSkin.ts` does — `localStorage` throws outright in some privacy modes, and a stored
+  value can be junk, so an `isViewMode` type guard is what makes the fallback safe rather than
+  rendering an unknown view. A failed write is swallowed: the choice still applies for the
+  session, it just doesn't survive a reload.
+
+  *The toggle.* Built as a literal copy of `dashboard/date-range-control.tsx`'s segmented-control
+  pattern — `role="group"` + `aria-label="Application view"` wrapping `Button`s with
+  `aria-pressed`, selected `variant="default"`, unselected `variant="outline"` — so it announces
+  the same way as the range control a user already met on Analytics. It lives in the page header
+  row, **outside** the `isLoading` branch and with no breakpoint conditions, so it is present at
+  every width; at 375px it wraps under the description instead of disappearing.
+
+  Two shadcn alternatives were fetched through the MCP server and rejected rather than assumed.
+  `toggle-group` would have introduced a second, differently-announced segmented-control pattern
+  (radio semantics) into an app that already has one, for no accessibility gain.
+  `button-group` — actually installed via `npx shadcn@latest add @shadcn/button-group` and read —
+  turns out to be only the joined-edges container around this identical markup, and it exports a
+  `cva` variants object, which trips this repo's oxlint `only-export-components` rule. A new lint
+  warning in vendored code for a border-radius change is a bad trade, so the file was removed
+  again and the precedent followed directly.
+
+  *Board is deliberately exempt from FV7.* The columns are `w-72 shrink-0` at every breakpoint and
+  never reflow; the row is a single `overflow-x-auto` flex container. R16.1 is explicit that
+  picking Board at 375px *is* picking a horizontally-scrolling layout, so no attempt was made to
+  collapse it. That scroller is `role="region"` + `aria-label="Application board, scrolls
+  horizontally"` + `tabIndex={0}` with an explicit `focus-visible:outline-ring` ring (matching
+  `applications-table.tsx`'s bare-`<button>` `SortButton` precedent), which is what makes the
+  scroll keyboard-reachable rather than mouse-drag/touch-only, and what satisfies axe's
+  "scrollable region must have keyboard access" rule for the *empty* columns, which contain
+  nothing focusable of their own.
+
+  *Bloat scoping.* Each column's `<ul>` carries `max-h-[26rem] overflow-y-auto`, so the scroll is
+  per-column rather than one page-length scroll, and the header/accent and "Show more" control
+  stay pinned outside it. `BOARD_INITIAL_CARD_LIMIT = 12` caps the initial render as a plain
+  `Array.prototype.slice` — no virtualization library, per R16.1: seven columns capped at 12 is
+  ~84 cards worst case, the same order of magnitude the table already renders, and a windowed
+  list would add both a dependency and a real a11y surface. Nothing is ever hidden from
+  filtering/search: the slice happens *after* `visibleApplications` has been filtered, so a
+  matching application always exists in its column, at worst behind "Show N more".
+
+  The reveal control is a **toggle**, not a one-way "Show more" that unmounts on click. A control
+  that disappears on activation drops focus to `<body>` — the same WCAG 2.4.3 failure
+  `ConfirmAppliedDialog`'s `finalFocus` exists to avoid — so it flips to "Show fewer" and stays
+  put, carrying `aria-expanded`. Its `aria-label` names the column ("Show 8 more Applied
+  applications") because "Show 8 more" is ambiguous across seven simultaneous columns, and the
+  label still *starts with* the visible text, so WCAG 2.5.3 Label in Name holds.
+
+  *Column colors came from the token layer.* A local `STATUS_ACCENT_CLASSES` map in
+  `applications-board.tsx` uses `bg-status-*`, the Tailwind utilities `index.css` already exposes
+  from F28's `--status-*` tokens through `@theme inline` — so the dark-mode `interviewing_oa` /
+  `offer` swap is picked up for free and no new hex was introduced. Confirmed in the *built* CSS,
+  not just in source: all seven `.bg-status-*` rules are emitted into
+  `dist/assets/index-*.css`. The map is deliberately **not** added beside `StatusBadge.tsx`'s
+  three maps: those are Tailwind *palette* classes predating the token layer (a different kind of
+  value), and exporting another object from that `.tsx` would add a sixth
+  `only-export-components` warning to a file that already carries five. The bar is `aria-hidden`
+  and every column also states its status as text plus a count, so nothing is conveyed by color
+  alone (WCAG 1.4.1) — which matters, because the light-mode `interviewing_oa` / `offer` hexes
+  sit in the sub-3:1 band this repo's conventions doc already records.
+
+  *The live count is inside the heading.* `<h2>Applied <span>(12)</span></h2>` rather than a
+  count floated beside it, so a screen-reader user navigating by heading hears the same count a
+  sighted user reads. It derives from `applications.length` on every render, so it cannot
+  disagree with the cards beneath it.
+
+  *No drag-and-drop, as specified.* `StatusSelect` is the only way to move a card. Empty columns
+  render a dashed "Nothing here yet." placeholder in the same idiom as the table's and card
+  list's "No applications match your filters." row.
+
+  *One deliberate shared-component edit.* `StatusControl` gained an optional `showBadge` prop
+  (default `true`, so the table and card-list renderings are unchanged). The board passes
+  `false`: the column heading already states the status and the select trigger's accessible name
+  repeats it ("Change status (currently Applied)"), so the badge would be a third copy of the
+  same word in a 288px column. This was chosen over duplicating `StatusControl`'s composition in
+  the board, which is exactly the drift F30/F32 introduced it to prevent.
+
+  *Gates.* `npx tsc -b` clean; `npm run lint` 0 errors and 19 `only-export-components` warnings —
+  the pre-existing count, unchanged; `npm run build` succeeds.
+
+  **Not verified — no browser was available to this session** (the agent had no
+  browser-automation tool, and per the run's constraints no dev server was bound). Every claim
+  below is reasoned from source and from the built CSS, and needs a real pass:
+  keyboard operation of the toggle and of the board's horizontal scroller (arrow keys / Home /
+  End once focused); the actual horizontal-scroll behaviour at 375px and the accompanying
+  confirmation that Table/card-list still show *zero* horizontal scroll; that a reload restores
+  the persisted view; that both live regions really announce from board mode; the fixed-height
+  column with 100+ applications and its "Show more"; both themes; and axe.
+
+- [x] **F52 — Visual polish pass on the add-application entry flow** (S)
   R16.2. Purely visual refinement of `autofill-dialog.tsx`'s paste-URL step (informed by the
   [Programa "Add product from URL" reference](https://mobbin.com/flows/26df0e89-6fe6-4ea2-b379-ff1349953586)
   — e.g. clearer in-progress state, iconography on the URL field) and
@@ -1835,7 +2044,64 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   `role="status"`, submitting live region, etc.).
   Depends on: F28 (notice banner's success/warning colors should use the final tokens).
 
-- [ ] **F53 — Settings page layout refinement** (S)
+  **Done 2026-09-09.** `frontend/src/components/applications/autofill-dialog.tsx` and
+  `frontend/src/components/applications/application-form-dialog.tsx`. One component installed via
+  the CLI for this task: `npx shadcn@latest add @shadcn/spinner`
+  (`frontend/src/components/ui/spinner.tsx`).
+
+  *Reference.* The
+  [Programa "Add product from URL" flow](https://mobbin.com/flows/26df0e89-6fe6-4ea2-b379-ff1349953586)
+  was pulled and looked at screen by screen. Its paste step is: a short expectation-setting
+  paragraph, a single URL input, and a bordered info note ("Check retrieved information — data
+  accuracy depends on the site you linked; review before using it") above the Cancel/Add pair.
+  That note is the thing worth stealing, and this dialog already *had* the sentence — it was just
+  rendered as a loose caption. It is now the reference's bordered, icon-led note. **The third
+  step Programa doesn't have and this task explicitly forbids — an intermediate preview screen —
+  was not added.**
+
+  *What actually changed, and what deliberately did not.* `handleSubmit`, `reset`,
+  `handleOpenChange`, every branch of the success/unsupported/failed/threw logic, the
+  `openCreateForm` payloads, the notice `tone`/`message` strings, the `role="status"` regions,
+  the `sr-only` submitting live region, and the input's `id` / `type` / `value` / `onChange` /
+  `disabled` / `aria-describedby` / `autoFocus` / `required` are all untouched. The diff is class
+  names, two decorative icons and a spinner.
+
+  | Change | Detail |
+  |---|---|
+  | Iconography on the URL field | A leading `Link2`, `aria-hidden` + `pointer-events-none`, absolutely positioned with `pl-8` on the `Input` — built exactly the way `applications-toolbar.tsx`'s search field already does it. |
+  | In-progress state | `<Spinner aria-hidden="true" />` inside the Continue button beside its existing "Fetching job details…" label, and the same treatment on the form dialog's submit button so both halves of the entry flow show progress identically. |
+  | The hint | Same text, same `id`, same `aria-describedby` target; promoted to a bordered `bg-muted/40` note with a leading `Info` icon. |
+  | Notice banner | `flex items-start gap-2`, slightly taller padding, and a tone icon (`CheckCircle2` / `AlertTriangle`) leading the message, so the outcome is legible before the sentence is read. |
+
+  *Why `InputGroup` was not used, even though it is the "right" registry item.* It was installed
+  via the CLI and read: `InputGroupAddon` attaches an `onClick` focus helper to a plain `<div>`,
+  which trips this repo's oxlint `jsx-a11y(click-events-have-key-events)` rule as a hard **error**
+  in vendored code. Vendoring a ~200-line component to break the lint gate, for one leading icon
+  the project already has an established pattern for, is the wrong trade — the file was removed
+  and the toolbar's precedent followed instead. That also keeps one adorned-input pattern in the
+  codebase rather than two.
+
+  *On "the notice banner's colors should use the final tokens" (the Depends-on line).* Checked
+  and deliberately left as-is. The emerald/warning pair is not re-pointed at `--status-*`: those
+  tokens carry *pipeline status* meaning, so a successful parse would start reading as "Offer".
+  The existing values were already measured against the final F27/F28 palette in F29's live
+  both-theme sweep (success 9.14:1 light / 14.88:1 dark; warning 8.73:1 / 15.42:1) and pass
+  comfortably in both themes, so "final tokens" is satisfied by having re-checked against the
+  landed palette rather than by changing hues. The reasoning is recorded in a source comment so a
+  future session doesn't re-litigate it.
+
+  *Spinner a11y.* The installed `Spinner` ships its own `role="status" aria-label="Loading"`. Both
+  call sites pass `aria-hidden="true"`, which takes it out of the accessibility tree: the button
+  label already changes to "Fetching job details…"/"Saving…" and there is already a polite live
+  region announcing the wait, so an un-hidden spinner would be a third simultaneous announcement.
+  (`role={undefined}` was tried first and rejected — oxlint's `jsx-a11y(aria-role)` can't
+  statically evaluate it and flags it as an error.)
+
+  *Gates.* `tsc -b` clean; lint 0 errors / 19 pre-existing warnings; build succeeds.
+  **Not verified:** no browser this session — the dialogs were not opened, so the in-progress
+  spinner, the note's appearance in both themes, and axe on either dialog are unobserved.
+
+- [x] **F53 — Settings page layout refinement** (S)
   R16.3. Visual-only refinement of `SettingsPage.tsx`'s single-field card, informed by the
   [Fresha gift-card settings](https://mobbin.com/screens/20a4b62e-609b-40b6-a17a-4b08e38c9fd5) and
   [Optimal Workshop settings form](https://mobbin.com/screens/db6e47ed-6dd4-4211-8be5-4125b44c96b5)
@@ -1846,7 +2112,43 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   unchanged; visual-only diff.
   Depends on: F28.
 
-- [ ] **F54 — Stat-tile visual nudge toward the Monarch reference's card treatment** (S)
+  **Done 2026-09-09.** `frontend/src/routes/SettingsPage.tsx` — the only file changed.
+
+  *Reference.* The task's two links were supplemented with a live
+  `search_screens` pass for the same pattern; the useful ones actually looked at were
+  [Plain's help-center field settings](https://mobbin.com/screens/246327c9-933f-48aa-ab7b-6e06e6e5a958)
+  and [Wix's form General settings](https://mobbin.com/screens/8162dbed-183a-432d-b78b-22f4e3674573).
+  Both show the same rhythm: a titled card section, a rule between the title and the body, the
+  field as a *narrow* control rather than a full-bleed one, its helper text directly beneath it in
+  a smaller size, and the save action sitting in its own separated strip at the bottom of the card
+  rather than floating under the input.
+
+  *Applied, scoped to the one setting this page actually has.* No new settings, no new sections.
+
+  | Before | After |
+  |---|---|
+  | `Card className="max-w-md"` → `CardContent` → `form` | `Card className="max-w-xl"` → `form` → `CardHeader className="border-b"` (`CardTitle` "Ghosting") + `CardContent` + `CardFooter` |
+  | Full-width number input | `max-w-28 tabular-nums` — it holds a small integer, so a full-bleed field read as an unbounded text box |
+  | Helper text at `text-sm`, full width | `text-xs max-w-prose`, so label → control → helper reads as one descending column |
+  | Save + status text in an `mt-4` row under the field | `CardFooter` (the shadcn `Card` primitive's own bordered, `bg-muted/50` strip), status left, Save right |
+
+  *What did not change.* `handleSubmit` and its `Number(value)` / `Number.isInteger` /
+  `parsed <= 0` validation, the `requestAnimationFrame` focus restore to
+  `settings-ghost-days-default`, both `useEffect`s, the exact `aria-describedby` strings
+  (`"settings-ghost-days-hint"` / `"settings-ghost-days-hint settings-ghost-days-error"`), the
+  hint and error `id`s, `data-invalid`/`aria-invalid`, and the always-mounted
+  `role="status" aria-live="polite"` region and its content expression. The one structural move
+  is that `<form>` now wraps the card interior instead of sitting inside `CardContent`, purely so
+  the submit control can live in `CardFooter` — the submit button is still inside the same form,
+  so submission behaviour is identical. The live region moved to the opposite end of the footer
+  row; it is the same element with the same role, `aria-live` and content.
+
+  *Gates.* `tsc -b` clean; lint 0 errors / 19 pre-existing warnings; build succeeds.
+  **Not verified:** the page was not opened in a browser this session — the new header rule,
+  footer strip, both themes, and the visual position of the "Settings saved." text are unobserved,
+  as is a real invalid-submit run confirming focus still lands on the input.
+
+- [x] **F54 — Stat-tile visual nudge toward the Monarch reference's card treatment** (S)
   R16.4. Modest visual refinement of `stat-tile.tsx`'s card styling (border weight, padding, typographic
   treatment), informed specifically by the [Monarch stat-card reference](https://mobbin.com/screens/92c2b32c-20a0-4487-9b6c-3f32cb464893) — not its Sankey, which this task
   doesn't touch. Existing `NumberTicker`/`BorderBeam` usage and the "one continuous accent per view" rule
@@ -1854,6 +2156,51 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   Acceptance: no change to `numericValue`/`suffix`/`decimalPlaces`/`accent` prop behavior; visual diff
   only; conventions doc's inventory table updated if the accent's visual presentation changes at all.
   Depends on: F28.
+
+  **Done 2026-09-09.** `frontend/src/components/dashboard/stat-tile.tsx`, plus the conventions-doc
+  inventory update the acceptance calls for (`docs/decisions/magicui-conventions.md`).
+  `AnalyticsPage.tsx` was not touched — no caller changed, because no prop changed.
+
+  *Reference.* The
+  [Monarch stat-card row](https://mobbin.com/screens/585aac8c-1cfd-4515-9080-0f036ace3c13) was
+  pulled and looked at (its Sankey, which the task excludes, was ignored). The card treatment
+  there is: generous padding, a thin quiet border, the figure large and typographically dominant,
+  and the caption sitting *beneath* it in small uppercase letter-spaced muted type.
+
+  | Change | Value |
+  |---|---|
+  | Padding | `[--card-spacing:--spacing(5)]` on the `Card` — 16px → 20px, driving the primitive's own padding/gap variable rather than overriding `px-*`/`py-*` |
+  | Caption | `text-xs font-medium tracking-wide uppercase text-muted-foreground` (was `text-sm`) |
+  | Figure | `leading-none tracking-tight` added; size left at `text-2xl` |
+  | Order | `flex-col-reverse` on the `<dl>` so the figure reads first |
+
+  *Two deliberate restraints.* (1) The figure was **not** enlarged to `text-3xl` despite the
+  reference. Analytics' stat row is `lg:grid-cols-5`, so the tiles are at their *narrowest*
+  exactly at the breakpoint where five sit side by side (~190px each), and "12.5 days" at 30px
+  would have been the first thing to wrap. (2) The `Card`'s `ring-1 ring-foreground/10` was left
+  alone rather than swapped for a heavier border — it is the project-wide card treatment, and
+  changing it here only would have made these five tiles the odd ones out.
+
+  *`flex-col-reverse` and the `<dl>`.* The DOM keeps the required `<dt>`-then-`<dd>` sequence, so
+  a screen reader still hears "Total Applications, 128" rather than a bare number; only the visual
+  order flips. Nothing inside the tile is focusable, so no tab order is affected.
+
+  *Nothing about the animation wiring moved.* `numericValue` / `suffix` / `decimalPlaces` /
+  `accent` behave identically, `isAnimated` is the same `typeof … === "number" && Number.isFinite`
+  test, `NumberTicker` keeps `value` / `decimalPlaces ?? 0` / `className="text-foreground
+  dark:text-foreground"`, and the `BorderBeam` line is byte-for-byte unchanged —
+  `duration={24}` (today's project-wide value), `colorFrom="var(--foreground)"`,
+  `colorTo="var(--muted-foreground)"`, still gated on `accent`, still with `relative` on the
+  `Card`. The one thing the acceptance asks to be honest about: the beam traces the card's border,
+  and the card is now 4px roomier on each side, so the beam's path is *marginally* longer at the
+  same 24s lap. That is a change to the accent's presentation, however small, so the conventions
+  doc's Analytics inventory row records it rather than leaving the doc silently stale.
+
+  *Gates.* `tsc -b` clean; lint 0 errors / 19 pre-existing warnings; build succeeds, and the
+  `[--card-spacing:--spacing(5)]` and `flex-col-reverse` rules are present in the emitted CSS.
+  **Not verified:** `/app/analytics` was not opened this session — the new tile proportions, the
+  beam running around the roomier card, the five-across `lg` layout with real values, and both
+  themes are all unobserved.
 
 ## Notes for parallel work (V2.1)
 

@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react"
+import { Info, Link2 } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -10,6 +11,7 @@ import {
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import { useApplicationsContext } from "@/hooks/useApplicationsContext"
 import { apiClient } from "@/lib/api-client"
 import { todayIsoDate } from "@/lib/utils"
@@ -127,20 +129,52 @@ export function AutofillDialog({ open, onOpenChange }: AutofillDialogProps) {
           <FieldGroup>
             <Field>
               <FieldLabel htmlFor="autofill-url">Job URL</FieldLabel>
-              <Input
-                id="autofill-url"
-                type="url"
-                placeholder="https://boards.greenhouse.io/acme/jobs/12345"
-                value={url}
-                onChange={(event) => setUrl(event.target.value)}
-                disabled={isSubmitting}
-                aria-describedby="autofill-url-hint"
-                autoFocus
-                required
-              />
-              <FieldDescription id="autofill-url-hint">
-                Greenhouse and Workday links fill in the details automatically. Any other link
-                still works — you&apos;ll fill in the rest on the next screen.
+              {/*
+                F52: leading link iconography on the URL field, following
+                the Programa "Add product from URL" reference. Built the
+                way `applications-toolbar.tsx`'s search field already
+                does it -- an `aria-hidden`, `pointer-events-none`
+                absolutely-positioned icon plus left padding on the
+                Input -- rather than swapping in shadcn's `InputGroup`,
+                so the input keeps its exact id/`aria-describedby`/
+                `autoFocus`/`required` wiring and the project keeps one
+                adorned-input pattern instead of two.
+              */}
+              <div className="relative">
+                <Link2
+                  className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                <Input
+                  id="autofill-url"
+                  type="url"
+                  placeholder="https://boards.greenhouse.io/acme/jobs/12345"
+                  value={url}
+                  onChange={(event) => setUrl(event.target.value)}
+                  disabled={isSubmitting}
+                  aria-describedby="autofill-url-hint"
+                  autoFocus
+                  required
+                  className="pl-8"
+                />
+              </div>
+              {/*
+                Same text, same id, same `aria-describedby` target --
+                promoted from a loose caption to the reference's bordered
+                "what to expect" note so the two-step flow sets
+                expectations before the round trip rather than after it.
+                The icon is decorative, so what gets announced when focus
+                lands on the input is unchanged.
+              */}
+              <FieldDescription
+                id="autofill-url-hint"
+                className="flex items-start gap-2 rounded-md border border-border bg-muted/40 px-3 py-2"
+              >
+                <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                <span>
+                  Greenhouse and Workday links fill in the details automatically. Any other link
+                  still works — you&apos;ll fill in the rest on the next screen.
+                </span>
               </FieldDescription>
             </Field>
           </FieldGroup>
@@ -166,7 +200,17 @@ export function AutofillDialog({ open, onOpenChange }: AutofillDialogProps) {
           >
             Cancel
           </Button>
+          {/*
+            F52: the in-progress state was label-text-only. The spinner
+            makes the wait visible at a glance for sighted users; it is
+            `aria-hidden`, which takes the installed `Spinner`'s own
+            `role="status"`/`aria-label="Loading"` out of the
+            accessibility tree, precisely so it does not become a *third*
+            announcement competing with the button label and the polite
+            region above -- those already cover the non-visual case.
+          */}
           <Button type="submit" form="autofill-form" disabled={isSubmitting || !url.trim()}>
+            {isSubmitting && <Spinner aria-hidden="true" />}
             {isSubmitting ? "Fetching job details..." : "Continue"}
           </Button>
         </DialogFooter>

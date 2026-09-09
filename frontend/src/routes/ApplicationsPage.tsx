@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { ALL_STATUSES, STATUS_LABEL } from "@/components/StatusBadge"
 import { ConfirmAppliedDialog } from "@/components/applications/confirm-applied-dialog"
+import { ApplicationsBoard } from "@/components/board/applications-board"
+import { ViewModeToggle } from "@/components/board/view-mode-toggle"
 import {
   ApplicationsToolbar,
   type StatusFilter,
@@ -16,6 +18,7 @@ import { statusSelectId } from "@/components/table/status-select"
 import { BlurFade } from "@/components/ui/blur-fade"
 import { useApplicationsContext } from "@/hooks/useApplicationsContext"
 import { useMediaQuery } from "@/hooks/useMediaQuery"
+import { useViewMode } from "@/hooks/useViewMode"
 import { ApiError } from "@/lib/api-client"
 import type { Application, ApplicationStatus } from "@/types/api"
 
@@ -41,6 +44,12 @@ export function ApplicationsPage() {
   const [search, setSearch] = useState("")
   const [sortKey, setSortKey] = useState<SortKey | null>(null)
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
+
+  // F51: the status-grouped Board (default) or Table, persisted to
+  // `jtracks_view_mode` -- see hooks/useViewMode.ts. Read synchronously
+  // on first render, so a reload restores the chosen view without a
+  // visible swap.
+  const [viewMode, setViewMode] = useViewMode()
 
   // F32: JS-driven, not a CSS `hidden`/`sm:block` swap -- a CSS-only swap
   // would mount both ApplicationsTable and ApplicationsCardList at once,
@@ -233,12 +242,21 @@ export function ApplicationsPage() {
         should re-animate on every keystroke/filter change.
       */}
       <BlurFade delay={0}>
-        <div>
-          <h1 className="text-xl font-semibold text-foreground">Applications</h1>
-          <p className="text-sm text-muted-foreground">
-            Every application in your pipeline -- filter, search, sort, and move a row through
-            its status right from the table.
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-semibold text-foreground">Applications</h1>
+            <p className="text-sm text-muted-foreground">
+              Every application in your pipeline -- filter, search, sort, and move a row through
+              its status right from the table, or group them by status on the board.
+            </p>
+          </div>
+          {/*
+            F51: outside the `isLoading` branch below and with no
+            breakpoint conditions, so the toggle is present and operable
+            at every width (R16.1) -- at 375px it wraps under the
+            description rather than disappearing.
+          */}
+          <ViewModeToggle viewMode={viewMode} onViewModeChange={setViewMode} />
         </div>
       </BlurFade>
 
@@ -269,7 +287,24 @@ export function ApplicationsPage() {
             search={search}
             onSearchChange={setSearch}
           />
-          {isCardLayout ? (
+          {/*
+            F51: three renderings, exactly one mounted at a time. Board
+            wins over the narrow-width card swap because it's an explicit
+            user choice (R16.1: "a real user choice, not a replacement"),
+            and because a mounted-but-hidden second rendering would
+            duplicate every row's `statusSelectId` DOM id -- the same
+            trap F32 documents just below. All three take the identical
+            `visibleApplications` array and the identical
+            `handleStatusChange` reference.
+          */}
+          {viewMode === "board" ? (
+            <ApplicationsBoard
+              applications={visibleApplications}
+              totalCount={applications.length}
+              onStatusChange={handleStatusChange}
+              updatingId={updatingId}
+            />
+          ) : isCardLayout ? (
             <ApplicationsCardList
               applications={visibleApplications}
               totalCount={applications.length}

@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react"
-import { Trash2 } from "lucide-react"
+import { AlertTriangle, CheckCircle2, Trash2 } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Spinner } from "@/components/ui/spinner"
 import { Textarea } from "@/components/ui/textarea"
 import { ALL_STATUSES, STATUS_LABEL } from "@/components/StatusBadge"
 import { useApplicationsContext } from "@/hooks/useApplicationsContext"
@@ -242,17 +243,35 @@ export function ApplicationFormDialog() {
           a screen reader user nor a sighted user has to infer the outcome
           from which inputs happen to be blank.
         */}
+        {/*
+          F52: visual pass only. The tone colors are left exactly as
+          F28/F29 measured them (9.14:1 / 14.88:1 success, 8.73:1 /
+          15.42:1 warning -- see docs/decisions/magicui-conventions.md's
+          both-theme sweep) rather than being re-pointed at the
+          `--status-*` tokens: those tokens carry *pipeline status*
+          meaning, and an autofill result is not a pipeline status, so
+          reusing them would make a successful parse read as "Offer".
+          What changed is structure -- a tone icon and a leading-aligned
+          two-column layout, so the outcome is legible before the
+          sentence is read. The icon is `aria-hidden`, so what the
+          `role="status"` region announces is unchanged.
+        */}
         {notice && (
           <p
             role="status"
             className={cn(
-              "rounded-md border px-3 py-2 text-sm",
+              "flex items-start gap-2 rounded-md border px-3 py-2.5 text-sm",
               notice.tone === "success"
                 ? "border-emerald-600/40 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100"
                 : "border-amber-600/40 bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
             )}
           >
-            {notice.message}
+            {notice.tone === "success" ? (
+              <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            ) : (
+              <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            )}
+            <span>{notice.message}</span>
           </p>
         )}
 
@@ -523,7 +542,9 @@ export function ApplicationFormDialog() {
             <Button type="button" variant="outline" onClick={closeForm} disabled={isSubmitting}>
               Cancel
             </Button>
+            {/* F52: same spinner treatment as the autofill step's Continue button, so the two halves of the entry flow show progress the same way. Decorative only -- the existing submitting live region still owns the announcement. */}
             <Button type="submit" form="application-form" disabled={isSubmitting}>
+              {isSubmitting && <Spinner aria-hidden="true" />}
               {isSubmitting ? "Saving..." : mode === "edit" ? "Save changes" : "Add application"}
             </Button>
           </div>
