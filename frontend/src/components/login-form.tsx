@@ -35,7 +35,7 @@ export function LoginForm({
   const { login, loginWithGoogle } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const redirectTo = (location.state as { from?: Location } | null)?.from?.pathname ?? "/"
+  const redirectTo = (location.state as { from?: Location } | null)?.from?.pathname ?? "/app"
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")

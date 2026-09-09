@@ -164,6 +164,19 @@ No section may make a claim the product does not do. The feature copy must match
 behavior (e.g. "Failed Interview/OA" is the real label per R1.2 and must not be softened to
 "Failed" in marketing copy either).
 
+**Design references (Mobbin), confirmed per section:**
+
+| Section | Reference(s) |
+|---|---|
+| Hero | [Linear](https://mobbin.com/screens/b7c17da1-eac4-4a8d-b7e9-2b8d6ef30f66) — restrained, product-first hero; single confident headline, minimal chrome, product screenshot below the fold |
+| Product visual | Funnel/flow presentation: [Amplitude's funnel dashboard](https://mobbin.com/screens/6c9ff58e-4bfa-4587-830e-bf121f7012f0), [Mixpanel's flow diagram](https://mobbin.com/screens/cc657e26-9efb-49ae-a0fb-f54a3c5dde50). Shareable-recap emphasis (per R10.3's "and/or the recap sticker"): [Spotify Wrapped's shareable card](https://mobbin.com/screens/6b681412-559a-4fbf-af3e-1e97b4207e84) (portrait stat card + explicit Share action — the closest real-world analog to `RecapCard` itself) and [Polarsteps' shareable stats card](https://mobbin.com/screens/cca74022-8ef8-4b95-83a6-c968b545d5e4) (dark stat card with Download/Share actions, individual-user data) |
+| Feature trio | [incident.io](https://mobbin.com/sites/sections/0e8ee7bc-4aa3-4f1b-805f-89117f5d5d68) — dark-mode 3-column icon/heading/description pattern with a single accent color, verifying the accent hue (R11.2) reads correctly in dark mode |
+| Footer | [Visitors](https://mobbin.com/sites/sections/17c6b36b-7e35-4efa-8000-9c5fdf472dc3) — minimal: logo, a couple of small link columns, plain legal text, no visual flourish; matches this row's "minimal legal/attribution" exactly |
+
+Per `.claude/rules/mobbin-ui.md`'s handoff rule: these are extracted for layout/visual direction
+(spacing rhythm, information hierarchy, treatment), not copied verbatim — the actual build is
+shadcn primitives (`.claude/rules/shadcn-ui.md`) with MagicUI accents layered on afterward.
+
 **R10.4 — Reusing real components.** The product visual should render the **actual**
 `SankeyChart` / `RecapCard` components against demo data, not a screenshot, so the landing page
 cannot drift from the product. If a component cannot be rendered outside the authenticated tree
@@ -370,23 +383,32 @@ for exactly this and nothing else), status-change transitions in the table, char
 None are in scope until confirmed. Note that chart draw-on animation collides with R12.5's export
 prohibition.
 
-### R15 — Design-reference tooling: Mobbin MCP (deferred — skipped for V2.1)
+### R15 — Design-reference tooling: Mobbin MCP (adopted, implemented)
 
-**Confirmed: skip.** Mobbin MCP is **not** being installed or used for V2.1. `.mcp.json` stays at
-`shadcn` and `magicuidesign-mcp` only. The fallback that already worked for R9 is used instead: the
-user supplies reference material directly (as `frontend/reference/strava_reference.PNG` did),
-committed to `frontend/reference/` so the intent is recoverable later (see
-[Q7](#open-questions--risks) for what's pending). R15.1–R15.3 as originally scoped (install
-before design work begins; research aid only, never a blocker; reference material never ships) are
-recorded here as a **future option**, not a V2.1 deliverable, in case a later iteration revisits it.
+**Superseded.** R15 originally confirmed *skipping* Mobbin MCP for V2.1, falling back to the user
+supplying reference material directly (as `frontend/reference/strava_reference.PNG` did). That
+decision has since been reversed: Mobbin MCP is installed and in active use. `.mcp.json` now
+includes `mobbin` (a remote HTTP server, alongside `shadcn` and `magicuidesign-mcp`);
+`.claude/rules/mobbin-ui.md` governs when and how it's used — the **reference stage** of a 3-stage
+pipeline (Mobbin → shadcn → MagicUI) also documented in `.claude/rules/shadcn-ui.md`'s "Design
+Pipeline" section and `.claude/rules/magicui-ui.md`'s pipeline note; its three tools
+(`search_screens`, `search_flows`, `search_sections`) are allow-listed in
+`.claude/settings.local.json`'s `permissions.allow`, the same way shadcn's and MagicUI's tools are.
+R16's board-view/entry-flow/settings/stat-tile references and R12.7's Duolingo/Beli recap-skin
+references were gathered by the user browsing Mobbin directly, before the MCP server was formally
+adopted; R10.3's landing-page section references below are the first gathered with the tool fully
+wired up. The original R15.1–R15.3 scoping (install before design work begins; research aid only,
+never a blocker; reference material never ships in the bundle) held up and now describes how it's
+actually used, not a future option.
 
 ### R16 — Design-overhaul additions (addendum, new scope, frontend-only)
 
 Recorded per this project's convention of logging newly-scoped work into the PRD as it's decided,
 rather than letting `FRONTEND_TASKS.md` carry scope the PRD doesn't reflect (the same precedent
 `PRD_V2.md`'s R9 addendum set). Grounded in Mobbin references the user reviewed directly and
-curated per area (a research aid only, per R15.2 — nothing installed, nothing shipped). Full detail
-and acceptance criteria live in `FRONTEND_TASKS.md`'s Milestone FV11 (F51–F54).
+curated per area — gathered before Mobbin MCP was formally adopted (see R15, now superseded); still
+a research aid only, per R15.2, never a blocker, and no reference material ships in the bundle.
+Full detail and acceptance criteria live in `FRONTEND_TASKS.md`'s Milestone FV11 (F51–F54).
 
 **R16.1 — Optional pipeline board view.** Informed by
 [Homerun's kanban pipeline](https://mobbin.com/screens/80dfe542-7c1b-4303-a449-b4f465d615fe) and
@@ -445,9 +467,11 @@ the next session doesn't re-plan it. Descriptions are taken from the current wor
 | Recap redesign | `recap-card.tsx` | `PRD_V2.md` **R9.2** — three hero stats + schematic Sankey + logo/date footer |
 | Dashboard Sankey sizing | `AnalyticsPage.tsx` | `PRD_V2.md` **R9.1** — 343×260 → 343×170 |
 | Sankey geometry revision | `sankey-chart.tsx` | `nodeWidth(10)`, `nodePadding(12)`, and `UNWEIGHTED_STROKE_WIDTH = 5` for the recap's `weighted={false}` mode — landed after R9, not previously documented in any PRD |
+| Mobbin MCP server + permissions | `.mcp.json` (`mobbin`), `.claude/settings.local.json` | Installed — remote HTTP server (`https://api.mobbin.com/mcp`); its 3 tools (`search_screens`/`search_flows`/`search_sections`) allow-listed in `permissions.allow` |
+| Mobbin usage rule + design pipeline | `.claude/rules/mobbin-ui.md` (new); `.claude/rules/shadcn-ui.md`'s "Design Pipeline"/"Visual Liberty" sections; `.claude/rules/magicui-ui.md`'s pipeline note | Written — Mobbin (reference) → shadcn (structure) → MagicUI (accents), auto-loaded |
 
 **Not yet done, despite adjacent work existing:** everything in R10–R13, R11's theme provider,
-R14.2/R14.6's new-surface motion, R15, and R16.
+R14.2/R14.6's new-surface motion, and R16. **R15 is now done** — see above and R15's own text.
 
 ---
 
@@ -511,7 +535,7 @@ Each is a check someone can actually perform:
 - **No live users, no live data.** No migration, no comms, no deprecation window. The board may be
   reset.
 - **Single developer, no deadline.**
-- **Workstream:** entirely FRONTEND, plus `docs/decisions/` and `.mcp.json`.
+- **Workstream:** entirely FRONTEND, plus `docs/decisions/`, `.mcp.json`, and `.claude/rules/`.
 - **The V2 data contract is frozen for this iteration.** The Sankey payload, the recap payload, the
   status enum and every metric definition are inputs to V2.1, not subjects of it.
 
@@ -535,7 +559,9 @@ remains fully open.
 - ~~Q4 — Table approach.~~ **Resolved.** A (column priority hide) + B (card list at narrow
   widths), combined. D (slim the Status cell) was not selected as a required deliverable but
   remains a cheap optional bonus. C (expandable rows) is out of scope. See R13.2.
-- ~~Q5 — Mobbin MCP.~~ **Resolved: skipped for V2.1.** Not installed, not used. See R15.
+- ~~Q5 — Mobbin MCP.~~ **Resolved: adopted (supersedes the original "skipped" resolution).**
+  Installed, ruled (`.claude/rules/mobbin-ui.md`), permissioned, and in active use for design
+  references, including R10.3's landing-page section references. See R15.
 - ~~Q6 — Is V2.1 truly frontend-only?~~ **Resolved: yes, confirmed.** See Constraints &
   assumptions.
 - **Q7 — Reference material — still open.** The user confirmed more reference material is coming
@@ -564,8 +590,10 @@ remains fully open.
 - **MagicUI on a marketing page invites overuse.** R14.3's one-continuous-accent rule exists
   precisely for this and will feel wrong in the moment; the conventions doc is the tiebreaker, not
   taste-in-the-moment.
-- **Mobbin MCP is unproven in this repo.** It is not installed, its output quality is unknown, and
-  R15.2 deliberately makes it optional so nothing stalls behind it.
+- ~~**Mobbin MCP is unproven in this repo.** It is not installed, its output quality is unknown, and
+  R15.2 deliberately makes it optional so nothing stalls behind it.~~ **Resolved** — see Q5, R15.
+  Installed and used successfully for R10.3's landing-page references above; R15.2's "optional,
+  never a blocker" framing held up rather than needing to be relied on.
 
 ---
 
@@ -612,5 +640,5 @@ Proposed ordering. Each stage is independently shippable and leaves the app work
    on R11's tokens landing first, same reasoning as R12/R13; otherwise independent of every other
    stage. `FRONTEND_TASKS.md`'s Milestone FV11 (F51–F54).
 
-**R15 (Mobbin MCP)** is not a stage — if it's happening, it happens before stage 1's design work
-begins, and nothing waits on it.
+**R15 (Mobbin MCP)** is not a stage — it was adopted ahead of stage 4's landing-page design work
+(R10.3), and no stage waited on it.

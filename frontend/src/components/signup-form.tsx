@@ -60,7 +60,7 @@ export function SignupForm({ className, ...props }: React.ComponentProps<typeof 
 
     try {
       await signup(email, password)
-      navigate("/", { replace: true })
+      navigate("/app", { replace: true })
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -78,7 +78,7 @@ export function SignupForm({ className, ...props }: React.ComponentProps<typeof 
 
     try {
       await loginWithGoogle()
-      navigate("/", { replace: true })
+      navigate("/app", { replace: true })
     } catch {
       setError("Something went wrong signing up with Google. Please try again.")
     } finally {

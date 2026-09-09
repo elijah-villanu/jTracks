@@ -327,9 +327,12 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
 
 **Explicitly out of scope — do not create tasks for these:**
 
-- **R15 (Mobbin MCP).** Confirmed *skipped* for V2.1, not deferred-with-a-task. `.mcp.json` stays at
-  `shadcn` + `magicuidesign-mcp`. Reference material comes from the user directly into
-  `frontend/reference/` the way `strava_reference.PNG` grounded R9, and never ships in the bundle.
+- ~~**R15 (Mobbin MCP).** Confirmed *skipped* for V2.1~~ — **superseded, see `PRD_V2_1.md`'s R15.**
+  Mobbin MCP is now adopted: installed in `.mcp.json` (`mobbin`), governed by
+  `.claude/rules/mobbin-ui.md`, and permissioned in `.claude/settings.local.json`. Milestone FV9's
+  F42/F43 below cite the Mobbin references gathered with it. There is still no dedicated task for
+  Mobbin itself — it's tooling, not a deliverable — so this remains "not a task," just no longer
+  "not used."
 - **R14.1 — the motion pass that already landed.** The MagicUI MCP server, `.claude/rules/magicui-ui.md`,
   `docs/decisions/magicui-conventions.md`, `main.tsx`'s `<MotionConfig reducedMotion="user">`, and
   `BlurFade`/`BorderBeam`/`NumberTicker` across Analytics, Login, Signup, the Applications header and
@@ -1022,7 +1025,7 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
 > option B. **F40 is a repo-wide change, not a new-file change**: R10.1 calls it "a repo-wide find, not a
 > single file," and it is.
 
-- [ ] **F40 — Move the authenticated app under `/app`** (M)
+- [x] **F40 — Move the authenticated app under `/app`** (M)
   R10.1, confirmed approach B. `/` becomes unconditionally public; the board becomes `/app`, plus
   `/app/analytics` and `/app/profile`. `/login` and `/signup` stay top-level, because a visitor reaches
   them from the public landing page before authenticating. Every touch point, all of which hardcode bare
@@ -1050,8 +1053,81 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   on `/app`; the route-change announcement still names the right page on all three app routes; no bare-path
   navigation survives; `tsc -b` and `npm run lint` clean.
   Depends on: none within FV9 — but do it **before F41**, which needs `/` free.
+  **Done 2026-09-08.** `App.tsx`, `ProtectedRoute.tsx`, `login-form.tsx`, `signup-form.tsx`,
+  `layout/AppLayout.tsx`. `path="app"` sits on the layout route rather than being repeated across three
+  children, so the prefix exists in exactly one place.
 
-- [ ] **F41 — Public landing route that does no authenticated work** (M)
+  *One thing the task's file list didn't predict.* `NavLink` marks a link active when the location
+  equals its path **or is a descendant of it**, so an un-`end`ed `/app` lights up "Tracker" on
+  `/app/analytics` and `/app/profile` too. The pre-F40 `to="/"` never had this problem — the descendant
+  test requires a `/` separator immediately after the prefix, which the root path can never produce — so
+  this is work the prefix created, not a latent bug. `NAV_LINKS` now carries an `end` flag, true only on
+  the index link, passed to both the desktop and the mobile `NavLink`.
+
+  *Verified by real render, not by reading.* An SSR harness (built with `vite build --ssr`, then
+  deleted) rendered `<App />` inside `MemoryRouter` with a stubbed `AuthContext`, at every route and in
+  both auth states:
+
+  | Route | user | Rendered | Active nav link |
+  |---|---|---|---|
+  | `/app` | signed in | `AppLayout` + Applications, 12,000 B | `Tracker` — exactly one `aria-current="page"` |
+  | `/app/analytics` | signed in | `AppLayout` + Analytics, 18,173 B | `Analytics` |
+  | `/app/profile` | signed in | `AppLayout` + Settings, 15,720 B | `Profile` |
+  | `/app/analytics` | signed out | 0 B — `ProtectedRoute` took its `Navigate to="/login"` branch | — |
+  | `/login` | signed out | LoginPage, 7,696 B | — |
+  | `/login` | signed in | 0 B — `GuestRoute` took its `Navigate to="/app"` branch | — |
+
+  Every rendered nav emitted exactly `/app`, `/app/analytics`, `/app/profile`, and exactly one
+  `aria-current="page"` on the correct link at each route — the `end` fix observed rather than argued.
+  `ROUTE_TITLES`' three keys are those same three pathnames, so the route-change announcement still
+  names the page; a stale key degrades it to "Page — navigated" with no error, which is why this was
+  checked against rendered hrefs rather than assumed.
+
+  *What is reasoned, not observed.* Effects don't run under `renderToString`, so the table above
+  observes the **guard decision**, not where the redirect lands. "Signing in lands on `/app`", "returns
+  to `/app/analytics` after signing in" and "an authenticated user visiting `/login` lands on `/app`"
+  rest on single unambiguous lines (`?? "/app"` in `login-form.tsx`, `<Navigate to="/app" replace />` in
+  `GuestRoute`) read rather than driven in a browser.
+
+  Grepped `src/` **including `src/mocks/`** for every `navigate(`, `<Navigate`, `Link to=`, `NavLink`
+  and `href="/`. The only surviving bare `"/"` is `mocks/handlers/autofill.ts`'s
+  `parsed.pathname.split("/")` — URL parsing, not routing. `tsc -b` clean; `oxlint` reports 19 warnings,
+  all pre-existing `only-export-components`, none in a file touched here.
+
+  **Follow-up verification in a real browser (independent pass), and one defect it caught.** The
+  three criteria left as "reasoned" above were then driven for real against a mocked dev server
+  (`VITE_ENABLE_MOCKS=true`, port 5181, MSW fixture credentials). Two passed as argued. One did not:
+
+  > **Deep-linking to `/app/analytics` while logged out returned to `/app`, not `/app/analytics`.**
+
+  `/login` renders *inside* `GuestRoute`, so the moment a successful sign-in sets `user`, that guard
+  re-renders and its `<Navigate to="/app" replace />` runs — beating `login-form`'s own
+  `navigate(redirectTo)`. The value the form computed from `location.state.from` was discarded every
+  time, so the return trip this acceptance criterion asks for never worked. History state was
+  confirmed intact (`{usr:{from:{pathname:"/app/analytics"}}}`), which is what ruled out the form's
+  own logic and pointed at the guard.
+
+  The race **predates F40** — before it, `GuestRoute` and the form's fallback were both `"/"`, so the
+  two agreeing on the wrong answer looked like the right one — but F40's acceptance requires the
+  return trip, so it is fixed here rather than inherited: `GuestRoute` now reads the same `from`
+  state `ProtectedRoute` writes, and falls back to `/app` only when there is none.
+
+  Re-verified after the fix, all observed in-browser rather than argued:
+
+  | Criterion | Result |
+  |---|---|
+  | Deep-link `/app/analytics` logged out → `/login` → sign in | lands `/app/analytics`, `h1` "Analytics" |
+  | Plain sign-in, no `from` state | lands `/app` |
+  | Authenticated visitor to `/login` | bounced to `/app` |
+  | Route-change announcement, all three routes | "Applications/Analytics/Settings — navigated" — no stale-key degradation |
+  | `end` flag / nav active state | exactly one `aria-current="page"`, correct link, on each of the three routes |
+
+  Note for whoever tests this next: the *authenticated visitor to `/login`* case cannot be reached by
+  a full page reload under the dev mock — the access token is in memory (F19) and the mock's
+  refresh-cookie limitation means a reload lands logged out. It has to be exercised client-side,
+  after signing in, or against the real backend.
+
+- [x] **F41 — Public landing route that does no authenticated work** (M)
   R10.2. Add `frontend/src/routes/LandingPage.tsx` at `/`, declared in `App.tsx` **outside** both
   `ProtectedRoute` and `GuestRoute` so it renders identically whether or not the visitor is signed in —
   that stable-URL-while-signed-in property is the entire rationale for choosing routing option B. Three
@@ -1070,7 +1146,50 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   landing page renders fully before `/auth/refresh` resolves.
   Depends on: F40
 
-- [ ] **F42 — Hard-coded demo data and the product visual** (M)
+  **Done 2026-09-08.** `routes/LandingPage.tsx`, declared in `App.tsx` as a `path="/"` sibling of both
+  guarded branches — not under `GuestRoute` (which would bounce a signed-in visitor to `/app`), not
+  under `ProtectedRoute`, and not under the `ApplicationsProvider` wrapper, which is attached to the
+  protected `<Route element>` and so is not an ancestor of `/` at all. The component never imports
+  `useAuth`, so there is no `isLoading` to gate on.
+
+  *Two of the three acceptance criteria are observed.* The same SSR harness rendered `/` in four auth
+  states — signed out/settled, signed in/settled, signed out with `isLoading: true`, signed in with
+  `isLoading: true` — and returned **byte-identical 19,453-byte HTML** in all four, carrying
+  `<h1>Know exactly where your job search stalls.</h1>` and no `Loading...` gate. That covers "logged
+  in, `/` still shows the landing page and does not redirect to `/app`" and "renders fully before
+  `/auth/refresh` resolves" directly: both guards render a literal `Loading...` div while `isLoading`,
+  and it never appeared.
+
+  *The network criterion is verified statically, and that is a real gap.* No browser tooling was
+  available this session, so "load `/` with the network panel open" was **not** performed. What was done
+  instead: a script walked the landing route's entire transitive import graph — 24 modules — and
+  grepped each for `fetch(`, `apiClient`, `useAuth`, `useApplicationsContext`, `useDashboardStats`,
+  `useRecap`, `ApplicationsProvider` and `isLoading`. Every hit is prose in a doc comment (`useTheme.ts`
+  citing `useAuth`'s shape; this page's own rule comment; `types/api.ts` and `demo-data.ts` naming
+  `src/mocks/` in order to forbid it). No module in the graph is capable of issuing a request. Combined
+  with the route structure above that is a strong argument — but it is an argument, not an observation,
+  and deserves a browser spot-check when one is at hand.
+
+  **That spot-check has since been performed, and the criterion passes.** Chrome, production
+  `vite preview` build, network recording started before the load of `/`. The complete request list:
+
+  ```
+  GET  /                              200
+  GET  /assets/index-<hash>.js        200
+  GET  /assets/index-<hash>.css       200
+  GET  /assets/LandingPage-<hash>.js  200
+  POST http://localhost:8000/auth/refresh   (pending)
+  OPTIONS http://localhost:8000/auth/refresh (pending)
+  ```
+
+  No `/applications`, no `/dashboard/*`, no `/settings` — the stated V2.1 success metric, observed.
+  The `POST /auth/refresh` is `AuthProvider`'s boot refresh, which this task explicitly permits
+  ("the refresh call itself still fires — that's `AuthProvider`'s job"); it was still `pending` while
+  the page was fully painted and interactive, which is the "renders before `/auth/refresh` resolves"
+  criterion observed as well rather than inferred from the absence of a `Loading...` div. Signed in,
+  `/` was also confirmed live to render the landing page rather than redirect to `/app`.
+
+- [x] **F42 — Hard-coded demo data and the product visual** (M)
   R10.2 + R10.4. Define the demo data in the landing page's own module (e.g.
   `routes/landing/demo-data.ts`), typed against the real `Sankey` / `DashboardRecap` types in
   `src/types/api.ts` — never a fetch, never the MSW handlers (which don't run in production anyway), never
@@ -1086,12 +1205,91 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   `RecapCard` renders its own dark gradient background and is deliberately theme-independent (R11.4) —
   check it doesn't look stranded on a light landing section. A deliberate framing treatment around it is
   fine; making the card follow `.dark` is not.
+  **Design references (Mobbin), per PRD R10.3:** funnel/flow presentation from
+  [Amplitude's funnel dashboard](https://mobbin.com/screens/6c9ff58e-4bfa-4587-830e-bf121f7012f0) and
+  [Mixpanel's flow diagram](https://mobbin.com/screens/cc657e26-9efb-49ae-a0fb-f54a3c5dde50); the
+  shareable-recap emphasis from
+  [Spotify Wrapped's shareable card](https://mobbin.com/screens/6b681412-559a-4fbf-af3e-1e97b4207e84)
+  (portrait stat card + explicit Share action) and
+  [Polarsteps' shareable stats card](https://mobbin.com/screens/cca74022-8ef8-4b95-83a6-c968b545d5e4)
+  (dark stat card with Download/Share actions). Extract layout/framing direction only, per
+  `.claude/rules/mobbin-ui.md`'s handoff rule — don't copy either verbatim.
   Acceptance: the product visual is a live render of the real component; changing a demo link value
   visibly changes the rendered chart; nothing in the landing module imports from `src/mocks/`; the visual
   is legible at 375px and in both themes.
   Depends on: F41, F39 (the restructured chart is what gets shown)
+  **Done 2026-09-08.** `routes/landing/demo-data.ts` plus the product-visual section of
+  `routes/LandingPage.tsx`.
 
-- [ ] **F43 — Landing sections: hero, feature trio, footer, and the landing theme control** (M)
+  *The task text was stale and the difference mattered.* It says "`RecapCard` renders its own dark
+  gradient background." As of F48–F50 it is a dispatcher over three skins, one of which
+  (`strava-skin.tsx`) has a **transparent** background. Dropped onto a landing section that skin would
+  composite onto whatever sits behind it — the "looks stranded" risk the task warns about, in a new
+  form. **Chose `skin="beli"`**: opaque, so it composites onto nothing, and its warm paper palette
+  belongs to neither theme, which is what an exported image actually is. Duolingo is opaque too, but it
+  is painted in the app's own teal accent (F27), so it would read as more page chrome rather than as an
+  artefact the product made. The card stays theme-independent — nothing here makes it follow `.dark`.
+  The framing treatment the task permits is a bordered `bg-muted` inset, taken from the Polarsteps
+  reference's card-on-a-sheet, which gives the cream card a defined edge in light mode where it would
+  otherwise float.
+
+  *Rendered both visuals, not one.* The section is a 12-column grid: `SankeyChart` at `lg:col-span-7`
+  and the recap card at `lg:col-span-5`, each in a titled card with a subtitle naming its sample data
+  (the Mixpanel dashboard-embed framing). They answer different questions — the flow is the analytical
+  story the Amplitude/Mixpanel references are about, the card is the shareable artefact the
+  Spotify-Wrapped/Polarsteps references are about — and the layout has room for both side by side.
+
+  *Invariants are enforced by construction, not by hand.* The hand-authored data is per-status counts;
+  `buildDemoSankey` derives all six nodes and every link from them and filters `value: 0` links out, so
+  `applied->interviewing_oa === interviewing_oa + offer + failed` cannot be broken by editing a number.
+  An `import.meta.env.DEV`-gated assertion re-checks all three rules at module load anyway, guarding the
+  one remaining risk (a future edit to the derivation itself); it is stripped from production builds.
+  Two separate cohorts: all-time (128) behind the flow, one month (34) behind the card — reusing the
+  all-time totals under a card labelled "This month" would be the landing page telling a story the
+  product wouldn't. Nothing under `src/routes/landing/` imports from `src/mocks/`; the one non-type
+  import is `STATUS_LABEL` from `components/StatusBadge`, deliberately, so the demo cannot show a status
+  name the product doesn't use.
+
+  *Live render observed.* An SSR harness rendered the real `SankeyChart` against `DEMO_SANKEY` at a
+  fixed width. Node labels came back as `["Applied (128 · 42 in flight)", "Interviewing / OA (9)",
+  "Rejected (41)", "Ghosted (27)", "Offer (3)", "Failed Interview/OA (6)"]`, and the component's own
+  `ChartDataTable` emitted `Applied -> Interviewing / OA  18` — that is 9 + 3 + 6, the contract
+  equality, coming out of the real component rather than out of the fixture. Mutating one demo link
+  (`applied->ghosted`, 27 -> 3) and re-rendering the same component changed the output: `Ghosted (3)`,
+  shortfall `42 in flight` -> `66 in flight`, HTML differs. That is "changing a demo link value visibly
+  changes the rendered chart" observed.
+
+  *Not observed:* legibility at 375px and in both themes. The chart's width comes from a
+  `ResizeObserver`, which never fires under `renderToString`, so the narrow render was reasoned from
+  measurements rather than seen — see F44 for those numbers and for the two layout changes they forced.
+
+  **Follow-up verification in a real browser (independent pass), and one defect it caught.** Both
+  visuals were then loaded in Chrome against a production `vite preview` build, in both themes and at
+  a real 375px layout viewport. The Sankey and the recap card both render live with the demo numbers,
+  and the Beli card sits legibly on its inset panel in light mode (the framing treatment doing exactly
+  the job it was chosen for — cream on white would have floated). But at desktop width:
+
+  > **The pipeline card was 614px tall around a 220px chart — 318px of measured dead space, over half
+  > the card empty.**
+
+  The two cards share a grid row and the recap column sets its height (a fixed 480px card plus
+  framing), while the chart stayed pinned at the size that suits narrow widths. The grid stretches
+  both columns to the taller one, so the funnel sat in the top third of its card with a void beneath —
+  the same failure mode F50's Beli list hit, in a different place, and on the flagship visual of the
+  marketing page.
+
+  Fixed by letting the chart's height track the layout instead of being a constant: 500px from `lg`
+  up, which is exactly where `lg:grid-cols-12` creates the second column and therefore the
+  stretching, and 220px below it, where the grid is a single column, each card is content-sized, and
+  F15/F36's narrow-width legibility work is calibrated. A media query rather than CSS because
+  `SankeyChart` takes a numeric `height` prop — it draws an SVG, it does not lay one out.
+
+  Measured after the fix: dead space 318px → 38px, matching the recap column's own 53px, with no
+  label collisions at the larger size (the extra height separates the `Offer` / `Failed Interview/OA`
+  labels that sat closest together). At 375px the chart is unchanged and the page still reports zero
+  overflowing elements.
+
+- [x] **F43 — Landing sections: hero, feature trio, footer, and the landing theme control** (M)
   R10.3 (the four-section layout is `[unconfirmed]` in the PRD — treat it as the working proposal and
   confirm the *copy* with the user rather than re-planning the structure). Top to bottom: hero (product
   lockup, one-line value proposition, one-sentence subhead, primary CTA → `/signup`, secondary CTA →
@@ -1104,12 +1302,55 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   This also closes out R11.1's second half: place F26's exported theme control in the landing header. Use
   shadcn primitives for anything interactive (`Button` with a router `Link` for the CTAs); MagicUI comes
   later in F45, not here.
+  **Design references (Mobbin), per PRD R10.3:** hero from
+  [Linear](https://mobbin.com/screens/b7c17da1-eac4-4a8d-b7e9-2b8d6ef30f66) (restrained, product-first,
+  single confident headline); feature trio from
+  [incident.io](https://mobbin.com/sites/sections/0e8ee7bc-4aa3-4f1b-805f-89117f5d5d68) (dark-mode
+  3-column icon/heading/description, single accent color); footer from
+  [Visitors](https://mobbin.com/sites/sections/17c6b36b-7e35-4efa-8000-9c5fdf472dc3) (minimal: logo, a
+  couple of link columns, plain legal text). Extract layout/spacing/hierarchy direction only, per
+  `.claude/rules/mobbin-ui.md`'s handoff rule — build with shadcn primitives, not copied markup.
   Acceptance: a visitor can state what jTracks does from the hero alone and reach `/signup` in one click
   (a stated success metric); every feature claim maps to a shipped behavior; no shortened status label
   anywhere on the page; the theme control works on `/` and its choice carries into `/app`.
   Depends on: F41, F42, F26
+  **Done 2026-09-08.** All four sections in `routes/LandingPage.tsx`, structure exactly as proposed —
+  the task said to confirm copy, not to re-plan the layout, so the layout wasn't re-planned. The
+  product visual is F42's section, carrying both visuals.
 
-- [ ] **F44 — Landing accessibility, 375px responsiveness, metadata, and bundle isolation** (M)
+  *References confirmed before taking direction from them.* Each named Mobbin URL was re-fetched and the
+  returned image actually looked at, not inferred from `app_name`. Linear's hero came back as expected
+  (one oversized two-line headline, one small subhead, product visual immediately beneath, CTAs in the
+  top nav) and the hero follows that restraint. Visitors' footer came back as a short prose column plus
+  narrow link columns in small muted type, which is the shape used here. **incident.io's section is not
+  literally a 3-column grid** as the task describes it — it is three stacked icon/heading/description
+  rows in a left column beside a product image. Took what the task was actually after (bordered icon
+  tile, bold heading, muted body, one accent colour used sparingly) and laid it out as the trio the task
+  asks for: three columns at `md`, stacked below. **Mixpanel's `cc657e26-...` never surfaced** across
+  three separate searches; other Mixpanel Flows screens did, and the framing direction was taken from
+  [`22fd2eb0-...`](https://mobbin.com/screens/22fd2eb0-af19-4efe-80f7-6af3d4f42d94) — a flow chart
+  embedded in a dashboard as a titled card with a subtitle and explanatory text, which is the pattern
+  both product-visual cards use. Flagging the substitution rather than claiming the named screen.
+
+  *Copy discipline.* Every feature claim is annotated in the source with the code that backs it
+  (`SettingsPage`'s ghost-days field; the separate `rejected`/`failed` statuses and Sankey sinks;
+  `recap-dialog.tsx`'s 270x480-at-`pixelRatio: 4` export over the full range set, three skins, Download
+  always and Share gated on `navigator.share`). Grepping the rendered HTML for `Failed[^<]*` returns two
+  matches and both are the full **"Failed Interview/OA"** — the label is never softened, including
+  inside the recap card's own ranked-outcomes list. **The copy itself is awaiting user confirmation**
+  and was surfaced verbatim in the session report; it is a draft, not a sign-off.
+
+  *Theme control.* F26's exported `ThemeToggle` is placed in the landing header unchanged.
+  `ThemeProvider` sits above `BrowserRouter` in `main.tsx` and persists to the single `jtracks_theme`
+  key, so the choice made on `/` is the same provider state `/app` reads — verified by reading the
+  provider, not by clicking through in a browser.
+
+  *One deliberate responsive omission.* "Log in" is hidden below `sm` in the header; see F44 for the
+  measurement that forced it. Both remaining `/login` entry points (hero secondary CTA, footer) sit
+  above the fold on a phone. The header lockup is **not** a link (it would point at the page you are
+  already on); the footer lockup **is**, and points at `/app` — F40 flagged that call as F43's to make.
+
+- [x] **F44 — Landing accessibility, 375px responsiveness, metadata, and bundle isolation** (M)
   R10.5, R10.6, and the PRD's Bundle-cost NFR. This is the first page a screen-reader user or a crawler
   will ever see and it does not get a lower bar than the app.
   - **Landmarks and headings:** real `<header>` / `<main>` / `<footer>`, exactly one `<h1>`, no skipped
@@ -1128,6 +1369,125 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   at 375px; `<title>` and description present; `vite build` shows the landing page in its own chunk that
   the `/app` entry does not pull in.
   Depends on: F43
+
+  **Done 2026-09-08.** `routes/LandingPage.tsx`, `hooks/useDocumentMetadata.ts`, `index.html`,
+  `App.tsx`.
+
+  *Landmarks and headings — observed.* Server-rendered the page and read the outline out of the real
+  HTML rather than off the JSX:
+
+  ```
+  header
+  main    id="landing-main"
+  section aria-labelledby="hero-heading"
+  H1      "Know exactly where your job search stalls."
+  section aria-labelledby="visual-heading"
+  H2      "One search, two views"
+  H3      "Pipeline flow"     H3 "Shareable recap"
+  section aria-labelledby="features-heading"
+  H2      "Three things jTracks does for you"
+  H3      "Ghosting handled for you"
+  H3      "A funnel that separates the two ways you lose"
+  H3      "A recap worth posting"
+  footer
+  nav     aria-label="Footer"
+  H2      "Product"
+  ```
+
+  Exactly one `<h1>`, no skipped levels, real `<header>`/`<main>`/`<footer>` elements, every section
+  labelled by its own heading. `SankeyChart` contributes its `sr-only` `<table>`/`<caption>` fallback,
+  so the funnel is readable to a screen reader here exactly as it is in-app. **`/` gets its own skip
+  link** — the deliberate call the task asks for: `AppLayout`'s isn't rendered on this route, and the
+  header puts five focusable controls ahead of the content, so it earns one; same markup and same
+  visually-hidden-until-focused treatment as the app's.
+
+  *375px — reasoned, and it changed the build.* No browser was available, so this was measured on paper
+  rather than driven, and the measurement found a real defect: wordmark ~83px + theme group 92px +
+  "Log in" ~62px + "Get started" ~88px + gaps + `px-4` = **~385px**, i.e. a horizontal scroll at 375px
+  on the one page R13.1 most obviously applies to. Fixed the way F33 fixed `AppLayout`'s cluster — hide
+  one control at the narrow end (`hidden sm:inline-flex` on "Log in"), bringing it to ~315px — plus
+  `flex-wrap` on the header row as a standing safety net so a future label change wraps instead of
+  scrolling. The recap card is a fixed 270px, so its inset panel drops to `px-2` below `sm`, giving the
+  card ~291px of room instead of ~279px. **Still unverified in a real narrow viewport**, and the layout
+  has no margin below roughly 358px.
+
+  *axe in both themes — not verified, but one real contrast defect was caught anyway.* No axe run was
+  performed; every colour on the page is a token from `index.css` (the recap card's fixed literals are
+  its own documented, theme-independent exception) and the interactive controls are unmodified
+  shadcn/Radix primitives already swept in both themes under F29 — but that is inheritance, not a clean
+  axe report on this URL, so treat it as open.
+
+  The one defect found came from reading the project's own record rather than from a tool: the hero
+  eyebrow was first drafted as `text-primary`, following the incident.io reference's accent-coloured
+  line. `docs/decisions/magicui-conventions.md` measures `--primary` as body text at **3.44:1** in light
+  — under the 4.5:1 floor — and says outright to flag it "before either gets used." That eyebrow would
+  have been the app's first live instance. Changed to `text-muted-foreground`; the accent still carries
+  the page through the primary CTAs (5.75:1) and the `aria-hidden` icons (3:1 non-text floor). The
+  conventions doc's F27 flag has been updated with the outcome and with the fact that the underlying gap
+  — `--primary` needing a darker light-mode value — is still unfixed.
+
+  *Metadata — observed.* `index.html` carries the real title and description, because `/` is the
+  crawlable entry point and a crawler that doesn't run JS sees only that file;
+  `useDocumentMetadata.ts` re-applies the same pair on mount and restores the previous values on unmount
+  so client-side movement between `/` and `/app` stays correct. Served the production build with
+  `vite preview` on port 5180 (`--strictPort`; 5173 and 8000 deliberately untouched, re-checked with
+  `netstat` after shutdown) and fetched `/`: `status=200`, with
+  `<title>jTracks — see where your job search stalls</title>` and the `<meta name="description">` both
+  present in the delivered bytes. Nothing beyond title + description was added.
+
+  *Bundle — observed against a real chunk listing.* `React.lazy` + `Suspense` on the `/` route only.
+  `npm run build`:
+
+  ```
+  dist/index.html                          2.55 kB | gzip:   1.29 kB
+  dist/assets/index-CTFXgTOA.css          90.43 kB | gzip:  15.72 kB
+  dist/assets/LandingPage-CVwL485W.js      9.55 kB | gzip:   3.29 kB
+  dist/assets/index-Ck57Lb5U.js        1,137.54 kB | gzip: 353.58 kB
+  ```
+
+  Checked the emitted bytes rather than trusting the file name. `index.html` links only
+  `index-Ck57Lb5U.js` and the CSS — no `modulepreload` for the landing chunk. The app entry's only
+  reference to it is a dynamic `(0,b.lazy)(()=>...import("./LandingPage-CVwL485W.js"),[])` with an empty
+  preload list, and grepping the app entry for three landing-only strings ("Know exactly where your job
+  search stalls", "Three things jTracks does for you", "One search, two views") returns **0** for each
+  while the landing chunk returns **1** for each. `LandingPage-*.js` statically imports only
+  `./index-*.js`. So the `/app` entry does not pull the landing page in.
+
+  *Known bundle caveat.* The landing chunk is small because `SankeyChart`, `RecapCard` and the `ui/`
+  primitives live in the shared entry — correct, since the app uses them too. But `sankey-chart.tsx`
+  imports `STATUS_BREAKDOWN_COLORS` from `status-breakdown-chart.tsx`, which pulls in `ui/chart.tsx` and
+  hence **Recharts**, for one colour map. That costs the `/app` entry nothing (Recharts is already on
+  its critical path) but it is dead weight for a visitor on `/`. Fixing it means moving that constant
+  out of F28's file, which is outside this milestone — logged here rather than done.
+
+  **Follow-up verification in a real browser (independent pass).** The two criteria left unverified
+  above were then driven in Chrome against a production `vite preview` build:
+
+  | Criterion | Result |
+  |---|---|
+  | axe clean on `/`, light theme | **0 violations** (axe-core 4.10.2, full document) |
+  | axe clean on `/`, dark theme | **0 violations** |
+  | No horizontal scroll at 375px | `scrollWidth 360 === clientWidth 360` at `innerWidth 375`, **0** elements extending past the viewport, measured in a real 375px layout viewport |
+  | Recap card fits at 375px | rendered at its exact 270px, right edge at 315px — 60px of margin |
+  | `<title>` + description delivered | present in the bytes served for `/` |
+
+  Landmark and heading outline re-confirmed live: one `<h1>`, `h1 → h2 → h3` with no skipped level,
+  real `<header>`/`<main>`/`<footer>`, and a skip link (`#landing-main`) — the task left that call
+  open and it was taken. The six controls that render with empty text content are the Sankey's
+  keyboard-reachable node buttons (F38); all six carry real accessible names ("Applied: 128
+  applications, 42 still in flight"), which is why axe passes rather than flagging 4.1.2.
+
+  *The bundle caveat above is narrower than the real gap.* Recharts is dead weight for a `/` visitor,
+  but so is the entire authenticated app: `index.html` loads the 1.1 MB entry chunk as its only
+  module script, and that chunk was confirmed to contain `aria-sort` (the applications table),
+  `jtracks_recap_skin` (the recap dialog) and `Add application`. The acceptance criterion as written
+  — "the landing page in its own chunk that the `/app` entry does not pull in" — genuinely passes,
+  and that direction is what the criterion tests. The other direction does not hold: this task's own
+  rationale asks for the split to work "**and vice versa**," and a landing visitor still downloads
+  every app route. The cause is that every other route in `App.tsx` is statically imported, so
+  `React.lazy` on `/` alone cannot separate them. Fixing it means code-splitting the authenticated
+  routes too, which changes the app's own loading behaviour and needs its own verification — out of
+  scope here, recorded so it is a decision rather than an oversight.
 
 ## Milestone FV10: Motion on the new surfaces & conventions upkeep (delivery stage 5 — R14.2, R14.3, R14.5)
 

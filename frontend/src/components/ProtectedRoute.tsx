@@ -33,6 +33,7 @@ export function ProtectedRoute() {
  */
 export function GuestRoute() {
   const { user, isLoading } = useAuth()
+  const location = useLocation()
 
   if (isLoading) {
     return (
@@ -43,7 +44,24 @@ export function GuestRoute() {
   }
 
   if (user) {
-    return <Navigate to="/" replace />
+    /*
+      F40: this has to honour the same `from` state `ProtectedRoute` sets
+      above, not just send everyone to `/app`. `/login` renders *inside*
+      this guard, so the instant a successful sign-in sets `user`, this
+      redirect runs during the re-render and beats `login-form`'s own
+      `navigate(redirectTo)` -- whatever the form computed is discarded.
+      Sending the visitor to a bare `/app` here is therefore enough to
+      swallow the deep link entirely: sign in after being bounced from
+      `/app/analytics` and you land on the tracker, not on analytics.
+
+      The race predates F40 (before it, both this redirect and the form's
+      fallback were `"/"`, so agreeing on the wrong answer looked like the
+      right one), but F40's acceptance requires the return trip to work,
+      so the two paths now read the same state and agree deliberately
+      rather than by coincidence.
+    */
+    const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname
+    return <Navigate to={from ?? "/app"} replace />
   }
 
   return <Outlet />

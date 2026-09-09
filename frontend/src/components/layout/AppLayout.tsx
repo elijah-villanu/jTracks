@@ -19,17 +19,32 @@ import { useApplicationsContext } from "@/hooks/useApplicationsContext"
 import { useAuth } from "@/hooks/useAuth"
 import { cn } from "@/lib/utils"
 
+/**
+ * F40: every app route now lives under `/app` (`/` is the public landing
+ * page). `end` matters on the index link and only there: NavLink marks a
+ * link active when the location equals its path *or* is a descendant of
+ * it, so an un-`end`ed `/app` would light up "Tracker" while the user is
+ * on `/app/analytics`. The pre-F40 `to="/"` never had this problem --
+ * NavLink's descendant test requires a `/` separator right after the
+ * prefix, which the root path can never produce -- so the flag is new
+ * work the prefix created, not a pre-existing bug.
+ */
 const NAV_LINKS = [
-  { to: "/", label: "Tracker" },
-  { to: "/analytics", label: "Analytics" },
-  { to: "/profile", label: "Profile" },
+  { to: "/app", label: "Tracker", end: true },
+  { to: "/app/analytics", label: "Analytics", end: false },
+  { to: "/app/profile", label: "Profile", end: false },
 ] as const
 
-/** Page title announced to screen readers after a client-side route change. */
+/**
+ * Page title announced to screen readers after a client-side route change.
+ * Keys are full pathnames and must track the `/app` prefix above -- a
+ * stale key doesn't error, it silently degrades the announcement to
+ * "Page — navigated".
+ */
 const ROUTE_TITLES: Record<string, string> = {
-  "/": "Applications",
-  "/analytics": "Analytics",
-  "/profile": "Settings",
+  "/app": "Applications",
+  "/app/analytics": "Analytics",
+  "/app/profile": "Settings",
 }
 
 /**
@@ -123,7 +138,12 @@ export function AppLayout() {
 
             <nav aria-label="Main" className="hidden items-center gap-1 sm:flex">
               {NAV_LINKS.map((link) => (
-                <NavLink key={link.to} to={link.to} className={navLinkClassName}>
+                <NavLink
+                  key={link.to}
+                  to={link.to}
+                  end={link.end}
+                  className={navLinkClassName}
+                >
                   {link.label}
                 </NavLink>
               ))}
@@ -179,6 +199,7 @@ export function AppLayout() {
                     <NavLink
                       key={link.to}
                       to={link.to}
+                      end={link.end}
                       onClick={() => setIsMobileMenuOpen(false)}
                       className={({ isActive }) =>
                         cn(navLinkClassName({ isActive }), "block w-full")
