@@ -86,7 +86,7 @@ export function LoginForm({
       */}
       <BlurFade delay={0}>
         <Card className="relative">
-          <BorderBeam duration={26} colorFrom="var(--foreground)" colorTo="var(--muted-foreground)" />
+          <BorderBeam duration={24} colorFrom="var(--foreground)" colorTo="var(--muted-foreground)" />
           <CardHeader>
             {/*
               A11y (WCAG 1.3.1 / 2.4.6): `CardTitle` renders a plain <div>, so

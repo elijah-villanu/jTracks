@@ -94,7 +94,7 @@ export function SignupForm({ className, ...props }: React.ComponentProps<typeof 
     // page.
     <BlurFade delay={0}>
       <Card className={cn("relative", className)} {...props}>
-        <BorderBeam duration={8} colorFrom="var(--foreground)" colorTo="var(--muted-foreground)" />
+        <BorderBeam duration={24} colorFrom="var(--foreground)" colorTo="var(--muted-foreground)" />
         <CardHeader>
           {/*
             A11y (WCAG 1.3.1 / 2.4.6): `CardTitle` renders a plain <div>, so

@@ -1497,7 +1497,7 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
 > status-change transitions, chart draw-on) are **not approved** and are not scheduled — see the
 > out-of-scope list at the top of this section.
 
-- [ ] **F45 — Apply the existing motion conventions to the landing page** (M)
+- [x] **F45 — Apply the existing motion conventions to the landing page** (M)
   R14.2 + R14.3 + R14.4. Use the values already fixed in `docs/decisions/magicui-conventions.md` rather
   than inventing per-page numbers: `BlurFade` at `duration 0.4s / easeOut / offset 6px / blur 6px /
   direction down`, a `0.08s` stagger step **between sibling groups** (never within a group), `BorderBeam`
@@ -1519,7 +1519,97 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   installed component was added via the CLI and ships none of MagicUI's hardcoded default colors.
   Depends on: F44
 
-- [ ] **F46 — Update the conventions doc and its per-page inventory** (S)
+  **Done 2026-09-08.** `frontend/src/routes/LandingPage.tsx` — the only file changed. No component
+  was installed and no `components/ui/*.tsx` was touched: everything this page needed
+  (`blur-fade`, `border-beam`) is already in the conventions doc's approved table, so the
+  discovery → inspect → CLI-install workflow had nothing new to run through. The *installed*
+  sources were still read before wiring anything, rather than the API being recalled from memory.
+
+  *Every number came from the doc, not from this page.*
+
+  | Value used | Where it comes from |
+  |---|---|
+  | `BlurFade` `duration 0.4s` / `easeOut` / `offset 6px` / `blur 6px` / `direction down` | Component defaults, left untouched — the doc's "Only `delay` is customized per group." Not one of them is passed explicitly. |
+  | `ENTRANCE_STAGGER_SECONDS = 0.08`, group *N* at `0.08 * N` → 0 / 0.08 / 0.16 / 0.24s | "A fixed `0.08s` step between sibling `BlurFade` groups." The constant is a copy of `AnalyticsPage.tsx`'s, same name and same doc comment intent, so the two pages read as one convention. |
+  | `BorderBeam duration={24}` | "Continuous accent (`BorderBeam`). `duration=24s`." Shipped at `8` to match the doc's then-current value; both were changed to **24** on 2026-09-09 (see the follow-up note at the end of F46). |
+  | `colorFrom="var(--foreground)"`, `colorTo="var(--muted-foreground)"` | The theming section's literal example, and identical to `stat-tile.tsx`/`signup-form.tsx`'s call sites. MagicUI's `#ffaa40`/`#9c40ff` defaults are overridden at the call site; the installed file was not edited. |
+  | No `NumberTicker` anywhere | Its "Not for" column. This page has no KPI tile — its only figures are caption text ("128 applications") and numbers inside `RecapCard`, which F35 puts off-limits regardless. |
+
+  One detail worth recording because it lives in the component rather than in our numbers:
+  `blur-fade.tsx` adds a fixed `0.04` to whatever `delay` it is given
+  (`transition={{ delay: 0.04 + delay, ... }}`), so the four groups actually start at
+  0.04 / 0.12 / 0.20 / 0.28s and the cascade has fully settled by ~0.68s. That offset applies
+  identically on Analytics and every other page using `BlurFade`, so it is a constant, not a
+  divergence — but it is the kind of thing that looks like a bug in a future measurement if it
+  isn't written down.
+
+  *Four groups, and nothing staggered inside one.* Hero, product visual, feature trio, footer —
+  exactly the four sibling groups the conventions doc's landing row told F45 to expect, each
+  wrapped whole. The trio is one `BlurFade`, not three; the hero's eyebrow/headline/subhead/CTA
+  pair arrive together; the footer's two columns arrive together. The `<header>` is deliberately
+  **not** a fifth group: the page frame stays put while the content cascades into it.
+  (`AppLayout`'s header does animate, but for a reason that doesn't transfer — there the header
+  *is* the shell's own content and mounts once per session.)
+
+  *The one continuous accent: the "Pipeline flow" card, and the two alternatives were rejected on
+  the doc's terms rather than on taste.* R14.3 is the rule this task called out as most likely to
+  break, so the reasoning is spelled out in the source too:
+  - **The recap card beside it** — rejected because the two cards share one grid row, so a second
+    beam would be a second continuous accent visible simultaneously. That is precisely the failure
+    mode the rule exists to prevent, and it would be visible at every width (the two cards stack
+    below `lg`, but both still sit in one viewport on a phone).
+  - **The hero's primary CTA** — rejected on the approved-components table's own wording:
+    `border-beam` is "not for" structural/interactive elements, being a decorative overlay and
+    never a substitute for a real state indicator. Beaming the one control the page is trying to
+    get clicked is exactly that mistake.
+  - **The pipeline-flow card wins** because the doc reserves the beam for "the single most
+    important element" in a view, and on `/` that is the visual the `<h1>`'s claim rests on ("Know
+    exactly where your job search stalls"). It is also the wider column (`lg:col-span-7`) and the
+    first read.
+
+  *Mobbin was re-checked for this call rather than assumed.* Three landing sections were fetched
+  and the images actually looked at — [Twenty](https://mobbin.com/sites/sections/abe261e4-d901-42f1-bea3-0a806e2d0669),
+  [incident.io](https://mobbin.com/sites/sections/c11ccc48-4f3a-41ae-a89b-62155ee8b946) and
+  [ClickUp](https://mobbin.com/sites/sections/8327bdfc-5c9d-4240-b4af-9431eebd0f9e). All three put
+  the visual emphasis on the *product visual* (an app window, a phone panel, a board screenshot)
+  rather than on the CTA, and incident.io splits its visual into a wide primary panel plus a
+  narrower secondary one — the same 7/5 shape this page already had. That supports crowning the
+  wider product panel and leaving the CTA plain. Nothing was copied; the references informed one
+  emphasis decision, which is all a screenshot can inform about motion.
+
+  *Structural care, so the animation doesn't quietly change the page it wraps.* `Card` needed
+  `relative` for the beam's `absolute inset-0` overlay (same as `StatTile`/the auth cards), and
+  `Card`'s own `overflow-hidden` + `rounded-xl` clip the beam to the border. `BlurFade` translates
+  and blurs but never scales, so `SankeyChart`'s `ResizeObserver` (F36) measures the same content
+  width during the entrance as after it. The footer wrapper is a plain `motion.div` with no
+  className, so the `<footer>` landmark and the `min-h-screen` + `flex-1` sticky-footer layout are
+  both unchanged.
+
+  *Verified.* `npx tsc -b` clean; `npm run lint` exits 0 with only the pre-existing
+  `only-export-components` warnings (none in this file). `npm run build` succeeded and F44's split
+  still holds — `dist/assets/LandingPage-*.js` **9.55 kB → 9.83 kB** and the shared entry
+  1,137.54 kB → 1,137.62 kB, i.e. the pass costs ~0.3 kB because `BlurFade`/`BorderBeam` already
+  ship in the entry chunk for the other pages, so only the call sites are new. The file contains
+  exactly one `<BorderBeam` element and four `<BlurFade delay=` elements (`grep -c`), which is the
+  shape this task specifies.
+
+  *Not verified — no browser tool was available this session, and F47 owns the matrix.* Stated
+  plainly so it is re-checked rather than assumed:
+  - **Nothing on `/` animates with OS reduced motion on** — reasoned, not observed. Both components
+    animate via `motion.*` under `main.tsx`'s `<MotionConfig reducedMotion="user">` (the route is
+    `React.lazy`-loaded inside `BrowserRouter`, which is inside that provider), and neither
+    portals out of the tree. That is the same inheritance every other animated page relies on, but
+    it has not been driven on this URL.
+  - **That exactly one continuous accent is visible at any scroll position** — the page contains
+    exactly one `BorderBeam` and no other looping accent, so "one visible" follows from "one
+    exists"; not confirmed by looking.
+  - **That 375px is still scroll-free.** The wrappers add no layout-affecting CSS (an unstyled
+    `motion.div`; `filter`/`transform` don't change layout boxes), so F44's measured
+    `scrollWidth 360 === clientWidth 360` should be untouched — should, not observed.
+  - **How the beam reads on the pipeline card in dark mode**, and how the cascade feels at real
+    speed. Both are judgement calls that need eyes on the page.
+
+- [x] **F46 — Update the conventions doc and its per-page inventory** (S)
   R14.5 and the PRD's Documentation NFR — the doc is updated in the **same change** as the code, not
   after. Two parts to `docs/decisions/magicui-conventions.md`:
   - **Conventions.** Its "Theming — never ship MagicUI's hardcoded defaults" section currently opens by
@@ -1534,7 +1624,73 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   every page using MagicUI, including the landing page; the theming section names the actual accent hue.
   Depends on: F45, F29
 
-- [ ] **F47 — V2.1 close-out verification across the whole matrix** (M)
+  **Follow-up (2026-09-09): `BorderBeam` duration is now 24s project-wide, replacing 8s.** F46's audit
+  of the inventory table surfaced that `login-form.tsx` had shipped `duration={26}` since the original
+  animation commit while every other call site passed 8; it was recorded as a deviation rather than
+  silently changed. Resolving it went through three steps, and the middle one is the informative part:
+  login was first aligned *down* to 8, which made the 8s pace obvious on a page you actually sit and
+  type into — the beam reads as active and attention-seeking there, not ambient. The user chose 24
+  (close to login's original 26), then extended it to every call site for uniformity.
+  Shipped: `login-form.tsx`, `signup-form.tsx`, `stat-tile.tsx` and `LandingPage.tsx` all pass
+  `duration={24}`; `docs/decisions/magicui-conventions.md` now documents 24 as *the* value in both its
+  timing section and all four affected inventory rows, with no per-page exception left standing.
+  Worth recording because it caused real confusion twice: `duration` is passed straight to Motion as
+  the time for **one full lap** of the border (`ease: "linear"`, `repeat: Infinity`), so **a higher
+  number is slower**. 8 was the fastest beam in the project, not the calmest.
+  No behaviour outside the beam changed; `tsc -b` and lint stayed clean.
+
+  **Done 2026-09-08.** `docs/decisions/magicui-conventions.md`, edited in the same change as F45's
+  code rather than after it.
+
+  *Theming section — the false claim is corrected and the hue is named.* The section now separates
+  what is still true from what isn't, against the real files:
+  - **Still true:** `frontend/components.json` does still set `baseColor: "neutral"`, and most of
+    the palette (`--background`, `--foreground`, `--card`, `--muted`, `--border`, `--input`,
+    `--secondary`, `--accent`, the `--sidebar-*` set apart from its primary/ring pair, and
+    `--chart-1`..`--chart-5`) is still zero-chroma in both `:root` and `.dark`.
+  - **No longer true:** the accent hue is named as shipped — **teal, `h = 195`** — with the values
+    re-read from `frontend/src/index.css` at write time rather than copied from the doc's own
+    older table: `--primary` `oklch(0.62 0.11 195)` / `oklch(0.75 0.11 195)`, `--ring`
+    `oklch(0.60 0.10 195)` / `oklch(0.66 0.10 195)`, `--sidebar-primary`/`--sidebar-ring` the
+    same, `--primary-foreground` near-black `oklch(0.145 0 0)` in both themes, and the status
+    palette in `--status-*` as literal hexes.
+  - **A third thing, found while checking:** the old sentence was already wrong before F27.
+    `--destructive` has always been red (`oklch(0.577 0.245 27.325)`), shipped with shadcn's
+    neutral base. Recorded, so "every existing color is grayscale" doesn't get re-derived from
+    scratch and re-believed.
+  - **F29's accent-hue decision record confirmed present** in the same file, immediately below:
+    "Palette decision record (F27/F28)" (why teal, the two values contrast measurement forced,
+    the contrast table) plus the "F29 live both-theme sweep" section and its independent
+    in-browser re-measurement. The theming section now points at both by name.
+  - One MagicUI-specific consequence added: the accent hue existing does **not** make it the right
+    color for an accent component. All four `BorderBeam` call sites pass
+    `var(--foreground)`/`var(--muted-foreground)`, never `var(--primary)` — a teal beam would
+    compete with the primary CTAs and the teal focus ring instead of reading as ambient.
+
+  *Every inventory row was checked against the code before being left alone.*
+
+  | Row | Checked | Outcome |
+  |---|---|---|
+  | Analytics | `AnalyticsPage.tsx`, `stat-tile.tsx` | **Revised for FV8.** The third `BlurFade` still wraps the same "Pipeline flow" `Card`, but F36 dropped its fixed `width={343}` (the Sankey now self-measures via `ResizeObserver`) and F38 added `interactive` (focusable per-node buttons + `ChartDataTable`). Both are still safe under an entrance wrapper, and the row now says why instead of leaving the reader to re-derive it. |
+  | Login | `login-form.tsx` | **Real discrepancy found.** The beam ships `duration={26}`, not the documented `8` — unchanged since the original animation commit, while Signup, `StatTile` and now the landing page all pass 8. Recorded in both the timing section and the row, and deliberately **not** silently "fixed": changing a shipped page's motion isn't F46's call to make in a doc pass. |
+  | Signup | `signup-form.tsx` | Accurate — `BlurFade delay={0}`, `BorderBeam` with token colors, `cn("relative", className)` on the card. (Its beam read `duration={8}` at audit time; changed to **24** on 2026-09-09 along with every other call site.) |
+  | Applications | `ApplicationsPage.tsx` | Accurate — one `BlurFade` around the header title/description only; toolbar and table still unwrapped. Unchanged. |
+  | Settings | `SettingsPage.tsx` | Accurate — one `BlurFade` around the form `Card`, no ticker, no beam. Unchanged. |
+  | Recap dialog | `recap-dialog.tsx`, `recap-skins/*` | Accurate and still correctly *empty*. The Embla carve-out is real and still in the code (`opts={prefersReducedMotion ? { duration: 0 } : undefined}`). Unchanged. |
+  | App shell | `AppLayout.tsx` | Accurate — one `BlurFade` around the whole `<header>`, no beam. Unchanged. |
+  | Landing | `LandingPage.tsx` | **Rewritten** from "None — deliberately, for now" to F45's actual shipment: four `BlurFade` groups with their delays, the single `BorderBeam` and why that element carried it, the two rejected alternatives, why there's no `NumberTicker`, that F35's rule still governs the `RecapCard` inside group 2, and the +0.28 kB bundle cost. |
+
+  *One extra staleness fixed while in the file.* F29's live sweep table labels routes as `/`,
+  `/analytics`, `/profile` — which FV9 moved (`/` is now the landing page; the app is under
+  `/app`). The observed results weren't rewritten (it's a record of what was seen at the time); a
+  footnote now maps the old labels onto today's routes.
+
+  *Nothing here was verified in a browser, and nothing needed to be.* Every claim added or kept is
+  a read of a real file (`index.css`, `components.json`, the eight component/route files above),
+  and the contrast numbers are carried forward from F29's live sweep unchanged rather than
+  re-measured — no browser was available this session.
+
+- [x] **F47 — V2.1 close-out verification across the whole matrix** (M)
   PRD_V2_1.md's Success metrics and Non-functional requirements, run once as a single checkable pass after
   everything else lands — the *dark mode doubles the verification surface* and *a UI overhaul silently
   undoes an accessibility audit* risks both come due at exactly this point.
@@ -1552,6 +1708,70 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   fixed or recorded here as a known limitation with a reason — the same standard as the F21 and F24
   verification notes above.
   Depends on: F33, F39, F45, F46
+
+  **Verification result (run in a real browser, 2026-09-09).** Every cell below was *observed*, not
+  reasoned about. Method notes matter for anyone re-running this, because two of them changed the result:
+
+  - **375px is a real 375px layout viewport**, via a same-origin iframe. `resize_window` reports success
+    but does not constrain the viewport in this environment, so measuring the top-level window would have
+    silently tested desktop twice.
+  - **Two harness corrections were needed before the contrast numbers meant anything.** `BlurFade` leaves a
+    permanent `filter: blur(0px)` on its wrapper, and `BorderBeam` renders a `pointer-events-none
+    absolute inset-0` overlay across its whole card (measured 384x354 on the auth card). axe refuses to
+    score text under either (`bgOverlap`), and *reports zero violations while having evaluated zero nodes* --
+    which reads exactly like a pass. First run of `/login` scored **0 nodes**; neutralising the no-op blur
+    and hiding the decorative beam took it to **10 nodes, 0 incomplete, 0 violations**. Both adjustments
+    are visually no-ops. Any future re-run must assert the evaluated-node count, not just the violation
+    count.
+
+  **Matrix -- 6 routes x 2 themes x 2 widths (24 cells): all pass.** No horizontal scrollbar in any cell
+  (`/` and `/app` report `scrollWidth 360 === clientWidth 360` at 375px, matching F44's figure), 0 axe
+  violations (wcag2a/2aa/21a/21aa), 0 contrast violations with 0 incomplete on every authenticated route.
+
+  **Matrix -- 4 dialogs x 2 themes x 2 widths (16 cells): all pass.** Each dialog was confirmed by title
+  (`Add application`, `Paste a job link`, `Generate recap`, `Mark as applied?`) rather than assumed --
+  an earlier run silently re-measured the first dialog four times because Escape did not close it, and
+  the identical titles were the only thing that exposed it. All fit the viewport; no document-level
+  horizontal scroll; 0 axe violations; 0 contrast violations.
+
+  **Chart/skin text axe cannot auto-score, measured by hand instead:** the 6 Sankey labels on `/`
+  (`bgOverlap` from ribbons passing beneath) measure **19.8:1 light / 17.18:1 dark**; Analytics' 13 SVG
+  labels clear AA at their worst (**4.74:1 light / 6.94:1 dark**); RecapDialog's 10-11 incomplete nodes are
+  all inside the Strava skin's translucent scrim panels and short numerals -- the same values F48 already
+  measured over light and dark backdrops. Nothing here is recorded as a pass on axe's silence alone.
+
+  **Global check 1 -- reduced motion: partially met, and the gap is inherited, not new.** With
+  `prefers-reduced-motion` forced true before app boot, **all 28 distinct intermediate transform values
+  disappear (28 -> 0)**: `main.tsx`'s `<MotionConfig reducedMotion="user">` is doing its job and no
+  movement occurs anywhere. The 0.4s opacity+blur fade still runs (11 mid-animation frames, versus 11 with
+  motion on). That is Motion's documented behaviour for `reducedMotion="user"` -- it suppresses transform
+  and layout animation, deliberately keeping opacity, which carries no vestibular risk. So the literal
+  wording of this task's criterion ("nothing animates anywhere") is not met, while its intent is. This is
+  R14.1 behaviour shared by every animated surface in the app since the first motion pass; F45 did not
+  introduce it. **Recorded as a known limitation, not fixed** -- changing it means overriding `BlurFade`
+  per-call-site against the conventions doc's fixed values, which is a conventions decision, not a
+  close-out fix.
+
+  **Global check 2 -- recap export: pass, all three skins.** Each exports a clean **1080x1920** PNG with a
+  fully transparent outer canvas (all four corner pixels alpha 0) and the Sankey rendered. F39's diff
+  re-run against the stored baselines: **strava 0.016%**, **duolingo 0.015%**, **beli 0.015%** differing
+  pixels (~330 px of text antialiasing on 2,073,600). One trap worth recording: the dialog opens on the
+  **Week** range, which is empty in the mock dataset ("0 Applications sent"), and diffing that against the
+  baseline yields a misleading **5.2%**. The baselines are **All-time** captures; match the range before
+  concluding anything from a diff. Exports were captured in-page and the disk write blocked, so no files
+  were added to the repo.
+
+  **Global check 3 -- every V2 audit fix still holds (verified live, not grepped):** `aria-sort` present on
+  all 5 sortable `<th>`s and cycling correctly (`none` -> `ascending` on click); the sortable-header naming
+  pattern intact; the staleness warning keeps `role="img"` + its visually-hidden duplicate; both Analytics
+  charts sit in wrappers carrying **`aria-hidden` and `inert`** with `sr-only` `ChartDataTable`s behind
+  them; route change moves focus to `main[tabindex="-1"]#main-content` and announces ("Analytics —
+  navigated"), with `aria-current="page"` on the active link; the skip link targets `#main-content`; and
+  `ApplicationsPage`'s live regions fire for real ("19 of 19 applications shown, sorted by Company
+  ascending."). `StatusSelect` also exposes `aria-label="Change status (currently Saved)"`.
+
+  **No unresolved failure.** One known limitation recorded above (reduced-motion opacity), one
+  documentation-worthy hazard for future runs (axe scoring silently defeated by `BlurFade`/`BorderBeam`).
 
 ## Milestone FV11: Pipeline board view, entry-flow/settings polish, and an analytics stat-tile nudge (R16)
 

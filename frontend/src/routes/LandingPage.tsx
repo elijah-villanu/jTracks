@@ -3,6 +3,8 @@ import { Link } from "react-router"
 import { RecapCard } from "@/components/dashboard/recap-card"
 import { SankeyChart } from "@/components/dashboard/sankey-chart"
 import { ThemeToggle } from "@/components/layout/theme-toggle"
+import { BlurFade } from "@/components/ui/blur-fade"
+import { BorderBeam } from "@/components/ui/border-beam"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { useDocumentMetadata } from "@/hooks/useDocumentMetadata"
@@ -12,6 +14,17 @@ import { DEMO_RECAP, DEMO_SANKEY } from "@/routes/landing/demo-data"
 const PAGE_TITLE = "jTracks — see where your job search stalls"
 const PAGE_DESCRIPTION =
   "jTracks is a job application tracker that keeps every application in one place, marks the ones that go quiet, and turns your search into a funnel you can read at a glance."
+
+/**
+ * F45: the entrance stagger between this page's four content groups (hero,
+ * product visual, feature trio, footer). Same value and same named-constant
+ * treatment as `AnalyticsPage.tsx`'s three groups -- the step is fixed
+ * project-wide in docs/decisions/magicui-conventions.md, not chosen per
+ * page, so group *N* gets `delay = 0.08 * N` here exactly as it does there.
+ * The last group therefore starts at 0.24s and the whole cascade has
+ * settled by ~0.68s.
+ */
+const ENTRANCE_STAGGER_SECONDS = 0.08
 
 /**
  * F43's feature trio. Every entry here is a claim about shipped V2
@@ -84,10 +97,30 @@ function Wordmark({ className }: { className?: string }) {
  *     link for a signed-in visitor: knowing which to show would mean
  *     reading `user`, and waiting on `isLoading` to know it.
  *
- * **No MagicUI or Motion here.** F43 says so explicitly -- landing-page
- * motion is F45 (milestone FV10), and adding entrance animation now would
- * pre-empt the conventions pass that owns the timing decisions. Plain
- * shadcn primitives and Tailwind only.
+ * **Motion is F45's, and it uses the project's existing numbers rather
+ * than page-specific ones** -- see docs/decisions/magicui-conventions.md,
+ * which is the tiebreaker here, not taste. Four `BlurFade` entrance groups
+ * (hero, product visual, feature trio, footer) at the component defaults
+ * that doc fixes (`duration 0.4s`, `easeOut`, `offset 6px`, `blur 6px`,
+ * `direction down` -- only `delay` is customized), staggered by
+ * `ENTRANCE_STAGGER_SECONDS` *between* groups and never within one, plus
+ * exactly one continuous accent for the entire page: a single 8s
+ * `BorderBeam` on the pipeline-flow card (R14.3). No `NumberTicker`
+ * anywhere -- this page has no KPI tile, only sample figures inside
+ * captions and inside `RecapCard`, and the doc scopes the ticker to
+ * numbers that *are* the content.
+ *
+ * **Reduced motion needs nothing local here** (R14.4). Every animated thing
+ * on this page is a Motion component under `main.tsx`'s
+ * `<MotionConfig reducedMotion="user">`; the route is lazy-loaded inside
+ * `BrowserRouter`, which is itself inside that provider, so `/` inherits it
+ * like every other route. No per-component `useReducedMotion` check, and
+ * nothing portals out of that tree.
+ *
+ * **F35's no-Motion-inside-the-recap rule still applies here.** The
+ * `BlurFade` around the product visual wraps `RecapCard` from the outside,
+ * which is permitted; nothing may be added *inside* the card or its skins,
+ * even on this page, where the instance is never exported.
  *
  * **Colors are tokens.** `frontend/src/index.css`'s variables, per
  * `.claude/rules/shadcn-ui.md`. The one fixed-literal palette on this page
@@ -190,45 +223,52 @@ export default function LandingPage() {
           Hero, following the Linear reference's restraint: one confident
           headline, one supporting line, and the product visual immediately
           underneath rather than a wall of copy before it.
+
+          Entrance group 1 of 4. Wrapped as a single group, not per
+          element: the eyebrow, headline, subhead and both CTAs arrive
+          together, because the conventions doc stages *groups* and
+          explicitly forbids staggering the items inside one.
         */}
-        <section aria-labelledby="hero-heading" className="py-16 sm:py-24">
-          {/*
-            `text-muted-foreground`, not `text-primary`, even though the
-            incident.io reference colours its equivalent line in the accent.
-            docs/decisions/magicui-conventions.md's F27/F29 record measures
-            `--primary` as body text at 3.44:1 in light mode -- under the
-            4.5:1 floor -- and explicitly says to flag it "before either
-            gets used." An accent-coloured eyebrow here would have been the
-            app's first live instance of exactly that. The accent still
-            carries the page via the primary CTAs (measured 5.75:1) and the
-            `aria-hidden` icons, which take the 3:1 non-text floor.
-          */}
-          <p className="text-sm font-medium tracking-wide text-muted-foreground uppercase">
-            Job application tracker
-          </p>
-          <h1
-            id="hero-heading"
-            className="mt-4 max-w-3xl text-4xl leading-[1.05] font-semibold tracking-tight text-balance sm:text-5xl lg:text-6xl"
-          >
-            Know exactly where your job search stalls.
-          </h1>
-          <p className="mt-5 max-w-2xl text-base text-pretty text-muted-foreground sm:text-lg">
-            jTracks keeps every application in one place, marks the ones that go quiet, and turns
-            the whole search into a funnel you can read at a glance.
-          </p>
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <Button className="h-11 px-6 text-base" render={<Link to="/signup" />}>
-              Create your account
-            </Button>
-            <Button
-              variant="outline"
-              className="h-11 px-6 text-base"
-              render={<Link to="/login" />}
+        <BlurFade delay={0}>
+          <section aria-labelledby="hero-heading" className="py-16 sm:py-24">
+            {/*
+              `text-muted-foreground`, not `text-primary`, even though the
+              incident.io reference colours its equivalent line in the accent.
+              docs/decisions/magicui-conventions.md's F27/F29 record measures
+              `--primary` as body text at 3.44:1 in light mode -- under the
+              4.5:1 floor -- and explicitly says to flag it "before either
+              gets used." An accent-coloured eyebrow here would have been the
+              app's first live instance of exactly that. The accent still
+              carries the page via the primary CTAs (measured 5.75:1) and the
+              `aria-hidden` icons, which take the 3:1 non-text floor.
+            */}
+            <p className="text-sm font-medium tracking-wide text-muted-foreground uppercase">
+              Job application tracker
+            </p>
+            <h1
+              id="hero-heading"
+              className="mt-4 max-w-3xl text-4xl leading-[1.05] font-semibold tracking-tight text-balance sm:text-5xl lg:text-6xl"
             >
-              Log in
-            </Button>
-          </div>
-        </section>
+              Know exactly where your job search stalls.
+            </h1>
+            <p className="mt-5 max-w-2xl text-base text-pretty text-muted-foreground sm:text-lg">
+              jTracks keeps every application in one place, marks the ones that go quiet, and turns
+              the whole search into a funnel you can read at a glance.
+            </p>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <Button className="h-11 px-6 text-base" render={<Link to="/signup" />}>
+                Create your account
+              </Button>
+              <Button
+                variant="outline"
+                className="h-11 px-6 text-base"
+                render={<Link to="/login" />}
+              >
+                Log in
+              </Button>
+            </div>
+          </section>
+        </BlurFade>
 
         {/*
           F42's product visual. Both panels are *live renders of the real
@@ -244,185 +284,236 @@ export default function LandingPage() {
           The framing follows the Mixpanel dashboard-embed pattern -- each
           visual sits in a titled card with a subtitle naming the data
           behind it, so nobody reads the sample numbers as a real user's.
+
+          Entrance group 2 of 4. `BlurFade` translates and blurs but never
+          scales, so the Sankey's ResizeObserver (F36) measures the same
+          content width during the entrance as after it -- the chart does
+          not re-lay-out as the animation settles.
         */}
-        <section aria-labelledby="visual-heading" className="border-t border-border py-16 sm:py-20">
-          <h2
-            id="visual-heading"
-            className="max-w-2xl text-2xl font-semibold tracking-tight text-balance sm:text-3xl"
-          >
-            One search, two views
-          </h2>
-          <p className="mt-3 max-w-2xl text-pretty text-muted-foreground">
-            The pipeline flow shows where applications actually end up. The recap turns any stretch
-            of that search into something you can post.
-          </p>
+        <BlurFade delay={ENTRANCE_STAGGER_SECONDS}>
+          <section aria-labelledby="visual-heading" className="border-t border-border py-16 sm:py-20">
+            <h2
+              id="visual-heading"
+              className="max-w-2xl text-2xl font-semibold tracking-tight text-balance sm:text-3xl"
+            >
+              One search, two views
+            </h2>
+            <p className="mt-3 max-w-2xl text-pretty text-muted-foreground">
+              The pipeline flow shows where applications actually end up. The recap turns any stretch
+              of that search into something you can post.
+            </p>
 
-          <div className="mt-8 grid gap-6 lg:grid-cols-12">
-            <Card className="lg:col-span-7">
-              <CardHeader>
-                <h3 className="font-medium">Pipeline flow</h3>
-                <p className="text-sm text-muted-foreground">
-                  Sample search · 128 applications, all time
-                </p>
-              </CardHeader>
-              <CardContent>
-                {/*
-                  Omitting `width` makes the chart measure this card's own
-                  width via ResizeObserver (F36), which is what keeps it
-                  legible from 375px up without a scaled viewBox.
-                  `interactive` (F38) is on so the visual behaves like the
-                  real dashboard rather than a picture of it; it also
-                  renders the `ChartDataTable` fallback, so the funnel is
-                  readable to a screen reader here exactly as it is in-app.
-                */}
-                <SankeyChart
-                  data={DEMO_SANKEY}
-                  height={isTwoColumnVisual ? 500 : 220}
-                  fontSize={10}
-                  className="w-full"
-                  interactive
+            <div className="mt-8 grid gap-6 lg:grid-cols-12">
+              {/*
+                R14.3's single continuous accent -- for the whole page, not
+                just this section. The conventions doc reserves `BorderBeam`
+                for "the single most important element" in a view; on `/` that
+                is the visual the headline's claim rests on ("know exactly
+                where your job search stalls"), which is also the wider of the
+                two columns and the first one read. The two alternatives were
+                rejected on the doc's own terms rather than on taste: the
+                recap card beside it would put two beams in one grid row,
+                which is precisely the failure the one-accent rule exists to
+                prevent, and the hero CTA is ruled out by the approved-
+                components table, which lists interactive elements under
+                `border-beam`'s "not for" column (it is a decorative overlay,
+                never a state indicator).
+
+                `relative` is required so the beam's `absolute inset-0`
+                overlay positions against this card instead of the page;
+                `Card`'s own `overflow-hidden` + `rounded-xl` then clip it to
+                the rounded border, the same combination `StatTile` already
+                relies on. `duration={24}` and the two token `var()` colors are
+                the documented values -- MagicUI's `#ffaa40`/`#9c40ff`
+                defaults are never shipped, and the installed component file
+                is not edited to achieve that.
+              */}
+              <Card className="relative lg:col-span-7">
+                <BorderBeam
+                  duration={24}
+                  colorFrom="var(--foreground)"
+                  colorTo="var(--muted-foreground)"
                 />
-              </CardContent>
-            </Card>
+                <CardHeader>
+                  <h3 className="font-medium">Pipeline flow</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Sample search · 128 applications, all time
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  {/*
+                    Omitting `width` makes the chart measure this card's own
+                    width via ResizeObserver (F36), which is what keeps it
+                    legible from 375px up without a scaled viewBox.
+                    `interactive` (F38) is on so the visual behaves like the
+                    real dashboard rather than a picture of it; it also
+                    renders the `ChartDataTable` fallback, so the funnel is
+                    readable to a screen reader here exactly as it is in-app.
+                  */}
+                  <SankeyChart
+                    data={DEMO_SANKEY}
+                    height={isTwoColumnVisual ? 500 : 220}
+                    fontSize={10}
+                    className="w-full"
+                    interactive
+                  />
+                </CardContent>
+              </Card>
 
-            <Card className="lg:col-span-5">
-              <CardHeader>
-                <h3 className="font-medium">Shareable recap</h3>
-                <p className="text-sm text-muted-foreground">
-                  Sample month · exported at 1080×1920
-                </p>
-              </CardHeader>
-              <CardContent>
-                {/*
-                  Skin choice is deliberate. `RecapCard` is theme-
-                  independent by contract (F28) and must stay that way --
-                  making it follow `.dark` is explicitly not allowed -- so
-                  the risk here is the opposite one: a fixed-palette card
-                  looking stranded on a themed landing section.
+              <Card className="lg:col-span-5">
+                <CardHeader>
+                  <h3 className="font-medium">Shareable recap</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Sample month · exported at 1080×1920
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  {/*
+                    Skin choice is deliberate. `RecapCard` is theme-
+                    independent by contract (F28) and must stay that way --
+                    making it follow `.dark` is explicitly not allowed -- so
+                    the risk here is the opposite one: a fixed-palette card
+                    looking stranded on a themed landing section.
 
-                  "beli" is the honest pick of the three. It is opaque, so
-                  it composites onto nothing: the Strava skin is
-                  *transparent* by design (F48 scoped transparency to it
-                  alone) and would take on whatever surface sits behind it,
-                  which on a light landing section means a card with no
-                  card. Duolingo is opaque too, but it's painted in the
-                  app's own teal accent (F27) and would read as more page
-                  chrome rather than as an artefact the product made. The
-                  Beli card's warm paper palette belongs to neither theme,
-                  which is exactly what an exported image is.
+                    "beli" is the honest pick of the three. It is opaque, so
+                    it composites onto nothing: the Strava skin is
+                    *transparent* by design (F48 scoped transparency to it
+                    alone) and would take on whatever surface sits behind it,
+                    which on a light landing section means a card with no
+                    card. Duolingo is opaque too, but it's painted in the
+                    app's own teal accent (F27) and would read as more page
+                    chrome rather than as an artefact the product made. The
+                    Beli card's warm paper palette belongs to neither theme,
+                    which is exactly what an exported image is.
 
-                  The inset panel below is the framing treatment F42
-                  permits, taken from the Polarsteps reference (a portrait
-                  card sitting on a plain sheet, actions outside it): a
-                  bordered `bg-muted` surface gives the card a defined edge
-                  in light mode, where cream-on-white would otherwise float,
-                  and a dark backdrop in dark mode.
-                */}
-                {/*
-                  `px-2` at the narrow end is not cosmetic: the card is a
-                  fixed 270px (the export contract's width, not a
-                  suggestion), and at a 375px viewport the surrounding
-                  chrome -- `main`'s `px-4`, the card content's `px-4` and
-                  this panel's own padding -- is what decides whether it
-                  fits. At `px-2` the card has ~291px to sit in; at `px-4`
-                  it would have ~279px and no margin for error.
-                */}
-                <div className="flex justify-center rounded-lg border border-border bg-muted px-2 py-4 sm:px-3 sm:py-5">
-                  <RecapCard recap={DEMO_RECAP} skin="beli" />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </section>
+                    The inset panel below is the framing treatment F42
+                    permits, taken from the Polarsteps reference (a portrait
+                    card sitting on a plain sheet, actions outside it): a
+                    bordered `bg-muted` surface gives the card a defined edge
+                    in light mode, where cream-on-white would otherwise float,
+                    and a dark backdrop in dark mode.
+                  */}
+                  {/*
+                    `px-2` at the narrow end is not cosmetic: the card is a
+                    fixed 270px (the export contract's width, not a
+                    suggestion), and at a 375px viewport the surrounding
+                    chrome -- `main`'s `px-4`, the card content's `px-4` and
+                    this panel's own padding -- is what decides whether it
+                    fits. At `px-2` the card has ~291px to sit in; at `px-4`
+                    it would have ~279px and no margin for error.
+                  */}
+                  <div className="flex justify-center rounded-lg border border-border bg-muted px-2 py-4 sm:px-3 sm:py-5">
+                    <RecapCard recap={DEMO_RECAP} skin="beli" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </section>
+        </BlurFade>
 
         {/*
           Feature trio, following the incident.io reference: a bordered
           icon tile, a short bold heading, a few lines of muted body, and a
           single accent colour used sparingly. Three columns at `md`,
           stacked below it.
-        */}
-        <section aria-labelledby="features-heading" className="border-t border-border py-16 sm:py-20">
-          <h2
-            id="features-heading"
-            className="max-w-2xl text-2xl font-semibold tracking-tight text-balance sm:text-3xl"
-          >
-            Three things jTracks does for you
-          </h2>
 
-          <div className="mt-10 grid gap-8 md:grid-cols-3 md:gap-6">
-            {FEATURES.map((feature) => {
-              const Icon = feature.icon
-              return (
-                <div key={feature.title}>
-                  <span className="flex size-10 items-center justify-center rounded-lg border border-border bg-card">
-                    <Icon className="size-5 text-primary" aria-hidden="true" />
-                  </span>
-                  <h3 className="mt-4 font-medium text-balance">{feature.title}</h3>
-                  <p className="mt-2 text-sm text-pretty text-muted-foreground">{feature.body}</p>
-                </div>
-              )
-            })}
-          </div>
-        </section>
+          Entrance group 3 of 4 -- the trio enters as one group. Fading the
+          three cards in one after another is the per-item staggering the
+          conventions doc rules out.
+        */}
+        <BlurFade delay={ENTRANCE_STAGGER_SECONDS * 2}>
+          <section aria-labelledby="features-heading" className="border-t border-border py-16 sm:py-20">
+            <h2
+              id="features-heading"
+              className="max-w-2xl text-2xl font-semibold tracking-tight text-balance sm:text-3xl"
+            >
+              Three things jTracks does for you
+            </h2>
+
+            <div className="mt-10 grid gap-8 md:grid-cols-3 md:gap-6">
+              {FEATURES.map((feature) => {
+                const Icon = feature.icon
+                return (
+                  <div key={feature.title}>
+                    <span className="flex size-10 items-center justify-center rounded-lg border border-border bg-card">
+                      <Icon className="size-5 text-primary" aria-hidden="true" />
+                    </span>
+                    <h3 className="mt-4 font-medium text-balance">{feature.title}</h3>
+                    <p className="mt-2 text-sm text-pretty text-muted-foreground">{feature.body}</p>
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        </BlurFade>
       </main>
 
       {/*
         Footer, following the Visitors reference: a short blurb column on
         the left, one narrow link column, and plain small legal text --
         no link farm.
+
+        Entrance group 4 of 4. The `<footer>` landmark stays intact inside
+        the wrapper -- `BlurFade` renders a plain `motion.div`, so this
+        adds an unstyled div to the tree, not a competing role. The root
+        is a `min-h-screen` flex column with `flex-1` on `<main>`, so the
+        extra auto-height flex item leaves the sticky-footer layout as it
+        was.
       */}
-      <footer className="border-t border-border">
-        <div className="mx-auto grid w-full max-w-6xl gap-8 px-4 py-10 sm:grid-cols-2">
-          <div>
-            {/*
-              F40 noted the logo-lockup-as-link decision was F43's to make.
-              This one is a link and it points at `/app`, not `/` -- from
-              the bottom of the landing page the useful destination is the
-              product, and `/app` is the one URL that does the right thing
-              either way: straight in for a signed-in visitor,
-              `ProtectedRoute` -> `/login` -> back to `/app` for everyone
-              else. The header lockup stays unlinked because it would only
-              point at the page you're already on.
-            */}
-            <Link
-              to="/app"
-              className="inline-flex rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-            >
-              <Wordmark />
-            </Link>
-            <p className="mt-3 max-w-xs text-sm text-muted-foreground">
-              A job application tracker that keeps score of your search, so you can tell what's
-              working from what isn't.
+      <BlurFade delay={ENTRANCE_STAGGER_SECONDS * 3}>
+        <footer className="border-t border-border">
+          <div className="mx-auto grid w-full max-w-6xl gap-8 px-4 py-10 sm:grid-cols-2">
+            <div>
+              {/*
+                F40 noted the logo-lockup-as-link decision was F43's to make.
+                This one is a link and it points at `/app`, not `/` -- from
+                the bottom of the landing page the useful destination is the
+                product, and `/app` is the one URL that does the right thing
+                either way: straight in for a signed-in visitor,
+                `ProtectedRoute` -> `/login` -> back to `/app` for everyone
+                else. The header lockup stays unlinked because it would only
+                point at the page you're already on.
+              */}
+              <Link
+                to="/app"
+                className="inline-flex rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+              >
+                <Wordmark />
+              </Link>
+              <p className="mt-3 max-w-xs text-sm text-muted-foreground">
+                A job application tracker that keeps score of your search, so you can tell what's
+                working from what isn't.
+              </p>
+            </div>
+
+            <nav aria-label="Footer" className="sm:justify-self-end">
+              <h2 className="text-sm font-medium">Product</h2>
+              <ul className="mt-3 space-y-2 text-sm">
+                <li>
+                  <Link to="/app" className="text-muted-foreground hover:text-foreground">
+                    Open the app
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/login" className="text-muted-foreground hover:text-foreground">
+                    Log in
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/signup" className="text-muted-foreground hover:text-foreground">
+                    Create an account
+                  </Link>
+                </li>
+              </ul>
+            </nav>
+
+            <p className="text-xs text-muted-foreground sm:col-span-2">
+              © 2026 jTracks. A personal project — not affiliated with any employer or job board.
+              Built with React, Tailwind CSS and shadcn/ui.
             </p>
           </div>
-
-          <nav aria-label="Footer" className="sm:justify-self-end">
-            <h2 className="text-sm font-medium">Product</h2>
-            <ul className="mt-3 space-y-2 text-sm">
-              <li>
-                <Link to="/app" className="text-muted-foreground hover:text-foreground">
-                  Open the app
-                </Link>
-              </li>
-              <li>
-                <Link to="/login" className="text-muted-foreground hover:text-foreground">
-                  Log in
-                </Link>
-              </li>
-              <li>
-                <Link to="/signup" className="text-muted-foreground hover:text-foreground">
-                  Create an account
-                </Link>
-              </li>
-            </ul>
-          </nav>
-
-          <p className="text-xs text-muted-foreground sm:col-span-2">
-            © 2026 jTracks. A personal project — not affiliated with any employer or job board.
-            Built with React, Tailwind CSS and shadcn/ui.
-          </p>
-        </div>
-      </footer>
+        </footer>
+      </BlurFade>
     </div>
   )
 }

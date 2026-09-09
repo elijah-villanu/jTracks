@@ -48,7 +48,7 @@ export function StatTile({ label, value, numericValue, suffix, decimalPlaces, ac
 
   return (
     <Card className={accent ? "relative" : undefined}>
-      {accent && <BorderBeam duration={8} colorFrom="var(--foreground)" colorTo="var(--muted-foreground)" />}
+      {accent && <BorderBeam duration={24} colorFrom="var(--foreground)" colorTo="var(--muted-foreground)" />}
       <CardContent>
         <dl className="flex flex-col gap-1">
           <dt className="text-sm text-muted-foreground">{label}</dt>
