@@ -1,5 +1,6 @@
 import { forwardRef } from "react"
 import { MessageSquare, Percent } from "lucide-react"
+import journeyJobLogoOnDark from "@/assets/JourneyJobLogoDark.png"
 import {
   RECAP_CARD_STYLE,
   RECAP_LITERAL_COLORS,
@@ -120,7 +121,7 @@ export const DuolingoSkin = forwardRef<HTMLDivElement, RecapSkinProps>(function 
 
       <RecapFooter
         recap={recap}
-        color={RECAP_LITERAL_COLORS.duolingoOnDark}
+        logoSrc={journeyJobLogoOnDark}
         mutedColor={RECAP_LITERAL_COLORS.duolingoOnDarkMuted}
         className="border-t pt-2.5"
         style={{ borderColor: RECAP_LITERAL_COLORS.duolingoHairline }}

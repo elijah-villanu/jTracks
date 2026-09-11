@@ -35,12 +35,14 @@ const EXPORT_PIXEL_RATIO = 4
 
 /**
  * F60/R17.4: every font face the three recap skins actually render inside
- * the `html-to-image`-captured subtree (recap-skins/shared.tsx's
- * `RecapFooter` wordmark at Display 400, and the skins' own text at every
+ * the `html-to-image`-captured subtree (the Beli skin's headline at
+ * Display 400 -- `beli-skin.tsx` -- and the skins' own text at every
  * Roboto weight in use -- 400 for unstyled body text like the footer's
  * date range, 500/600/700 for labels and stat figures). Kept as an
  * explicit list rather than inferred from the DOM, since `document.fonts`
- * has no "faces this subtree needs" query.
+ * has no "faces this subtree needs" query. The footer's own mark used to
+ * be a Display-font wordmark too; it's the real logo PNG now (see
+ * `ensureRecapImagesLoaded`), so it no longer contributes to this list.
  */
 const REQUIRED_RECAP_FONTS = [
   '400 1rem "Hedvig Letters Sans"',
@@ -271,12 +273,37 @@ export function RecapDialog({ open, onOpenChange }: RecapDialogProps) {
     }
   }
 
+  /**
+   * Same trap as `ensureRecapFontsLoaded`, for the footer's JourneyJob logo
+   * `<img>` (added when the footer switched from a `currentColor` icon+text
+   * mark to the real PNG). `toBlob` clones the DOM synchronously; an
+   * `<img>` whose bytes haven't decoded yet serializes as a blank box, no
+   * error, no on-screen sign. `decode()` (not `complete`/`onload`) is used
+   * because it resolves only once the image can actually be painted, and
+   * calling it on an `<img>` that hasn't started fetching yet still
+   * triggers the fetch and waits for it -- unlike checking `.complete`,
+   * which would just read `false` and move on.
+   */
+  async function ensureRecapImagesLoaded(card: HTMLElement): Promise<void> {
+    try {
+      const images = Array.from(card.querySelectorAll("img"))
+      await Promise.all(images.map((img) => img.decode()))
+    } catch (err) {
+      setExportError(
+        err instanceof Error
+          ? `Recap logo may not have finished loading (${err.message}); exporting anyway.`
+          : "Recap logo may not have finished loading; exporting anyway."
+      )
+    }
+  }
+
   async function exportCardToBlob(): Promise<Blob> {
     const card = cardRefs.current[skinId]
     if (!card) {
       throw new Error("Recap card isn't ready yet.")
     }
     await ensureRecapFontsLoaded()
+    await ensureRecapImagesLoaded(card)
     // `backgroundColor` is intentionally omitted: html-to-image only
     // fills the exported canvas's background when it's explicitly set,
     // so leaving it out keeps the *outer* PNG canvas transparent. What
@@ -292,7 +319,7 @@ export function RecapDialog({ open, onOpenChange }: RecapDialogProps) {
   }
 
   /** Skin-qualified so exporting several designs doesn't overwrite one file. */
-  const exportFileName = `jtracks-recap-${range}-${skinId}.png`
+  const exportFileName = `journeyjob-recap-${range}-${skinId}.png`
 
   async function handleDownload() {
     setExportError(null)
@@ -334,8 +361,8 @@ export function RecapDialog({ open, onOpenChange }: RecapDialogProps) {
 
       await navigator.share({
         files: [file],
-        title: "jTracks recap",
-        text: recap?.headline ?? "My jTracks recap",
+        title: "JourneyJob recap",
+        text: recap?.headline ?? "My JourneyJob recap",
       })
     } catch (err) {
       // The user dismissing the native share sheet throws an
@@ -537,7 +564,7 @@ export function RecapDialog({ open, onOpenChange }: RecapDialogProps) {
               disabled={!recap || isExporting}
               className="group h-auto flex-col gap-1.5 rounded-xl px-3 py-2 text-[11px] font-medium"
             >
-              <span className="flex size-11 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors group-hover:bg-primary/90">
+              <span className="flex size-11 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors group-hover:bg-[color-mix(in_oklch,var(--primary),black_15%)]">
                 <Share2 className="size-5" />
               </span>
               Share

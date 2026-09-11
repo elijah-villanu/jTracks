@@ -1,5 +1,4 @@
 import type { CSSProperties, ReactNode } from "react"
-import { Briefcase } from "lucide-react"
 import type { DashboardRecap, RecapHighlight } from "@/types/api"
 
 /**
@@ -112,34 +111,40 @@ export function featuredStats(highlights: RecapHighlight[]): RecapHighlight[] {
 
 interface RecapFooterProps {
   recap: DashboardRecap
-  /** Ink color for the wordmark; the date range renders in `mutedColor`. */
-  color: string
+  /**
+   * The real JourneyJob logo PNG, ink-matched to this skin's own fixed
+   * background -- `JourneyJobLogoLight.png` (navy ink) for the one light
+   * skin, `JourneyJobLogoDark.png` (white ink) for the two dark ones.
+   * Passed in, not chosen here, for the same reason `color`/`mutedColor`
+   * used to be: the *layout* is shared, not the palette.
+   */
+  logoSrc: string
   mutedColor: string
   className?: string
   style?: CSSProperties
 }
 
 /**
- * The logo lockup + period date range every skin closes with, matching
- * `AppLayout`'s own `Briefcase` + "jTracks" mark.
+ * The logo lockup + period date range every skin closes with. Renders the
+ * actual JourneyJob logo PNG (the same asset the navbar uses), not a
+ * recreated icon+text mark -- html-to-image's export gate
+ * (`recap-dialog.tsx`'s `ensureRecapImagesLoaded`) awaits its `decode()`
+ * before capture, the same way `ensureRecapFontsLoaded` gates the fonts.
  *
  * F49 asks for exactly this to be shared rather than reimplemented per
  * skin, so the three designs can't drift on the one piece that carries
- * the app's identity. Colors are passed in because the skins sit on very
- * different backgrounds (two dark, one light) -- the *layout* is what's
- * shared, not the palette.
+ * the app's identity. `logoSrc`/`mutedColor` are passed in because the
+ * skins sit on very different backgrounds (two dark, one light) -- the
+ * *layout* is what's shared, not the palette.
  */
-export function RecapFooter({ recap, color, mutedColor, className, style }: RecapFooterProps) {
+export function RecapFooter({ recap, logoSrc, mutedColor, className, style }: RecapFooterProps) {
   return (
     <div
       className={`flex items-center justify-between text-[9px] ${className ?? ""}`}
       style={{ color: mutedColor, ...style }}
     >
-      {/* F57/R17.1: Display role, weight 400 only. Sits inside the html-to-image export subtree (F60 verifies it in the PNG, not on screen). */}
-      <span className="flex items-center gap-1 font-display font-normal" style={{ color }}>
-        <Briefcase className="size-3" aria-hidden="true" />
-        jTracks
-      </span>
+      {/* Sits inside the html-to-image export subtree (F60/`ensureRecapImagesLoaded` verify it in the PNG, not on screen). */}
+      <img src={logoSrc} alt="JourneyJob" className="h-4 w-auto" />
       <span>
         {recap.period_start} – {recap.period_end}
       </span>

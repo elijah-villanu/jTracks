@@ -418,6 +418,67 @@ The controls are native `<button type="button">` elements with `tabIndex 0` and 
 they carry native keyboard activation by construction, and a real click was confirmed to drive the
 full state change.
 
+## Accent recolor (2026-09-10) — teal → blue, supersedes F27's hue choice
+
+User request: replace the F27 teal accent with an exact brand blue, `#0F57FE`. This section
+records the new decision on top of the F27/F28 record above rather than rewriting it — same
+convention F46 already established for this file ("noted... rather than rewritten, since the
+table is a record of what was observed at the time").
+
+**New values** (`frontend/src/index.css`):
+
+| Token | `:root` | `.dark` |
+|---|---|---|
+| `--primary` / `--sidebar-primary` | `#0F57FE` (exact, as given) | `oklch(0.707 0.165 254.624)` (Tailwind blue-400) |
+| `--primary-foreground` / `--sidebar-primary-foreground` | `oklch(0.985 0 0)` (near-white) | `oklch(0.145 0 0)` (near-black, unchanged from F27) |
+| `--ring` / `--sidebar-ring` | `#0F57FE` (same as primary) | `oklch(0.623 0.214 259.815)` (Tailwind blue-500) |
+
+`#0F57FE` converts to `oklch(0.537 0.255 263.2)` — close to Tailwind's own blue-600
+(`oklch(0.546 0.245 262.881)`), which is why the dark-mode values below reuse Tailwind's
+blue-400/blue-500 rather than a freehand lightened guess: same hue family, and Tailwind's own
+scale is already gamut-safe and has an established lightness/chroma curve for exactly this
+"lighten a saturated blue for dark surfaces" problem.
+
+**Why `--primary-foreground` flipped to near-white, unlike F27's near-black call:** F27's teal
+was light enough (`L=0.62`) that near-black text read best. This blue is much darker/more
+saturated (`L=0.537`) — near-black text on it only clears **3.60:1**, under the 4.5:1 text floor.
+Near-white clears **5.50:1**. Dark mode's lighter blue-400 (`L=0.707`) flips the math back:
+near-black text clears **7.79:1**, near-white would only clear **2.44:1** — so dark keeps F27's
+near-black choice.
+
+**A regression this flip would have introduced, and the fix.** The `default` Button/Badge
+variants and the recap dialog's share-button avatar all lightened `--primary` toward whatever's
+behind them on hover (`hover:bg-primary/80`, `/90`) — fine with near-black text (dark text stays
+legible as the background lightens), but with white text this *drops* contrast as the background
+gets paler. Measured: light-mode hover was **3.75:1** with white text — under 4.5:1, a real
+regression, not a hypothetical one. Fixed by changing the hover mechanism itself, in all three
+call sites (`button.tsx`, `badge.tsx`, `recap-dialog.tsx`'s share button), from opacity-toward-
+backdrop to a fixed darken: `hover:bg-[color-mix(in_oklch,var(--primary),black_15%)]` — mirrors
+the `secondary` variant's existing `color-mix` hover pattern, just mixing toward literal `black`
+instead of `var(--foreground)` (which would *lighten* in dark mode, since `--foreground` is
+near-white there). Re-measured with the fix: **6.74:1** light / **5.73:1** dark. `--ring` needed
+no equivalent fix — `:root`'s `--ring` is just `--primary` itself (already 5.50:1 against
+white/card, unlike F27's teal which started under the 3:1 floor and needed its own tuned value).
+
+**Known conflicts, flagged but not resolved here** (both are decisions about *other* features'
+colors, not the accent token itself, so left for the user to decide rather than changed
+unilaterally):
+
+- **`--status-applied` (`#3b82f6`) now nearly matches the new accent hue.** F27's whole
+  hue-picking rationale (`h=195` "the one major hue the status palette doesn't already occupy")
+  is defeated by this change — blue was `applied`'s hue precisely so it would never collide with
+  primary, and now it does. "Applied" chips/chart segments will read close to primary CTAs.
+  Not fixed here since it means recoloring a status, not the accent. See the F28 status table
+  above for the current `--status-*` values if this gets revisited.
+- **The Duolingo recap skin's hardcoded gradient** (`recap-skins/shared.tsx`'s
+  `duolingoBackground: "linear-gradient(160deg, #0b4f57 0%, #072f35 100%)"`) was deliberately
+  painted in "the app's own teal accent family (F27) instead of Duolingo's blue" (see that file's
+  and `duolingo-skin.tsx`'s doc comments) specifically so the skin wouldn't look like a copy of
+  Duolingo's actual brand blue. With the app's own accent now blue, that rationale is inverted —
+  left untouched (it's a fixed, hand-authored export palette, not a live token reader), but the
+  "echoes the app's accent, not Duolingo's" comment is now stale and the visual distinction from
+  real Duolingo blue is weaker than intended.
+
 ## Install workflow (reminder)
 
 Same as `.claude/rules/magicui-ui.md`: discover via `searchRegistryItems`/`listRegistryItems`,

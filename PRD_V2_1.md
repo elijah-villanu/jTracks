@@ -478,7 +478,7 @@ Confirmed role mapping:
 |---|---|---|---|
 | Hero H1 | `LandingPage.tsx` | Display (Hedvig Letters Sans) | 400 |
 | Section H2 | `LandingPage.tsx` | Display (Hedvig Letters Sans) | 400 |
-| Logo wordmark ("jTracks") | `AppLayout.tsx`, footers, recap cards | Display (Hedvig Letters Sans) | 400 |
+| Logo wordmark | `AppLayout.tsx`, footers, recap cards | N/A (see note) | N/A (see note) |
 | Stat-tile numbers (`NumberTicker`) | `stat-tile.tsx` | Text (Roboto) | 700 |
 | Recap hero stats | `strava-skin.tsx`, `duolingo-skin.tsx`, and the Beli skin once it lands | Text (Roboto) | 700 |
 | App page H1 (Applications/Analytics/Settings/Login/Signup) | route headers | Text (Roboto) | 600 |
@@ -486,6 +486,12 @@ Confirmed role mapping:
 | Body copy | paragraphs, subheads | Text (Roboto) | 400 |
 | UI chrome (buttons, table, form labels, badges) | app-wide, shadcn defaults | Text (Roboto) | 400–500 |
 | Meta/caption | table caption, timestamps | Text (Roboto) | 400 |
+
+*Logo wordmark row superseded by **R18**.* When this table was written the wordmark was Display
+(Hedvig Letters Sans) 400 text next to a `Briefcase` icon. R18 replaced it app-wide with the real
+JourneyJob logo PNG (`components/layout/logo.tsx`), including the recap card footer — which now
+uses the actual logo image (ink-matched per skin background) rather than a font-rendered mark at
+all, so it has no font role left to track here.
 
 **R17.2 — Weights to source. Resolved.** Display: **Hedvig Letters Sans, weight 400 only** (its
 sole available weight; 400 italic also exists but is not used anywhere in the mapping above). Text:
@@ -534,6 +540,76 @@ non-regression NFR.
 
 ---
 
+### R18 — Product rename: jTracks → JourneyJob (must-have)
+
+The product is renamed from **jTracks** to **JourneyJob**, with a new user-supplied logo
+(`frontend/src/assets/JourneyJobLogoLight.png` for light mode, `JourneyJobLogoDark.png` for dark
+mode — same wordmark, ink color swapped per theme). Scope is **the rendered frontend only**:
+every user-visible string and the navbar mark. Documentation (this PRD's own prose elsewhere,
+`FRONTEND_TASKS.md`, `docs/decisions/*.md`, code comments) is **not** being swept for the old
+name — those still say "jTracks" in places and that's expected, not a bug to fix later.
+
+**Also explicitly out of scope, by the same reasoning:** internal, non-rendered identifiers —
+`localStorage` keys (`jtracks_theme`, `jtracks_view_mode`, `jtracks_recap_skin`), the mock
+`jtracks_refresh` cookie name, and the seeded demo account's email domain
+(`demo@jtracks.dev`). None of these are a name *reference* a user reads; renaming them risks
+breaking already-documented dev credentials and persisted preferences for no visible benefit.
+
+**Where the name changed:**
+- Browser tab title + meta description (`frontend/index.html`).
+- Landing page title/description, hero copy, feature-trio heading, footer copyright
+  (`LandingPage.tsx`).
+- The shared `Wordmark`/header lockup on both the landing page and the authenticated app shell —
+  see the logo requirement below, which replaces this text entirely with the new logo image.
+- Recap dialog's native-share `title`/`text` and the downloaded export filename
+  (`journeyjob-recap-<range>-<skin>.png`, was `jtracks-recap-...`) (`recap-dialog.tsx`).
+- The recap card footer's own logo lockup (`recap-skins/shared.tsx`) — see below, updated
+  2026-09-11 to use the real logo image rather than a text mark.
+
+**Logo placement:**
+- **App shell navbar** (`AppLayout.tsx`): replaces the old `Briefcase` icon + "jTracks" text, in
+  both the desktop header and the mobile `Sheet`'s header, with the new `Logo` component
+  (`components/layout/logo.tsx`) — two `<img>`s (light/dark PNG) toggled via `dark:hidden` /
+  `hidden dark:block`, the same theme-resolution mechanism every other themed value in this app
+  already uses, so no JS theme read was needed.
+- **Landing page header/footer** (`LandingPage.tsx`): the existing shared `Wordmark` component now
+  wraps `Logo` instead of `Briefcase` + text — both its call sites (header, footer) get the new
+  mark automatically.
+- **Login/signup pages** (`LoginPage.tsx`/`SignupPage.tsx`): these routes have no navbar at all
+  today, so the logo is placed as an absolutely-positioned mark in the page's top-left corner —
+  "where it sits when there is a navbar" — rather than inside the auth card itself.
+
+**Correction (2026-09-11): recap card footer now uses the real logo too, and every placement got
+bigger.** The user flagged two things after the initial rollout: the recap footer still used the
+old `Briefcase`-icon-plus-text mark (never switched to the PNG), and the logo read too small
+everywhere it appeared.
+
+- **Recap card footer** (`recap-skins/shared.tsx`'s `RecapFooter`): now renders the actual logo
+  PNG via an `<img>`, matching the navbar. The theme-swap mechanism the navbar uses (`dark:hidden`)
+  doesn't apply here — recap cards are exported with a fixed palette independent of the app's
+  light/dark setting (R12.5) — so instead each skin passes whichever logo variant matches *its own*
+  fixed background: `JourneyJobLogoDark.png` (white ink) for the two dark skins (Strava, Duolingo),
+  `JourneyJobLogoLight.png` (navy ink) for the light one (Beli). `RecapFooter`'s `color` prop was
+  replaced with `logoSrc` for this. Since this is the first raster image inside the
+  `html-to-image`-captured subtree, `recap-dialog.tsx` gained `ensureRecapImagesLoaded` — an
+  `img.decode()`-based gate alongside the existing `ensureRecapFontsLoaded`, for the same reason:
+  `toBlob` clones the DOM synchronously, and an undecoded image would silently export as a blank
+  box. Verified live: a real Download completed cleanly across all three skins with the new mark
+  legible in each (announced "Recap image downloaded as journeyjob-recap-week-beli.png.", no
+  export error).
+- **Source PNGs trimmed.** The originally-supplied files had ~72% dead vertical space around the
+  wordmark (measured: visible ink occupied only 233px of 821px height) — every height-constrained
+  usage was scaling a box that was mostly transparent padding, which is why the logo read as too
+  small even before any deliberate resizing. Trimmed to a tight bounding box (aspect ratio changed
+  from 2.33:1 to ~5.2:1); the untrimmed originals are kept alongside as
+  `JourneyJobLogoLight-original.png` / `JourneyJobLogoDark-original.png` in case they're needed,
+  but nothing in the app imports them.
+- **Every placement sized up**, on top of the trim: navbar desktop header `h-7`→`h-9` (now matches
+  the header's own `Button size="lg"` height), navbar mobile Sheet `h-6`→`h-7`, login/signup
+  top-left mark `h-7`→`h-9`, landing page header/footer `h-6`→`h-8`, recap footer `h-3.5`→`h-4`.
+
+---
+
 ## Already implemented in this iteration
 
 Recorded per this project's convention of logging implementation-driven work back into the PRD
@@ -559,10 +635,14 @@ the next session doesn't re-plan it. Descriptions are taken from the current wor
 | Sankey geometry revision | `sankey-chart.tsx` | `nodeWidth(10)`, `nodePadding(12)`, and `UNWEIGHTED_STROKE_WIDTH = 5` for the recap's `weighted={false}` mode — landed after R9, not previously documented in any PRD |
 | Mobbin MCP server + permissions | `.mcp.json` (`mobbin`), `.claude/settings.local.json` | Installed — remote HTTP server (`https://api.mobbin.com/mcp`); its 3 tools (`search_screens`/`search_flows`/`search_sections`) allow-listed in `permissions.allow` |
 | Mobbin usage rule + design pipeline | `.claude/rules/mobbin-ui.md` (new); `.claude/rules/shadcn-ui.md`'s "Design Pipeline"/"Visual Liberty" sections; `.claude/rules/magicui-ui.md`'s pipeline note | Written — Mobbin (reference) → shadcn (structure) → MagicUI (accents), auto-loaded |
+| Accent recolor: teal → `#0F57FE` blue | `frontend/src/index.css`, `docs/decisions/magicui-conventions.md` | Done — `--primary`/`--ring`/`--sidebar-*` re-tuned per-theme with re-measured contrast; hover states on `Button`/`Badge`/recap share button fixed from opacity-based to `color-mix` darkening (opacity-toward-background broke with the new white-on-primary text pairing) |
+| Product rename: jTracks → JourneyJob + new logo | `frontend/index.html`, `LandingPage.tsx`, `AppLayout.tsx`, `LoginPage.tsx`, `SignupPage.tsx`, `recap-dialog.tsx`, `recap-skins/shared.tsx`, `components/layout/logo.tsx` (new) | Done — see **R18** above for full scope/rationale |
 
 **Not yet done, despite adjacent work existing:** everything in R10–R13, R11's theme provider,
-R14.2/R14.6's new-surface motion, R16, and **R17 (typeface overhaul, new)**. **R15 is now done** —
-see above and R15's own text.
+R14.2/R14.6's new-surface motion, and R16. **R15 and R18 are done.** R17 is implemented but its
+own re-verification pass (R17.6) is partial — see `FRONTEND_TASKS.md`'s F60/F61 for exactly what's
+still outstanding (export cold/warm-cache diff + baseline regeneration; the remaining
+route/dialog/axe/contrast sweep).
 
 ---
 

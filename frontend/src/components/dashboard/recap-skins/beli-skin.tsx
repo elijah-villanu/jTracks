@@ -1,4 +1,5 @@
 import { forwardRef } from "react"
+import journeyJobLogoOnLight from "@/assets/JourneyJobLogoLight.png"
 import { STATUS_LABEL } from "@/components/StatusBadge"
 import {
   RECAP_CARD_STYLE,
@@ -149,7 +150,7 @@ export const BeliSkin = forwardRef<HTMLDivElement, RecapSkinProps>(function Beli
 
       <RecapFooter
         recap={recap}
-        color={RECAP_LITERAL_COLORS.beliInk}
+        logoSrc={journeyJobLogoOnLight}
         mutedColor={RECAP_LITERAL_COLORS.beliMuted}
         className="border-t pt-2.5"
         style={{ borderColor: RECAP_LITERAL_COLORS.beliRule }}

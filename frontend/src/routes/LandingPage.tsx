@@ -1,7 +1,8 @@
-import { Briefcase, Ghost, Share2, Workflow } from "lucide-react"
+import { Ghost, Share2, Workflow } from "lucide-react"
 import { Link } from "react-router"
 import { RecapCard } from "@/components/dashboard/recap-card"
 import { SankeyChart } from "@/components/dashboard/sankey-chart"
+import { Logo } from "@/components/layout/logo"
 import { ThemeToggle } from "@/components/layout/theme-toggle"
 import { BlurFade } from "@/components/ui/blur-fade"
 import { BorderBeam } from "@/components/ui/border-beam"
@@ -11,9 +12,9 @@ import { useDocumentMetadata } from "@/hooks/useDocumentMetadata"
 import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { DEMO_RECAP, DEMO_SANKEY } from "@/routes/landing/demo-data"
 
-const PAGE_TITLE = "jTracks — see where your job search stalls"
+const PAGE_TITLE = "JourneyJob — see where your job search stalls"
 const PAGE_DESCRIPTION =
-  "jTracks is a job application tracker that keeps every application in one place, marks the ones that go quiet, and turns your search into a funnel you can read at a glance."
+  "JourneyJob is a job application tracker that keeps every application in one place, marks the ones that go quiet, and turns your search into a funnel you can read at a glance."
 
 /**
  * F45: the entrance stagger between this page's four content groups (hero,
@@ -69,17 +70,12 @@ const FEATURES = [
 ] as const
 
 /**
- * The product lockup, reused by the header and the footer.
- * F57/R17.1: Display role (Hedvig Letters Sans, weight 400 only -- there is
- * no heavier file, hierarchy comes from size/tracking elsewhere on the page).
+ * The product lockup, reused by the header and the footer. Thin wrapper
+ * around the shared `Logo` (light/dark PNG pair) so both call sites pick up
+ * a size/className without duplicating the theme-swap markup.
  */
 function Wordmark({ className }: { className?: string }) {
-  return (
-    <span className={`flex items-center gap-2 font-display font-normal ${className ?? ""}`}>
-      <Briefcase className="size-5 text-primary" aria-hidden="true" />
-      jTracks
-    </span>
-  )
+  return <Logo className={`h-9 ${className ?? ""}`} />
 }
 
 /**
@@ -181,7 +177,7 @@ export default function LandingPage() {
           the viewport it wraps to a second line instead of putting the
           whole page into a horizontal scroll (R13.1 / F44).
         */}
-        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
+        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
           {/*
             Not a link: this lockup is already on the page it would point
             at. F40 flagged the equivalent decision in `AppLayout` -- the
@@ -201,14 +197,21 @@ export default function LandingPage() {
             */}
             <ThemeToggle />
             {/*
-              Hidden below `sm` for the same reason `AppLayout` gates its
-              action cluster at `lg` (F33/R13.1): measured at 375px the
-              wordmark (~83px) plus the theme group (92px), "Log in"
-              (~62px), "Get started" (~88px), their gaps and the container's
-              `px-4` come to ~385px, which is a horizontal scroll on the
-              page F44 forbids one on. Dropping this one control brings it
-              to ~315px. Nothing is lost: the hero's secondary CTA and the
-              footer both link to `/login`, both above the fold on a phone.
+              Hidden below `sm`. **Correction, re-measured 2026-09-11 after
+              the logo size increase:** this used to be justified by a
+              combined-width budget (wordmark + this whole row summing past
+              375px). That framing no longer holds and arguably never quite
+              did -- the outer container's `flex-wrap` wraps the wordmark
+              and this action row onto separate lines as two independent
+              flex items, so the wordmark's own width was never actually
+              part of this row's budget. Verified live at 375px with "Log
+              in" forced visible: theme group + "Log in" + "Get started"
+              right-edges at 275px, well inside the 357px content width, no
+              horizontal scroll (`document.documentElement.scrollWidth ===
+              clientWidth`). Left hidden anyway -- this is a content-density
+              call for a phone-width header, not a scroll-safety one, and
+              nothing is lost: the hero's secondary CTA and the footer both
+              link to `/login`, both above the fold on a phone.
             */}
             <Button variant="ghost" className="hidden sm:inline-flex" render={<Link to="/login" />}>
               Log in
@@ -257,7 +260,7 @@ export default function LandingPage() {
               Know exactly where your job search stalls.
             </h1>
             <p className="mt-5 max-w-2xl text-base text-pretty text-muted-foreground sm:text-lg">
-              jTracks keeps every application in one place, marks the ones that go quiet, and turns
+              JourneyJob keeps every application in one place, marks the ones that go quiet, and turns
               the whole search into a funnel you can read at a glance.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -434,7 +437,7 @@ export default function LandingPage() {
               id="features-heading"
               className="max-w-2xl font-display text-2xl font-normal tracking-tight text-balance sm:text-3xl"
             >
-              Three things jTracks does for you
+              Three things JourneyJob does for you
             </h2>
 
             <div className="mt-10 grid gap-8 md:grid-cols-3 md:gap-6">
@@ -515,7 +518,7 @@ export default function LandingPage() {
             </nav>
 
             <p className="text-xs text-muted-foreground sm:col-span-2">
-              © 2026 jTracks. A personal project — not affiliated with any employer or job board.
+              © 2026 JourneyJob. A personal project — not affiliated with any employer or job board.
               Built with React, Tailwind CSS and shadcn/ui.
             </p>
           </div>

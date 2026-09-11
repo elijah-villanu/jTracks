@@ -1,5 +1,6 @@
 import { forwardRef } from "react"
 import type { ReactNode } from "react"
+import journeyJobLogoOnDark from "@/assets/JourneyJobLogoDark.png"
 import { SankeyChart } from "@/components/dashboard/sankey-chart"
 import { STATUS_LITERAL_COLORS } from "@/components/dashboard/status-breakdown-chart"
 import {
@@ -157,7 +158,7 @@ export const StravaSkin = forwardRef<HTMLDivElement, RecapSkinProps>(function St
       <Panel className="px-3 py-2">
         <RecapFooter
           recap={recap}
-          color={RECAP_LITERAL_COLORS.onScrimMuted}
+          logoSrc={journeyJobLogoOnDark}
           mutedColor={RECAP_LITERAL_COLORS.onScrimMuted}
         />
       </Panel>

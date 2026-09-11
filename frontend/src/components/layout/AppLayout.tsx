@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react"
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router"
-import { Briefcase, ClipboardPaste, LogOut, Menu, Plus } from "lucide-react"
+import { ClipboardPaste, LogOut, Menu, Plus } from "lucide-react"
 import { ApplicationFormDialog } from "@/components/applications/application-form-dialog"
 import { AutofillDialog } from "@/components/applications/autofill-dialog"
 import { BlurFade } from "@/components/ui/blur-fade"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
+import { Logo } from "@/components/layout/logo"
 import { ThemeToggle } from "@/components/layout/theme-toggle"
 import {
   Sheet,
@@ -58,7 +59,7 @@ const ROUTE_TITLES: Record<string, string> = {
 /** Shared active-state styling for the Tracker/Analytics/Profile nav links. */
 function navLinkClassName({ isActive }: { isActive: boolean }) {
   return cn(
-    "rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+    "rounded-md px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
     isActive && "bg-muted text-foreground"
   )
 }
@@ -130,14 +131,10 @@ export function AppLayout() {
       */}
       <BlurFade delay={0}>
         <header className="border-b border-border">
-          <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-3">
-            {/* F57/R17.1: Display role, weight 400 only -- no heavier file exists. */}
-            <div className="flex items-center gap-2 font-display font-normal">
-              <Briefcase className="size-5 text-primary" aria-hidden="true" />
-              <span>jTracks</span>
-            </div>
+          <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
+            <Logo className="h-9" />
 
-            <nav aria-label="Main" className="hidden items-center gap-1 sm:flex">
+            <nav aria-label="Main" className="hidden items-center gap-2 sm:flex">
               {NAV_LINKS.map((link) => (
                 <NavLink
                   key={link.to}
@@ -161,38 +158,36 @@ export function AppLayout() {
               already carries every one of these actions, ThemeToggle
               included -- covers everything narrower.
             */}
-            <div className="hidden items-center gap-3 lg:flex">
+            <div className="hidden items-center gap-4 lg:flex">
               {user && (
                 <span className="hidden text-sm text-muted-foreground lg:inline">
                   {user.email}
                 </span>
               )}
               <ThemeToggle />
-              <Button size="sm" variant="outline" onClick={() => setIsAutofillOpen(true)}>
+              <Button size="lg" variant="outline" onClick={() => setIsAutofillOpen(true)}>
                 <ClipboardPaste />
                 Paste a Link
               </Button>
-              <Button size="sm" onClick={() => openCreateForm()}>
+              <Button size="lg" onClick={() => openCreateForm()}>
                 <Plus />
                 Add Job
               </Button>
-              <Button size="sm" variant="ghost" onClick={handleLogout}>
+              <Button size="lg" variant="ghost" onClick={handleLogout}>
                 <LogOut />
                 Log out
               </Button>
             </div>
 
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-              <SheetTrigger render={<Button size="icon" variant="outline" className="lg:hidden" />}>
+              <SheetTrigger render={<Button size="icon-lg" variant="outline" className="lg:hidden" />}>
                 <Menu />
                 <span className="sr-only">Open menu</span>
               </SheetTrigger>
               <SheetContent side="right" className="lg:hidden">
                 <SheetHeader>
-                  {/* F57/R17.1: Display role, weight 400 only -- overrides SheetTitle's default font-medium/text-base at this call site only. */}
-                  <SheetTitle className="flex items-center gap-2 font-display font-normal">
-                    <Briefcase className="size-5 text-primary" aria-hidden="true" />
-                    jTracks
+                  <SheetTitle className="flex items-center">
+                    <Logo className="h-7" />
                   </SheetTitle>
                 </SheetHeader>
 
