@@ -3,6 +3,8 @@ import { Link, useLocation, useNavigate, type Location } from "react-router"
 import { cn } from "@/lib/utils"
 import { ApiError } from "@/lib/api-client"
 import { useAuth } from "@/hooks/useAuth"
+import { BlurFade } from "@/components/ui/blur-fade"
+import { BorderBeam } from "@/components/ui/border-beam"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -33,7 +35,7 @@ export function LoginForm({
   const { login, loginWithGoogle } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const redirectTo = (location.state as { from?: Location } | null)?.from?.pathname ?? "/"
+  const redirectTo = (location.state as { from?: Location } | null)?.from?.pathname ?? "/app"
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -75,75 +77,92 @@ export function LoginForm({
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card>
-        <CardHeader>
-          {/*
-            A11y (WCAG 1.3.1 / 2.4.6): `CardTitle` renders a plain <div>, so
-            this route previously had no heading element at all. Tailwind's
-            preflight resets heading typography, so the nested <h1> is
-            visually identical to what shipped.
-          */}
-          <CardTitle>
-            <h1>Login to your account</h1>
-          </CardTitle>
-          <CardDescription>
-            Enter your email below to login to your account
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit}>
-            <FieldGroup>
-              {error && (
-                <p
-                  role="alert"
-                  className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-                >
-                  {error}
-                </p>
-              )}
-              <Field>
-                <FieldLabel htmlFor="email">Email</FieldLabel>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="m@example.com"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  required
-                />
-              </Field>
-              <Field>
-                <div className="flex items-center">
-                  <FieldLabel htmlFor="password">Password</FieldLabel>
-                </div>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  required
-                />
-              </Field>
-              <Field>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? "Logging in..." : "Login"}
-                </Button>
-                <Button
-                  variant="outline"
-                  type="button"
-                  disabled={isSubmitting}
-                  onClick={handleGoogleLogin}
-                >
-                  Login with Google
-                </Button>
-                <FieldDescription className="text-center">
-                  Don&apos;t have an account? <Link to="/signup">Sign up</Link>
-                </FieldDescription>
-              </Field>
-            </FieldGroup>
-          </form>
-        </CardContent>
-      </Card>
+      {/*
+        Single entrance for the whole auth card + a single, slow BorderBeam
+        accent (the card is the one thing on this page) -- see
+        docs/decisions/magicui-conventions.md. `relative` is required so the
+        beam's `absolute inset-0` overlay positions against the card, not the
+        page.
+      */}
+      <BlurFade delay={0}>
+        <Card className="relative">
+          <BorderBeam duration={24} colorFrom="var(--foreground)" colorTo="var(--muted-foreground)" />
+          <CardHeader>
+            {/*
+              A11y (WCAG 1.3.1 / 2.4.6): `CardTitle` renders a plain <div>, so
+              this route previously had no heading element at all. Tailwind's
+              preflight resets heading typography, so the nested <h1> is
+              visually identical to what shipped.
+            */}
+            {/*
+              F58/R17.1: this is the page's app-H1 role (600), not
+              CardTitle's own default (font-medium/500) -- overridden at
+              this call site rather than in the shared primitive, which
+              also backs unrelated, lighter sub-section titles elsewhere
+              (e.g. AnalyticsPage's "Status breakdown").
+            */}
+            <CardTitle className="font-semibold">
+              <h1>Login to your account</h1>
+            </CardTitle>
+            <CardDescription>
+              Enter your email below to login to your account
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit}>
+              <FieldGroup>
+                {error && (
+                  <p
+                    role="alert"
+                    className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                  >
+                    {error}
+                  </p>
+                )}
+                <Field>
+                  <FieldLabel htmlFor="email">Email</FieldLabel>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="m@example.com"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    required
+                  />
+                </Field>
+                <Field>
+                  <div className="flex items-center">
+                    <FieldLabel htmlFor="password">Password</FieldLabel>
+                  </div>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    required
+                  />
+                </Field>
+                <Field>
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? "Logging in..." : "Login"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={handleGoogleLogin}
+                  >
+                    Login with Google
+                  </Button>
+                  <FieldDescription className="text-center">
+                    Don&apos;t have an account? <Link to="/signup">Sign up</Link>
+                  </FieldDescription>
+                </Field>
+              </FieldGroup>
+            </form>
+          </CardContent>
+        </Card>
+      </BlurFade>
     </div>
   )
 }

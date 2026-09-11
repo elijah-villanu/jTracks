@@ -2,9 +2,61 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/*
+  F56/R17.3: self-hosted @font-face declarations for the Display + Text
+  typeface pairing (R17.1). Never a runtime fonts.googleapis.com/
+  fonts.gstatic.com <link>/@import -- that would pull a third-party
+  request into the landing page's critical path (R10's bundle-cost NFR).
+  Files live in ./assets/fonts (F55) and are Vite-fingerprinted via the
+  relative url() below. Each face declares a single real font-weight
+  (never a range) so the browser loads the exact static file instead of
+  synthesizing a weight that isn't actually there.
+*/
+@font-face {
+  font-family: "Hedvig Letters Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./assets/fonts/HedvigLettersSans-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Roboto";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./assets/fonts/Roboto-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Roboto";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./assets/fonts/Roboto-Medium.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Roboto";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./assets/fonts/Roboto-SemiBold.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Roboto";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./assets/fonts/Roboto-Bold.woff2") format("woff2");
+}
+
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  /*
+    F25: native form controls, scrollbars and the UA's default canvas
+    background follow whichever theme is actually painted, not just our
+    own token values.
+  */
+  color-scheme: light;
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -12,7 +64,32 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
+  /*
+    Accent recolor (2026-09-10): swapped from the F27 teal (h~195) to a
+    user-specified exact brand blue, #0F57FE == oklch(0.537 0.255 263.2).
+    That lightness/chroma is close to Tailwind's own blue-600, and at this
+    lightness near-black text fails outright (3.60:1) -- so unlike the
+    teal, --primary-foreground is near-white in light mode. Values
+    measured with a WCAG contrast calculator against this file's real
+    surfaces (see docs/decisions/magicui-conventions.md's theming section
+    for the full numbers):
+      - light --primary-foreground (near-white) on --primary: 5.50:1.
+      - dark --primary uses Tailwind's blue-400 oklch (same hue family,
+        lightened/desaturated the way Tailwind's own scale does it,
+        rather than guessing a lightened value freehand) -- near-black
+        text on it: 7.79:1.
+      - dark --ring uses Tailwind's blue-500 oklch, one step darker than
+        dark --primary, mirroring the teal's own "ring a touch darker
+        than primary" pattern; clears 5.38:1 against dark --background.
+      - light --ring is just --primary itself -- already 5.50:1 against
+        white/card, no separate tuning needed (unlike the teal, which
+        started under the 3:1 floor).
+    Known collision, not fixed here (flagged to the user): --status-applied
+    (#3b82f6) is now nearly the same hue as --primary, so "Applied" no
+    longer reads as visually distinct from primary CTAs the way the F27
+    comment's hue-picking rationale intended.
+  */
+  --primary: #0F57FE;
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
@@ -23,7 +100,7 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --ring: #0F57FE;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -31,23 +108,45 @@
   --chart-5: oklch(0.269 0 0);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary: #0F57FE;
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.97 0 0);
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar-ring: #0F57FE;
+
+  /*
+    F28: status palette, promoted from status-breakdown-chart.tsx's
+    hardcoded hex into the token layer so the breakdown chart's <Cell>,
+    the Sankey nodes/ribbons and (via @theme inline below) any Tailwind
+    utility all read from one place, per R11.3. Light-mode values are
+    the original, already-validated hexes (see
+    status-breakdown-chart.tsx) -- unchanged here.
+  */
+  --status-saved: #94a3b8;
+  --status-applied: #3b82f6;
+  --status-interviewing-oa: #f59e0b;
+  --status-offer: #10b981;
+  --status-rejected: #ef4444;
+  --status-failed: #ec4899;
+  --status-ghosted: #8b5cf6;
 }
 
 .dark {
+  color-scheme: dark;
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  /* Accent recolor (2026-09-10): Tailwind blue-400/-500 stand in for a
+     hand-tuned lightened/darkened #0F57FE -- same hue family, and their
+     lightness/chroma curve is already gamut-safe and battle-tested rather
+     than guessed. See the :root primary comment above for the full
+     rationale and contrast numbers. */
+  --primary: oklch(0.707 0.165 254.624);
+  --primary-foreground: oklch(0.145 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
@@ -57,7 +156,7 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --ring: oklch(0.623 0.214 259.815);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -65,12 +164,33 @@
   --chart-5: oklch(0.269 0 0);
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.707 0.165 254.624);
+  --sidebar-primary-foreground: oklch(0.145 0 0);
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-ring: oklch(0.623 0.214 259.815);
+
+  /*
+    F28 dark-mode status set: applied/rejected/failed/ghosted are the
+    same hex as light (measured 4.6:1-5.6:1 against both dark
+    --background and --card -- see the decision doc). interviewing_oa and
+    offer swap to the darker "dark-safe" pair this file's history already
+    proposed (#d97706 / #059669) -- measured 6.2:1 / 5.3:1 against dark
+    --background (5.6:1 / 4.75:1 against --card), both comfortably clear
+    of AA. Note: the *undimmed* light hexes actually measure even higher
+    contrast on a dark background (9.2:1 / 7.8:1) -- the swap isn't
+    required by contrast math, it's kept for the reduced-glare/saturation
+    reasoning the original comment intended. Either way this is a WCAG
+    AA pass, not a fail being fixed.
+  */
+  --status-saved: #94a3b8;
+  --status-applied: #3b82f6;
+  --status-interviewing-oa: #d97706;
+  --status-offer: #059669;
+  --status-rejected: #ef4444;
+  --status-failed: #ec4899;
+  --status-ghosted: #8b5cf6;
 }
 
 @theme inline {
@@ -106,15 +226,82 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
+  /* F28: exposes the status tokens above as Tailwind utilities (e.g. `fill-status-applied`) for any future className-based consumer -- the chart/Sankey code below reads the raw `--status-*` custom properties directly via `var()` since it needs plain strings for SVG fill/stroke props, not classNames. */
+  --color-status-saved: var(--status-saved);
+  --color-status-applied: var(--status-applied);
+  --color-status-interviewing-oa: var(--status-interviewing-oa);
+  --color-status-offer: var(--status-offer);
+  --color-status-rejected: var(--status-rejected);
+  --color-status-failed: var(--status-failed);
+  --color-status-ghosted: var(--status-ghosted);
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /*
+    F56/R17.3: Display + Text font tokens. Each carries a real fallback
+    stack after the family name so a blocked/missing font file degrades
+    to today's system-stack look instead of to Times. These re-point
+    Tailwind's `font-sans` utility *and* preflight's body stack, landing
+    R17.1's "body copy"/"UI chrome" rows without touching a single
+    component. Unlike --color-*/--radius-* above, fonts are
+    theme-independent -- do NOT duplicate --font-display/--font-sans
+    into :root/.dark, there is no light/dark variant of a typeface.
+  */
+  --font-display: "Hedvig Letters Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Roboto", ui-sans-serif, system-ui, sans-serif;
+}
+
+/*
+  F60 fix (browser-verified regression), root cause confirmed live in a real
+  browser, not assumed:
+
+  Tailwind v4 only auto-generates a `font-family` utility for its three
+  reserved keys (sans/serif/mono) -- `--font-sans` above reaches the page for
+  free via preflight's `--default-font-family` (a build-time substitution
+  Tailwind does internally for those 3 keys specifically), but a *custom*
+  theme key like `--font-display` gets no such treatment, so an explicit
+  `@utility` is required to get a `.font-display` class at all.
+
+  The real trap: `@theme inline` (used here, deliberately, so `--font-sans`
+  can drive `--default-font-family`) never emits `--font-display` as an
+  actual runtime CSS custom property -- Tailwind substitutes `@theme inline`
+  values directly into ITS OWN generated utilities at build time instead of
+  keeping them queryable. So `@utility font-display { font-family:
+  var(--font-display); }` compiles, and its selector genuinely matches
+  (confirmed via `h1.matches('.font-display')` => true and inspecting the
+  served CSS directly), but `var(--font-display)` resolves to nothing --
+  making the whole declaration "invalid at computed-value time" per the CSS
+  Variables spec. An invalid declaration still WINS the cascade (browsers
+  don't discover the invalid var() until after cascade resolution), which is
+  why even `!important` and moving it outside any layer didn't help and were
+  red herrings -- but once "won," it computes to the property's inherited
+  value instead of the invalid one, silently falling back to Roboto. Proven
+  by setting the literal string directly via an inline style (no var()
+  indirection): it worked immediately, at normal priority, no !important
+  needed -- isolating the bug to the var() reference itself, not cascade
+  order. Fix: reference the literal fallback stack directly, matching how
+  Tailwind's own build-time substitution works for its reserved keys,
+  instead of a runtime var() this theme mode never provides.
+*/
+@utility font-display {
+  font-family: "Hedvig Letters Sans", ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    /*
+      F56/R17.3: Hedvig Letters Sans has exactly one real weight (400).
+      Without this, a stray font-semibold/font-bold on a Display element
+      would render as a browser-synthesized fake bold -- which looks
+      merely "fine" on screen and then serializes into the recap export
+      (R17.4). Roboto never needs synthesis (all four sourced weights are
+      real static files), so this costs nothing there.
+    */
+    font-synthesis-weight: none;
   }
   body {
     @apply bg-background text-foreground;

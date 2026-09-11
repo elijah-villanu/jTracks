@@ -1,8 +1,31 @@
+import { BorderBeam } from "@/components/ui/border-beam"
 import { Card, CardContent } from "@/components/ui/card"
+import { NumberTicker } from "@/components/ui/number-ticker"
+import { cn } from "@/lib/utils"
 
 interface StatTileProps {
   label: string
   value: string
+  /**
+   * When present (and finite), the tile counts up to this number on mount
+   * via MagicUI's `NumberTicker` instead of rendering `value` as static
+   * text -- see docs/decisions/magicui-conventions.md. `value` is still
+   * required and still used verbatim whenever this is omitted/non-finite
+   * (e.g. avg-response-time's "—" null case), so every existing caller
+   * keeps working unchanged.
+   */
+  numericValue?: number | null
+  /** Appended after the animated number, e.g. "%" or " days" -- not passed through NumberTicker itself, which only formats the number. */
+  suffix?: string
+  /** Decimal places the animated number counts to; ignored when `numericValue` is omitted. */
+  decimalPlaces?: number
+  /**
+   * Adds a single, slow MagicUI `BorderBeam` accent -- reserve this for
+   * the *one* headline stat on a given page (see docs/decisions/
+   * magicui-conventions.md's "one accent per view" rule); every tile
+   * glowing at once reads as noise, not emphasis.
+   */
+  accent?: boolean
 }
 
 /**
@@ -15,15 +38,52 @@ interface StatTileProps {
  * tied to the metric it describes instead of only being visually adjacent
  * to it (WCAG 1.3.1). Kept inside the tile so the markup stays valid --
  * a <dl> may not have arbitrary nested wrappers between it and its
- * <dt>/<dd> children.
+ * <dt>/<dd> children. The animated variant still renders real text (via
+ * `NumberTicker`'s `textContent` writes onto its own `<span>` inside the
+ * `<dd>`), and the app-wide `MotionConfig reducedMotion="user"` (main.tsx)
+ * makes it jump straight to the final value for users with reduced-motion
+ * enabled instead of animating.
  */
-export function StatTile({ label, value }: StatTileProps) {
+export function StatTile({ label, value, numericValue, suffix, decimalPlaces, accent }: StatTileProps) {
+  const isAnimated = typeof numericValue === "number" && Number.isFinite(numericValue)
+
   return (
-    <Card>
+    // F54 (R16.4): card-shell styling only, nudged toward the Monarch
+    // stat-card reference -- roomier padding (`--card-spacing` 4 -> 5,
+    // i.e. 16px -> 20px) and the reference's quieter, uppercase,
+    // letter-spaced caption sitting *under* the figure. The BorderBeam
+    // wiring below is untouched (`duration={24}`, the project-wide value
+    // per docs/decisions/magicui-conventions.md), as is every one of the
+    // `numericValue`/`suffix`/`decimalPlaces`/`accent` props.
+    <Card className={cn("[--card-spacing:--spacing(5)]", accent && "relative")}>
+      {accent && <BorderBeam duration={24} colorFrom="var(--foreground)" colorTo="var(--muted-foreground)" />}
       <CardContent>
-        <dl className="flex flex-col gap-1">
-          <dt className="text-sm text-muted-foreground">{label}</dt>
-          <dd className="m-0 text-2xl font-semibold text-foreground tabular-nums">{value}</dd>
+        {/*
+          `flex-col-reverse` flips only the *visual* order so the number
+          reads first, the way the reference's cards do. The DOM keeps
+          the required <dt>-then-<dd> sequence, so a screen reader still
+          hears "Total Applications, 128" rather than a bare number, and
+          nothing here is focusable, so no tab order is affected.
+        */}
+        <dl className="flex flex-col-reverse gap-1.5">
+          <dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+            {label}
+          </dt>
+          {/* F59/R17.1: "big number" role moved from Display (which can't carry 700) to Text (Roboto) at 700 -- stays on the Text family, no font-display here. NumberTicker's own child <span> inherits family/weight from this <dd>. */}
+          <dd className="m-0 text-2xl leading-none font-bold tracking-tight text-foreground tabular-nums">
+            {isAnimated ? (
+              <>
+                <NumberTicker
+                  value={numericValue}
+                  decimalPlaces={decimalPlaces ?? 0}
+                  className="text-foreground dark:text-foreground"
+                />
+                {suffix}
+              </>
+            ) : (
+              value
+            )}
+          </dd>
         </dl>
       </CardContent>
     </Card>

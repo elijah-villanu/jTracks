@@ -40,6 +40,17 @@ export const STATUS_LABEL: Record<ApplicationStatus, string> = {
  * as the same color everywhere it appears. `failed` uses pink/fuchsia,
  * deliberately distinct from `rejected`'s red, so the two can never be
  * confused at a glance.
+ *
+ * F28: these `dark:` variants were written before dark mode was
+ * reachable (F25) and were untested assumptions. Now measured with a
+ * WCAG contrast calculator against the real dark theme's `--background`
+ * / `--card` (composited for the `/NN` opacity variants): every status's
+ * dark badge text clears 8:1+ against its own tinted background --
+ * comfortably past the 4.5:1 AA floor -- so no values changed here. See
+ * docs/decisions/magicui-conventions.md for the full numbers, and
+ * `STATUS_FOCUS_CLASSES`/`STATUS_CELL_CLASSES` below (also re-verified,
+ * also unchanged: focus-state text clears 8:1+, cell-tint text clears
+ * 17:1+ since the tint is very subtle against the dark surface).
  */
 export const STATUS_COLOR_CLASSES: Record<ApplicationStatus, string> = {
   saved: "bg-slate-100 text-slate-700 dark:bg-slate-800/70 dark:text-slate-300",
