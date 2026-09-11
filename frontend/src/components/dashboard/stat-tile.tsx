@@ -69,7 +69,8 @@ export function StatTile({ label, value, numericValue, suffix, decimalPlaces, ac
           <dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
             {label}
           </dt>
-          <dd className="m-0 text-2xl leading-none font-semibold tracking-tight text-foreground tabular-nums">
+          {/* F59/R17.1: "big number" role moved from Display (which can't carry 700) to Text (Roboto) at 700 -- stays on the Text family, no font-display here. NumberTicker's own child <span> inherits family/weight from this <dd>. */}
+          <dd className="m-0 text-2xl leading-none font-bold tracking-tight text-foreground tabular-nums">
             {isAnimated ? (
               <>
                 <NumberTicker

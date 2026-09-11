@@ -2,6 +2,52 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/*
+  F56/R17.3: self-hosted @font-face declarations for the Display + Text
+  typeface pairing (R17.1). Never a runtime fonts.googleapis.com/
+  fonts.gstatic.com <link>/@import -- that would pull a third-party
+  request into the landing page's critical path (R10's bundle-cost NFR).
+  Files live in ./assets/fonts (F55) and are Vite-fingerprinted via the
+  relative url() below. Each face declares a single real font-weight
+  (never a range) so the browser loads the exact static file instead of
+  synthesizing a weight that isn't actually there.
+*/
+@font-face {
+  font-family: "Hedvig Letters Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./assets/fonts/HedvigLettersSans-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Roboto";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./assets/fonts/Roboto-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Roboto";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./assets/fonts/Roboto-Medium.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Roboto";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./assets/fonts/Roboto-SemiBold.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Roboto";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./assets/fonts/Roboto-Bold.woff2") format("woff2");
+}
+
 @custom-variant dark (&:is(.dark *));
 
 :root {
@@ -180,11 +226,69 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /*
+    F56/R17.3: Display + Text font tokens. Each carries a real fallback
+    stack after the family name so a blocked/missing font file degrades
+    to today's system-stack look instead of to Times. These re-point
+    Tailwind's `font-sans` utility *and* preflight's body stack, landing
+    R17.1's "body copy"/"UI chrome" rows without touching a single
+    component. Unlike --color-*/--radius-* above, fonts are
+    theme-independent -- do NOT duplicate --font-display/--font-sans
+    into :root/.dark, there is no light/dark variant of a typeface.
+  */
+  --font-display: "Hedvig Letters Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Roboto", ui-sans-serif, system-ui, sans-serif;
+}
+
+/*
+  F60 fix (browser-verified regression), root cause confirmed live in a real
+  browser, not assumed:
+
+  Tailwind v4 only auto-generates a `font-family` utility for its three
+  reserved keys (sans/serif/mono) -- `--font-sans` above reaches the page for
+  free via preflight's `--default-font-family` (a build-time substitution
+  Tailwind does internally for those 3 keys specifically), but a *custom*
+  theme key like `--font-display` gets no such treatment, so an explicit
+  `@utility` is required to get a `.font-display` class at all.
+
+  The real trap: `@theme inline` (used here, deliberately, so `--font-sans`
+  can drive `--default-font-family`) never emits `--font-display` as an
+  actual runtime CSS custom property -- Tailwind substitutes `@theme inline`
+  values directly into ITS OWN generated utilities at build time instead of
+  keeping them queryable. So `@utility font-display { font-family:
+  var(--font-display); }` compiles, and its selector genuinely matches
+  (confirmed via `h1.matches('.font-display')` => true and inspecting the
+  served CSS directly), but `var(--font-display)` resolves to nothing --
+  making the whole declaration "invalid at computed-value time" per the CSS
+  Variables spec. An invalid declaration still WINS the cascade (browsers
+  don't discover the invalid var() until after cascade resolution), which is
+  why even `!important` and moving it outside any layer didn't help and were
+  red herrings -- but once "won," it computes to the property's inherited
+  value instead of the invalid one, silently falling back to Roboto. Proven
+  by setting the literal string directly via an inline style (no var()
+  indirection): it worked immediately, at normal priority, no !important
+  needed -- isolating the bug to the var() reference itself, not cascade
+  order. Fix: reference the literal fallback stack directly, matching how
+  Tailwind's own build-time substitution works for its reserved keys,
+  instead of a runtime var() this theme mode never provides.
+*/
+@utility font-display {
+  font-family: "Hedvig Letters Sans", ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    /*
+      F56/R17.3: Hedvig Letters Sans has exactly one real weight (400).
+      Without this, a stray font-semibold/font-bold on a Display element
+      would render as a browser-synthesized fake bold -- which looks
+      merely "fine" on screen and then serializes into the recap export
+      (R17.4). Roboto never needs synthesis (all four sourced weights are
+      real static files), so this costs nothing there.
+    */
+    font-synthesis-weight: none;
   }
   body {
     @apply bg-background text-foreground;

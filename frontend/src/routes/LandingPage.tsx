@@ -68,10 +68,14 @@ const FEATURES = [
   },
 ] as const
 
-/** The product lockup, reused by the header and the footer. */
+/**
+ * The product lockup, reused by the header and the footer.
+ * F57/R17.1: Display role (Hedvig Letters Sans, weight 400 only -- there is
+ * no heavier file, hierarchy comes from size/tracking elsewhere on the page).
+ */
 function Wordmark({ className }: { className?: string }) {
   return (
-    <span className={`flex items-center gap-2 font-semibold ${className ?? ""}`}>
+    <span className={`flex items-center gap-2 font-display font-normal ${className ?? ""}`}>
       <Briefcase className="size-5 text-primary" aria-hidden="true" />
       jTracks
     </span>
@@ -245,9 +249,10 @@ export default function LandingPage() {
             <p className="text-sm font-medium tracking-wide text-muted-foreground uppercase">
               Job application tracker
             </p>
+            {/* F57/R17.1: Display role, weight 400 only -- no heavier file exists, so hierarchy against the rest of the page comes from size/tracking, never a weight utility. */}
             <h1
               id="hero-heading"
-              className="mt-4 max-w-3xl text-4xl leading-[1.05] font-semibold tracking-tight text-balance sm:text-5xl lg:text-6xl"
+              className="mt-4 max-w-3xl font-display text-4xl leading-[1.05] font-normal tracking-tight text-balance sm:text-5xl lg:text-6xl"
             >
               Know exactly where your job search stalls.
             </h1>
@@ -292,9 +297,10 @@ export default function LandingPage() {
         */}
         <BlurFade delay={ENTRANCE_STAGGER_SECONDS}>
           <section aria-labelledby="visual-heading" className="border-t border-border py-16 sm:py-20">
+            {/* F57/R17.1: Display role, weight 400 only. */}
             <h2
               id="visual-heading"
-              className="max-w-2xl text-2xl font-semibold tracking-tight text-balance sm:text-3xl"
+              className="max-w-2xl font-display text-2xl font-normal tracking-tight text-balance sm:text-3xl"
             >
               One search, two views
             </h2>
@@ -423,9 +429,10 @@ export default function LandingPage() {
         */}
         <BlurFade delay={ENTRANCE_STAGGER_SECONDS * 2}>
           <section aria-labelledby="features-heading" className="border-t border-border py-16 sm:py-20">
+            {/* F57/R17.1: Display role, weight 400 only. */}
             <h2
               id="features-heading"
-              className="max-w-2xl text-2xl font-semibold tracking-tight text-balance sm:text-3xl"
+              className="max-w-2xl font-display text-2xl font-normal tracking-tight text-balance sm:text-3xl"
             >
               Three things jTracks does for you
             </h2>

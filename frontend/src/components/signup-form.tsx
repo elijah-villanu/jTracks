@@ -103,7 +103,14 @@ export function SignupForm({ className, ...props }: React.ComponentProps<typeof 
             Tailwind's preflight resets heading typography, so the nested
             <h1> is visually identical.
           */}
-          <CardTitle>
+          {/*
+            F58/R17.1: this is the page's app-H1 role (600), not CardTitle's
+            own default (font-medium/500) -- overridden at this call site
+            rather than in the shared primitive, which also backs unrelated,
+            lighter sub-section titles elsewhere (e.g. AnalyticsPage's
+            "Status breakdown").
+          */}
+          <CardTitle className="font-semibold">
             <h1>Create an account</h1>
           </CardTitle>
           <CardDescription>

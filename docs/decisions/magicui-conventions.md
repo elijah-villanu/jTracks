@@ -170,6 +170,16 @@ project's colors in — override via props/`className` at each usage instead, so
 file stays a clean, up-to-date mirror of upstream MagicUI and can be re-synced later without
 losing local edits.
 
+**Typography follows the same rule (FV12/R17), in its own doc.** `docs/decisions/typography.md`
+records the Display+Text typeface pairing (Hedvig Letters Sans / Roboto), the self-hosted
+`@font-face`/`--font-display`/`--font-sans` tokens in `frontend/src/index.css`, and the recap
+export's font-readiness gate. No MagicUI component takes a font prop the way `BorderBeam` takes
+`colorFrom`/`colorTo`, so every MagicUI call site in this project simply inherits
+`--font-sans`/`--font-display` (or, in practice, whatever the surrounding chrome's `font-*`
+utility already resolves to) rather than shipping a family of its own — the same "never ship the
+library's hardcoded default, always resolve through this project's tokens" principle this section
+states for color, applied to type.
+
 ## Palette decision record (F27/F28)
 
 Per the PRD's Documentation NFR, the theming decisions made in FV6 (`frontend/src/index.css`),

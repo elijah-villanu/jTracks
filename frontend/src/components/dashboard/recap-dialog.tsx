@@ -33,6 +33,23 @@ import type { DashboardRange } from "@/types/api"
 // exports a clean 1080x1920 PNG, the standard Instagram-Stories resolution.
 const EXPORT_PIXEL_RATIO = 4
 
+/**
+ * F60/R17.4: every font face the three recap skins actually render inside
+ * the `html-to-image`-captured subtree (recap-skins/shared.tsx's
+ * `RecapFooter` wordmark at Display 400, and the skins' own text at every
+ * Roboto weight in use -- 400 for unstyled body text like the footer's
+ * date range, 500/600/700 for labels and stat figures). Kept as an
+ * explicit list rather than inferred from the DOM, since `document.fonts`
+ * has no "faces this subtree needs" query.
+ */
+const REQUIRED_RECAP_FONTS = [
+  '400 1rem "Hedvig Letters Sans"',
+  '400 1rem "Roboto"',
+  '500 1rem "Roboto"',
+  '600 1rem "Roboto"',
+  '700 1rem "Roboto"',
+] as const
+
 interface RecapDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -221,11 +238,45 @@ export function RecapDialog({ open, onOpenChange }: RecapDialogProps) {
     onOpenChange(nextOpen)
   }
 
+  /**
+   * F60/R17.4: gate the export on font readiness, awaiting it *before*
+   * `toBlob` fires. A custom font that hasn't finished loading when the
+   * capture happens silently bakes the browser's fallback font into the
+   * PNG -- no error, no visual sign on screen, just a wrong export.
+   *
+   * `document.fonts.ready` alone is not enough, and this is the trap worth
+   * naming: it only settles *pending* loads. A face no rendered node has
+   * requested yet isn't pending, so `ready` can resolve immediately while a
+   * face the card needs was never fetched at all (e.g. right after a cold
+   * page load, before anything on screen has asked for Roboto 700). So
+   * this explicitly `load()`s every face `REQUIRED_RECAP_FONTS` names
+   * first -- forcing the fetch regardless of what's been rendered -- and
+   * only then awaits `ready` for the whole set to finish settling.
+   *
+   * Guarded so a rejection can't kill Download/Share outright -- an export
+   * with a fallback font still beats no export at all -- but the failure
+   * is surfaced through `exportError` rather than swallowed, so a real
+   * font-loading problem doesn't look identical to a clean export.
+   */
+  async function ensureRecapFontsLoaded(): Promise<void> {
+    try {
+      await Promise.all(REQUIRED_RECAP_FONTS.map((font) => document.fonts.load(font)))
+      await document.fonts.ready
+    } catch (err) {
+      setExportError(
+        err instanceof Error
+          ? `Recap fonts may not have finished loading (${err.message}); exporting anyway.`
+          : "Recap fonts may not have finished loading; exporting anyway."
+      )
+    }
+  }
+
   async function exportCardToBlob(): Promise<Blob> {
     const card = cardRefs.current[skinId]
     if (!card) {
       throw new Error("Recap card isn't ready yet.")
     }
+    await ensureRecapFontsLoaded()
     // `backgroundColor` is intentionally omitted: html-to-image only
     // fills the exported canvas's background when it's explicitly set,
     // so leaving it out keeps the *outer* PNG canvas transparent. What

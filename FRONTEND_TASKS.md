@@ -2202,6 +2202,412 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   beam running around the roomier card, the five-across `lg` layout with real values, and both
   themes are all unobserved.
 
+## Milestone FV12: Typeface overhaul (delivery stage 7 — R17)
+
+> New scope, added after R11–R13 shipped and R10/R12 were substantially built — recorded as R17 in
+> `PRD_V2_1.md`. **Nothing in this milestone is an open question**: R17.1's Display+Text pairing and role
+> table, R17.2's weight set, R17.3's self-hosting/token discipline and R17.5's `font-display: swap`
+> default are all confirmed in the PRD, including the verified finding that Hedvig Letters Sans is a
+> **single-weight (400)** family. So there is no spike here, only execution and verification.
+> Per R17.6 this is a token swap applied retroactively across finished surfaces, **not new layout work** —
+> no page gets re-laid-out. It is sequenced last because every surface it touches (FV9's landing page,
+> FV8's recap skins, FV7's table/card list, FV11's board and stat tiles) must already exist to be
+> verified against.
+>
+> The hard gate is the recap export (R17.4, extending R12.5): a web font that hasn't finished loading when
+> `toBlob` fires bakes the browser's fallback silently into the PNG. **F60 owns that and is this
+> milestone's highest-risk task** — treat it the way F35/F39/F48 were treated, with a real export and a
+> real diff, not an assumption.
+
+- [x] **F55 — Add the self-hosted font files and their licenses to the repo** (S)
+  R17.2 + R17.3. The fonts are **self-hosted and user-supplied** — never a runtime
+  `fonts.googleapis.com` `<link>`/`@import`, which would pull a third-party request into the critical path
+  and violate R10's landing bundle-cost NFR. Exactly five files, matching R17.2's resolved weight set:
+  `HedvigLettersSans-Regular.woff2` (400, its only weight), and Roboto at 400 / 500 / 600 / 700 as four
+  discrete static files. **No italics** (R17.2: Hedvig's 400 italic exists but is used nowhere in R17.1's
+  mapping), **no 900** (Roboto Black is not sourced — this matters in F59), and no dedicated monospace
+  family (the only `font-mono` reference is internal to shadcn's `components/ui/chart.tsx` and stays).
+  **Where they live is a call this task makes, because the repo has no convention yet**: `frontend/public/`
+  holds only `favicon.svg`, `icons.svg` and `mockServiceWorker.js`, and `frontend/src/assets/` doesn't
+  exist. Put them in a new `frontend/src/assets/fonts/`, referenced from `index.css` by a relative `url()`.
+  Assets under `src/` are fingerprinted by Vite and a wrong path **fails the build**; a `public/` path is
+  copied verbatim, so a typo becomes a silent 404 that falls back to the system stack — the same class of
+  invisible failure R17.4 warns about, but on every page instead of just the export.
+  Keep the license texts alongside the files (R17.2's "good practice"): SIL OFL 1.1 for Hedvig Letters
+  Sans, Apache License 2.0 for Roboto, plus a short `README.md` naming both specimen URLs and exactly
+  which variant/subset was downloaded, so a future re-download reproduces the same metrics. Neither
+  license requires an in-app attribution string, so none is added.
+  Acceptance: exactly those five `.woff2` files exist at `frontend/src/assets/fonts/` and nothing else —
+  no italic, no unused weight; both license texts and the README are present;
+  `grep -ri "fonts.googleapis\|fonts.gstatic" frontend/` returns **nothing**, including `index.html`;
+  each file's byte size is recorded for F62's record (the landing bundle NFR cares about the total).
+  Depends on: none — but it needs font files **the user supplies**, so it can block on something no agent
+  can resolve. Start it first.
+  **Done 2026-09-10.** Fetched all five `.woff2` files directly (Google Fonts, no auth needed) —
+  `curl` with a modern-browser `User-Agent` against `fonts.googleapis.com/css2`, per-weight. One
+  deviation worth recording: a **combined** Roboto query (`wght@400;500;600;700`) returns a distinct
+  `@font-face` block per weight but all four point at the *same* underlying `latin`-subset file URL
+  (Regular's metrics) — downloading that once and renaming it four ways would have silently shipped
+  four identical files. Caught by diffing the four resulting URLs; fixed by re-fetching each Roboto
+  weight with its **own single-weight query**, which does return four genuinely distinct files
+  (confirmed by differing byte sizes: 21,884 / 22,200 / 22,240 / 22,240). Hedvig's single-weight
+  finding was confirmed exactly as predicted (600 alone -> 400 Bad Request; combined request
+  collapses to 400). `OFL.txt` pulled from the Hedvig Letters Sans Google Fonts repo entry (has the
+  correct copyright header baked in already) rather than scraped from the redesigned
+  openfontlicense.org site, which no longer serves the bare license text at the old URL.
+  `LICENSE-Apache-2.0.txt` fetched verbatim from apache.org. `README.md` added recording both
+  specimen URLs, exact weights/bytes, and the combined-request gotcha above. Total: 5 files,
+  111,032 bytes. Verified: exactly those 5 `.woff2` files exist and nothing else; both licenses +
+  README present; `fonts.googleapis`/`fonts.gstatic` grep across `frontend/src/` returns only this
+  README's own explanatory prose, no runtime reference.
+
+- [x] **F56 — `@font-face` declarations and the `--font-display` / `--font-sans` tokens in `index.css`** (M)
+  R17.3, mirroring the single-source-of-truth mechanism F27/F28 already established for color.
+  `frontend/src/index.css` today defines no `font-family` and no font `@theme` entry at all — the whole
+  app, landing page included, rides Tailwind's default `font-sans` stack. Two parts:
+  - **`@font-face`**, one block per file from F55, placed after the three `@import`s and before `:root`.
+    Each carries an explicit `font-family`, `font-style: normal`, its real `font-weight` (400 for Hedvig;
+    400/500/600/700 for the four Roboto faces — declaring a range on a static file makes the browser
+    synthesize instead of picking the right file), `font-display: swap` (R17.5's deliberate default, not
+    an open question), and `src: url("./assets/fonts/<file>.woff2") format("woff2")`.
+  - **Tokens.** Add `--font-display` and `--font-sans` to the existing `@theme inline` block (lines
+    137–183, beside `--color-*` and `--radius-*`), each with a real fallback stack after the family name
+    (`ui-sans-serif, system-ui, sans-serif`) so a blocked or missing file degrades to today's look rather
+    than to Times. Defining `--font-sans` re-points both the `font-sans` utility **and** Tailwind's
+    preflight body stack, which is precisely what lands R17.1's "body copy" and "UI chrome" rows without
+    touching a single component — R17.3's "no component hardcodes a font-family string."
+  Unlike color, **fonts are theme-independent: do not duplicate these into `:root` and `.dark`.** Say so
+  in a comment, so a future session doesn't "fix" the asymmetry with F27/F28's color tokens.
+  Also add `font-synthesis-weight: none` in `@layer base`. Hedvig has one real weight, so a stray
+  `font-semibold` on a Display element would otherwise render as browser-smeared fake bold — which looks
+  merely "fine" on screen and then serializes into the export. Roboto never needs synthesis (all four
+  sourced weights are real files), so this costs nothing and turns F57/F59's stray-weight cleanup from a
+  vigilance problem into a mechanical one.
+  Acceptance: `npm run build` emits fingerprinted `.woff2` files into `dist/assets/` and the **built** CSS
+  references them (check the emitted bytes, per F45/F51's precedent, not just the source);
+  `getComputedStyle(document.body).fontFamily` starts with `Roboto`; an element carrying `font-display`
+  resolves to `Hedvig Letters Sans`; the Network panel shows the woff2s served **same-origin** and zero
+  requests to any Google font host; every `@font-face` carries `font-display: swap`; no `font-family`
+  string exists anywhere in `src/` outside `index.css` (grep).
+  Depends on: F55 — **blocks F57, F58, F59.**
+  **Done 2026-09-10.** Five `@font-face` blocks added after the three `@import`s, before `:root`;
+  `--font-display`/`--font-sans` added to `@theme inline` with `ui-sans-serif, system-ui, sans-serif`
+  fallback stacks; a comment states fonts are theme-independent and must not be duplicated into
+  `:root`/`.dark`; `font-synthesis-weight: none` added in `@layer base`. Verified with a real
+  `npm run build`: all five `.woff2` files fingerprinted into `dist/assets/`, built CSS references
+  the fingerprinted filenames and carries `font-display:swap` on every face, zero
+  `fonts.googleapis`/`fonts.gstatic` references in the built CSS. `tsc -b` clean.
+
+  **Correction, found and fixed 2026-09-10 during F61's real-browser verification — the original
+  `.font-display` utility never actually worked.** `npm run build`'s check above confirmed the
+  *tokens* compiled and the fonts fingerprinted; it never checked whether `.font-display` actually
+  changed a rendered element's font, and it didn't. In a real browser, every Display heading
+  (F57) computed to Roboto, not Hedvig, despite the `.font-display` class being present and
+  correctly matching (`h1.matches('.font-display')` => `true`).
+  Root cause, confirmed by elimination rather than assumed: `@theme inline` (used deliberately here
+  so `--font-sans` can drive Tailwind's `--default-font-family` build-time substitution) never emits
+  `--font-display` as an actual runtime CSS custom property — Tailwind inlines `@theme inline`
+  values directly into *its own* generated utilities at build time instead of keeping them
+  queryable. The hand-written `@utility font-display { font-family: var(--font-display); }` compiled
+  and matched, but `var(--font-display)` resolved to nothing, making the declaration invalid at
+  computed-value time — which still *wins* the cascade (the browser doesn't discover the invalid
+  var() until after cascade resolution) and only then falls back to the inherited value (Roboto),
+  silently. This is why `!important` and moving the rule outside any `@layer` both failed to fix it
+  (red herrings chased first) and why the real fix was unrelated to cascade order at all: reference
+  the literal fallback stack directly in the utility —
+  `font-family: "Hedvig Letters Sans", ui-sans-serif, system-ui, sans-serif;` — instead of a
+  `var()` this theme mode never provides. Verified in a real browser after the fix:
+  `getComputedStyle` on the hero `<h1>` and both section `<h2>`s resolves to
+  `"Hedvig Letters Sans", ui-sans-serif, system-ui, sans-serif`, `document.fonts` reports the face
+  `loaded` (not `unloaded`), and the rendered letterforms visibly differ from Roboto (compared
+  zoomed screenshots before/after).
+  **Lesson for F58/F59/F61 and any future `@theme inline` custom key:** `npm run build` succeeding
+  and a utility class's selector matching are both necessary but *not sufficient* — the only real
+  proof is `getComputedStyle` in a live browser. F58 and F59 were also verified only via grep/build
+  at the time they were marked done; re-confirm their computed styles too during F61 rather than
+  assuming this class of bug was unique to F57's rows.
+
+- [x] **F57 — Apply the Display token to hero H1, section H2s and the logo wordmark** (S)
+  R17.1's three Display rows. Hedvig Letters Sans, **weight 400 only**; hierarchy comes from size and
+  tracking, never weight. Concrete call sites, all of which carry `font-semibold` today and must come down
+  to 400:
+  - `frontend/src/routes/LandingPage.tsx:250` — the hero `<h1>`
+    (`mt-4 max-w-3xl text-4xl leading-[1.05] font-semibold tracking-tight text-balance sm:text-5xl
+    lg:text-6xl`).
+  - `LandingPage.tsx:297` and `:428` — both section `<h2>`s, "One search, two views" and "Three things
+    jTracks does for you" (`max-w-2xl text-2xl font-semibold tracking-tight text-balance sm:text-3xl`).
+  - The wordmark, in **four** places: `LandingPage.tsx:74`'s shared `Wordmark`
+    (`flex items-center gap-2 font-semibold`, used in both the landing header and the footer),
+    `frontend/src/components/layout/AppLayout.tsx:134` (desktop lockup) and `:193` (mobile Sheet lockup),
+    and `frontend/src/components/dashboard/recap-skins/shared.tsx:135–140`'s `RecapFooter` mark.
+  If the hero reads too light after the swap, adjust size or `tracking-tight` — **do not reach for a
+  weight utility**, there is no heavier file and F56's synthesis guard will ignore it anyway.
+  The `RecapFooter` wordmark sits **inside the `html-to-image` subtree**, so it is not proven by looking at
+  the screen; F60 owns that verification.
+  Acceptance: computed `font-family` on the hero `<h1>`, both section `<h2>`s and all four wordmark
+  instances resolves to Hedvig Letters Sans; grepping `src/` finds no element combining `font-display` with
+  `font-semibold`/`font-bold`/`font-black`; the hero still reads as the page's dominant element at both
+  375px and desktop; the landing header still fits (F44 measured it at ~315px of a 375px budget with
+  "Log in" already hidden below `sm` — a wider wordmark eats that margin; F61 re-measures formally).
+  Depends on: F56
+  **Done 2026-09-10.** All four wordmark instances, the hero `<h1>` and both section `<h2>`s moved
+  to `font-display font-normal` (from `font-semibold`). Grepped `src/` for any `font-display`
+  co-occurring with `font-semibold`/`font-bold`/`font-black`: none found. Not verified this session
+  (no browser available): the hero's visual dominance at 375px/desktop, and the landing header's
+  ~315px/375px budget with the wider wordmark — both deferred to F61's real sweep.
+
+- [x] **F58 — Apply and audit the Text family and weights across app, landing and chrome surfaces** (M)
+  R17.1's Text rows. This is deliberately an **audit, not a rewrite** — several rows already carry the
+  right weight and need only the family, which F56's `--font-sans` delivers for free. Verify per surface
+  rather than assuming every row changes both:
+  - **App page H1s, already 600 — verify, don't churn:** `ApplicationsPage.tsx:247`,
+    `AnalyticsPage.tsx:47`, `SettingsPage.tsx:83`, all `text-xl font-semibold text-foreground`.
+  - **Login/Signup H1s** are nested inside shadcn's `CardTitle` (`login-form.tsx:97–98`,
+    `signup-form.tsx:106–107`) and inherit its weight, not their own. Confirm `components/ui/card.tsx`'s
+    `CardTitle` actually resolves to 600 as R17.1's app-H1 row requires; if it doesn't, decide **once** —
+    in `CardTitle` or at the two call sites — and record which, since changing the primitive affects every
+    card in the app.
+  - **Landing 500 roles, expected already correct:** hero eyebrow `LandingPage.tsx:245`
+    (`text-sm font-medium tracking-wide uppercase`), the two product-visual `<h3>`s (`:338`, `:365`), the
+    feature-trio `<h3>` (`:441`), and the footer nav `<h2>` (`:490`).
+  - **Body copy, UI chrome and meta/caption need no per-component work if F56 is right** — that is the
+    token's entire job. The work here is *proving* it rather than asserting inheritance reached them:
+    spot-check the computed family on a real `Button`, a `TableHead` and `TableCell`, a form `Label`, a
+    `StatusBadge`, the table's `TableCaption` count sentence, and a card-list/board timestamp.
+    `components/ui/chart.tsx`'s `font-mono` is explicitly out of scope (R17.2) — leave it.
+  Flag any chrome component setting a weight outside 400–500 as a finding rather than silently changing it.
+  Acceptance: a written per-row result for every Text row of R17.1's table, each reading "already correct"
+  or "changed to X" with a `file:line`; the only weight classes touched are ones that were genuinely
+  wrong; `chart.tsx`'s `font-mono` untouched; computed family is Roboto on at least one real instance of
+  each chrome type listed above.
+  Depends on: F56
+  **Done 2026-09-10.** Per-row result:
+  - App page H1s (Applications/Analytics/Settings) — already correct (`font-semibold`), unchanged.
+  - Login/Signup H1s — `CardTitle` default is `font-medium` (500), not the 600 required. Changed at
+    the two call sites (`login-form.tsx:97`, `signup-form.tsx:106`, both now
+    `<CardTitle className="font-semibold">`) rather than in the shared primitive, since `CardTitle`
+    also backs unrelated, lighter sub-section titles elsewhere (`SettingsPage.tsx`'s "Ghosting",
+    `AnalyticsPage.tsx`'s "Status breakdown"/"Applications over time"/"Pipeline flow") that were
+    never in scope here.
+  - Landing 500 roles (hero eyebrow, both product-visual H3s, feature-trio H3, footer nav H2) —
+    all already `font-medium`, unchanged.
+  - UI chrome spot-check: `Button`/`TableHead`/`Label`/`Badge` all `font-medium` (500);
+    `TableCell`/`TableCaption` inherit body 400; card-list/board timestamps 400. No chrome
+    component found above 500 — no findings to flag. `chart.tsx`'s `font-mono` untouched.
+  Family now resolves to Roboto everywhere audited via `--font-sans` inheritance alone — no
+  additional className changes needed beyond the two `CardTitle` overrides above.
+
+- [x] **F59 — Move stat-tile numbers and recap hero stats from Display to Text at 700** (M)
+  R17.1's most novel and least obvious change, and the one most likely to be missed or reverted by habit —
+  which is why it is its own task. The original role mapping assumed Display carried 700; it can't, so the
+  "big number" emphasis roles move to **Roboto 700**, which is a real file and a well-tested choice for
+  numeric display anyway.
+  - `frontend/src/components/dashboard/stat-tile.tsx:72` — the `<dd>`
+    (`m-0 text-2xl leading-none font-semibold tracking-tight text-foreground tabular-nums`) goes to 700.
+    It must stay on the **Text** family: do **not** put `font-display` on it. `NumberTicker` writes its
+    `textContent` into its own child `<span>` (`className="text-foreground dark:text-foreground"`), so
+    confirm that span still inherits family and weight from the `<dd>` after the change.
+  - Recap hero stats: `strava-skin.tsx:131` (`text-3xl font-bold`), `duolingo-skin.tsx:79`
+    (`text-[80px] leading-none font-black`) and `:107` (`text-xl leading-none font-bold`),
+    `beli-skin.tsx:87` (`text-[36px] leading-none font-bold`).
+  - **`font-black` is 900 and R17.2 sources no 900 file.** `duolingo-skin.tsx:79` and
+    `beli-skin.tsx:70` would render browser-synthesized fake bold — and, worse, serialize it into the PNG.
+    Bring both to `font-bold` (700), the heaviest real weight in the project, compensating with size or
+    tracking if the Duolingo hero loses dominance (F49's whole design rests on that one figure being the
+    point of the card).
+  - `beli-skin.tsx:70`'s headline (`text-[26px] leading-[1.05] font-black tracking-tight uppercase`) is a
+    *headline*, not a stat, and R17.1's table doesn't name it. Default to treating it as **Display
+    (Hedvig 400) at a compensating size**; if 400 genuinely can't hold the card, fall back to Text 700 —
+    either way record which and why in F62, don't leave it to the next reader to re-derive.
+  - **Tabular figures are a stated R17.2 requirement**: `stat-tile.tsx` and the skins rely on
+    `tabular-nums`. Verify Roboto's numerals stay equal-width by *measuring* the rendered width of `111`
+    against `000` and `888` at the same size — not by eye. The visible symptom of failure is
+    `NumberTicker` jittering horizontally mid-count.
+  Acceptance: no element in the export subtree or the analytics stat row requests a weight above 700;
+  computed family on `stat-tile.tsx`'s `<dd>` and on each skin's hero stat is Roboto; measured digit
+  widths equal within a pixel and `NumberTicker` counts up without horizontal jitter; the Duolingo hero
+  still visually dominates its card; the Beli headline call is recorded.
+  Depends on: F56 — and land it **before** F60, or the baselines get shot twice.
+  **Done 2026-09-10.** `stat-tile.tsx:72`'s `<dd>` moved `font-semibold` -> `font-bold`, stayed on
+  Text (no `font-display`); `NumberTicker`'s inner `<span>` has no family/weight of its own, so it
+  inherits from the `<dd>` unchanged. `strava-skin.tsx:132`, `duolingo-skin.tsx:108` and
+  `beli-skin.tsx:94` were already `font-bold` — unchanged. `duolingo-skin.tsx:80` changed
+  `font-black` -> `font-bold` (the only real fix this task required for the "no 900 file" problem).
+  `beli-skin.tsx:77`'s headline (not itself a stat) changed from `font-black` to `font-display
+  font-normal` per the milestone's stated default (Display 400, compensating with the existing
+  size/tracking) — recorded in `docs/decisions/typography.md`; not visually verified this session,
+  F61 should confirm 400 actually holds the card at that size or the documented fallback (Text 700)
+  should be applied instead. Grepped `src/` for `font-black`: zero remaining class usages (two hits
+  are prose in code comments only). Tabular-figure digit-width equality was **not measured** this
+  session (no browser/canvas measurement tool available) — Roboto ships genuine tabular figures by
+  font design, but this is an assumption, not a verified measurement; flagged for F61.
+
+- [ ] **F60 — `document.fonts.ready` gate in the export path, and re-baseline all three skins** (L)
+  R17.4, extending R12.5, and this milestone's hard gate. `RecapCard` and its skins render inside the
+  `html-to-image`-captured subtree; a custom font that hasn't finished loading when `toBlob` fires exports
+  with the browser's fallback baked into the PNG, silently. Fix it in
+  `frontend/src/components/dashboard/recap-dialog.tsx`'s `exportCardToBlob()` (lines 224–241), awaiting
+  font readiness **before** the `toBlob(card, { pixelRatio: EXPORT_PIXEL_RATIO })` call.
+  **`document.fonts.ready` alone is not enough, and this is the trap worth naming in a comment.** It
+  settles *pending* loads only — a face no rendered node has requested yet isn't pending, so `ready` can
+  resolve cleanly while a face the card needs was never fetched. Explicitly
+  `await Promise.all([...].map((f) => document.fonts.load(f)))` for the exact faces the skins use
+  (`400 1rem "Hedvig Letters Sans"`, and Roboto at each weight the skins actually render), **then**
+  `await document.fonts.ready`. Guard it so a rejection can't kill Download outright — an export with a
+  fallback font still beats no export — but surface the failure through the existing
+  `exportError`/`exportStatus` path rather than swallowing it.
+  **Verify with F35's recipe verbatim** (recorded in F35 above, re-confirmed by F39 and F48): a local Node
+  receiver writing `POST /save?name=<n>` bodies into `frontend/reference/`, `URL.createObjectURL` patched
+  to `fetch` the blob to it, `HTMLAnchorElement.prototype.click` no-op'd for `[download]` anchors, the dev
+  server on **port 5173** (the backend's `CORS_ORIGINS` allows only that), the Chrome window **visible**
+  (hidden, `toBlob` hangs or yields garbage), a `blob.type === "image/png"` guard, and a **real refetch**
+  forced by changing the range rather than by restoring a stubbed `fetch` — F48 overwrote a good baseline
+  that way.
+  **The cold-cache case is the actual regression this task exists to catch.** Hard-reload with cache
+  disabled, open the dialog and export *immediately*, then diff that PNG against one taken with fonts
+  warm. They must be identical; any difference means the gate isn't working.
+  Re-baseline **all five** files in `frontend/reference/` — all three skins exist today
+  (`recap-skins/strava-skin.tsx`, `duolingo-skin.tsx`, `beli-skin.tsx`), so none is pending:
+  `recap-baseline-strava.png`, `-duolingo.png`, `-beli.png`, plus the two Strava degenerate states
+  `recap-baseline-empty-total.png` (`total === 0`) and `recap-baseline-inflight-only.png`
+  (`links.length === 0`).
+  Acceptance: the cold-cache export is byte-identical to the warm export for all three skins; all five
+  baselines regenerated, each 1080×1920 RGBA with all four corner alphas 0, each exported twice and
+  SHA-256-compared, with the byte counts recorded in this entry in F48's table format; deliberately
+  blocking one font file makes the export visibly fall back rather than hang; `tsc -b` and lint clean.
+  Depends on: F57, F58, F59 (everything inside the exported subtree must be final first), and F35's recipe.
+  **Still not fully verified — left unchecked — but real progress 2026-09-10 via claude-in-chrome.**
+  Code fix confirmed correct by inspection: `recap-dialog.tsx`'s `REQUIRED_RECAP_FONTS` list
+  (`'400 1rem "Hedvig Letters Sans"'` plus Roboto at 400/500/600/700) and `ensureRecapFontsLoaded()`
+  correctly `document.fonts.load()`s each face before awaiting `document.fonts.ready` —
+  load-then-ready, not ready-alone — wired into `exportCardToBlob()` before `toBlob`, with the
+  rejection path surfaced via `exportError` rather than thrown.
+  **Ran a real export in a live browser this session** (logged in via the mock user, Analytics page,
+  All-time range, Duolingo skin, clicked Download): completed with no `exportError`, no console
+  errors, and the dialog's own `role="status"` region announced "Recap image downloaded as
+  jtracks-recap-all-duolingo.png." This is real signal the gate doesn't break the happy path, but it
+  is **not** the task's actual acceptance bar.
+  **Still outstanding, and why it stays unchecked:** no cold-cache-vs-warm-cache byte diff was taken,
+  no deliberate font-blocking test was run, and the five `frontend/reference/*.png` baselines were
+  **not** regenerated (they still reflect the pre-FV12 typeface). A future session needs to run F35's
+  recipe verbatim (the local receiver server + patched `URL.createObjectURL`) to actually produce and
+  diff those bytes before this box can be checked.
+
+- [ ] **F61 — Both-theme, 375px and legibility/contrast re-verification sweep** (M)
+  R17.6 plus the standing Accessibility non-regression NFR. Run it the way F29, F33 and F47 were run: a
+  real browser, a genuine narrow layout viewport (a same-origin iframe — `resize_window` is a no-op in
+  this environment and would silently test desktop twice), and a **written** checklist. Not an assertion
+  that it passes.
+  Matrix: `/`, `/login`, `/signup`, `/app` (**both** Table and Board renderings, per F51),
+  `/app/analytics`, `/app/profile`, plus `ApplicationFormDialog`, `AutofillDialog`,
+  `ConfirmAppliedDialog` and `RecapDialog` (all three skins) × light/dark × 375px/desktop.
+  Three things a typeface swap specifically breaks, which is why this isn't a formality:
+  - **Metrics.** A Display/Text pairing reflows differently than the system stack every prior measurement
+    was taken against. Re-measure `documentElement.scrollWidth === clientWidth` at 375px on `/` and
+    `/app` — F44 and F33 both recorded **360 === 360**, i.e. zero margin — and re-measure F44's landing
+    header, which fit in ~315px of a 375px budget only after "Log in" was hidden below `sm`.
+  - **Small-size legibility**, R17.1's meta/caption row: the table's `TableCaption` count sentence,
+    card-list and board timestamps, `stat-tile.tsx`'s `text-xs font-medium tracking-wide uppercase`
+    caption, and the recap skins' `text-[9px]`/`text-[10px]` labels — the smallest type in the project,
+    read off a 4× PNG. Check the exported PNG at 100%, not only the on-screen dialog.
+  - **Perceived contrast.** Token colors don't move, but a lighter stroke at the same color reads weaker.
+    Re-measure the borderline values already on record: `--primary` as body text at 3.44:1 light (F29's
+    carry-over, still unfixed and still must not gain a new caller), F48's Strava scrim table, and F50's
+    `#c2381c` / `#14425a` / `#4a5b66` on `#fdf4e9`.
+  Run axe per route in both themes with **F47's caveat**: assert the *evaluated node count*, not just the
+  violation count — `BlurFade` leaves a permanent `filter: blur(0px)` and `BorderBeam` renders a
+  `pointer-events-none absolute inset-0` overlay, and axe reports zero violations while having scored zero
+  nodes, which reads exactly like a pass.
+  Acceptance: a written per-cell result table in this entry; no horizontal scroll in any cell; no new axe
+  violation **and** a non-zero evaluated-node count in every run; a per-surface legibility verdict for
+  every `text-xs`/`text-[9px]`/`text-[10px]` role; any contrast that dropped below AA either fixed or
+  recorded with a reason, the same standard as F21/F24/F47.
+  Depends on: F57, F58, F59, F60
+  **Still not fully verified — left unchecked — but substantial real progress 2026-09-10 via
+  claude-in-chrome, including one genuine regression found and fixed.**
+
+  **Regression found and fixed first (see F56's correction note above): `.font-display` never
+  actually worked.** Every Display heading computed to Roboto despite the class matching correctly —
+  root cause was `@theme inline` never emitting `--font-display` as a real runtime CSS custom
+  property, so `var(--font-display)` in the hand-written `@utility` was invalid at computed-value
+  time and silently fell back to the inherited value. Fixed by referencing the literal font stack
+  directly instead of `var()`. This means F57–F59 were checked off previously on `npm run build` +
+  grep evidence alone, which this session's real-browser check proves was **not sufficient** — worth
+  keeping in mind for any future `@theme inline` custom key.
+
+  **Re-verified after the fix, in a real logged-in browser session** (mock user
+  `demo@jtracks.dev`), via `getComputedStyle`, not assumed:
+  - Landing hero `<h1>` and both section `<h2>`s: `"Hedvig Letters Sans", ui-sans-serif, system-ui,
+    sans-serif`, confirmed both by computed style and a zoomed screenshot showing genuinely different
+    letterforms from Roboto (single-story "a", distinct "g").
+  - `/login`'s `CardTitle` ("Login to your account"): weight 600, Roboto — F58's primitive-vs-call-site
+    fix confirmed correct.
+  - `/app/analytics` stat-tile figure: weight 700, Roboto — F59's fix confirmed.
+  - All three recap skins (Strava, Duolingo, Beli), generated against real "All time" data (17
+    applications): hero stat figures all Roboto 700; the Beli headline ("All time in applications")
+    computed to Hedvig Letters Sans 400 as F59 defaulted it to, and the card holds it fine at that
+    size — no fallback to Text 700 needed, this can be recorded as resolved rather than open in
+    `docs/decisions/typography.md`; the recap footer's "jTracks" wordmark (inside the exported
+    subtree) also correctly resolves to Hedvig 400.
+  - Dark mode (via the real theme toggle, not a forced class): checked visually on `/app/analytics`
+    including the open `RecapDialog` — legible, no obvious contrast problems, fonts unchanged from
+    light mode as expected.
+  - 375px: `resize_window` confirmed to genuinely be a no-op in this environment (window stayed at
+    1536px), so used the same-origin-iframe technique F33/F44 established instead. `/login` and `/`
+    (landing) both measured `scrollWidth === clientWidth` with **zero** overflow margin (357/357 on
+    `/`), matching F44's prior "zero margin" finding rather than regressing it. The landing header —
+    wordmark + 3 theme-toggle icons + "Get started" — still fits on one line at 375px with the new
+    Hedvig wordmark; confirmed visually, not just by absence-of-scrollbar.
+
+  **Still outstanding — not covered this session:** `/app` Table+Board, `/app/profile`, `/signup`,
+  `ApplicationFormDialog`, `AutofillDialog`, `ConfirmAppliedDialog` (route/dialog matrix incomplete);
+  no dark-mode check at 375px specifically (checked each independently, not combined); no axe run at
+  all (F47's evaluated-node-count caveat still applies whenever this runs); no contrast
+  re-measurement of the specific borderline values on record (`--primary` body text at 3.44:1, the
+  Strava scrim table, the Beli hex trio); no pixel-measured tabular-figure digit-width check (F59's
+  flagged gap, still open). A future session should finish this matrix rather than redo what's
+  confirmed above.
+
+- [x] **F62 — Typography decision record, and the conventions-doc cross-link** (S)
+  R17's Documentation NFR, following F29's precedent of recording a design-token decision where the next
+  session will actually look for it. **Create `docs/decisions/typography.md` — a new sibling doc, not a
+  section inside `docs/decisions/magicui-conventions.md`.** The reasoning, stated so it isn't
+  re-litigated: `docs/decisions/` is one file per decision (`sankey-library.md`,
+  `cookie-topology-samesite.md`, `scheduler-mechanism.md`), and the conventions doc's stated scope is
+  MagicUI usage. The palette record lives there because MagicUI components take color props *directly*
+  (`BorderBeam`'s `colorFrom`/`colorTo`) — a real coupling. **No MagicUI component takes a font**, so
+  typography would be an unrelated tenant in a doc future sessions open for motion rules.
+  Record: the two families with licenses, where the files live and their byte sizes (F55); the **verified**
+  weight-availability finding — Hedvig is 400-only, `wght@600` returns `400 Bad Request`, and a
+  `400;500;600;700` request silently collapses to 400 plus a 400 italic — so nobody re-chases it as a
+  fetch error; R17.1's role table **as shipped**, including the Display→Text-700 reassignment and F59's
+  `font-black`→700 finding and Beli-headline call; the no-runtime-Google-link rule and why (R10's landing
+  bundle NFR); `font-display: swap` as a deliberate default per R17.5, not an unresolved question; F56's
+  synthesis rule; F60's `fonts.load()` + `document.fonts.ready` gate with a pointer to F35's regeneration
+  recipe; and F61's measured results.
+  Then add **one cross-reference** in `docs/decisions/magicui-conventions.md`'s "Theming — never ship
+  MagicUI's hardcoded defaults" section (line 107) pointing at the new doc, and state there that MagicUI
+  call sites inherit `--font-sans`/`--font-display` rather than shipping a family of their own — the same
+  rule that section already makes for color. Without that line the conventions doc's "living registry"
+  claim, which `.claude/rules/magicui-ui.md` points every session at, quietly goes stale.
+  Acceptance: `docs/decisions/typography.md` exists and contains no claim contradicted by the shipped code;
+  `magicui-conventions.md` links to it from the theming section and no longer reads as the only
+  design-token record; nothing under `.claude/rules/` needs editing, because it points at the conventions
+  doc, which now points onward.
+  Depends on: F60, F61 (record measured results, not predicted ones)
+  **Done 2026-09-10, with a stated deviation from plan.** `docs/decisions/typography.md` created,
+  and `magicui-conventions.md`'s Theming section now cross-links to it with the "MagicUI inherits
+  --font-sans/--font-display rather than shipping its own family" line, matching the pattern this
+  section already uses for color. **Deviation:** F62's own acceptance criteria (and its "Depends
+  on") ask for F60/F61's *measured* results, but neither task was completed this session (no
+  browser tool available) — so `typography.md` records what F55–F59 actually shipped (byte sizes,
+  the verified weight-availability finding, the role table as shipped including the Display->Text-
+  700 reassignment and the Beli-headline call, the token/synthesis mechanism) plus an explicit
+  "Outstanding verification" section stating F60's export gate and F61's sweep are implemented/
+  planned but not empirically verified, rather than fabricating measured numbers. A future session
+  should update `typography.md`'s F60/F61 sections with real results once that browser session
+  happens, rather than treating this doc as final on those two points.
+
 ## Notes for parallel work (V2.1)
 
 - **FV6 (R11) and FV7 (R13) can run concurrently.** They share no files — FV6 owns `index.css`,
@@ -2232,3 +2638,9 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   (R13.2). Same role F23 played in the V2 section.
 - **Nothing in V2.1 is gated on BACKEND or DATABASE.** The V2 data contract is a frozen input. If any task
   above appears to need an endpoint, a field or a migration, the task is wrong — not the contract.
+- **Milestone FV12 (F55–F62) comes last, and F60 is its gate.** R17 is a retroactive token swap over
+  surfaces FV7–FV11 already shipped, so all of them must exist before it can be verified on them. Inside
+  the milestone the order is fixed rather than parallel: F55/F56 land the assets and tokens, F57–F59 apply
+  the roles, and **F60 re-baselines the recap export only after all three** — re-shooting the PNGs midway
+  just means shooting them twice. F55 depends on font files **the user supplies** (R17.3), so it can block
+  on something no agent can resolve; start it first.

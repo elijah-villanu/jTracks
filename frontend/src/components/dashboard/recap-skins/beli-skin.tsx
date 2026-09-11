@@ -66,8 +66,15 @@ export const BeliSkin = forwardRef<HTMLDivElement, RecapSkinProps>(function Beli
         color: RECAP_LITERAL_COLORS.beliInk,
       }}
     >
+      {/*
+        F59/R17.1: this is a headline, not a stat, and R17.1's table doesn't
+        name it -- treated as Display (Hedvig 400, the only real weight)
+        rather than Text 700, compensating for the lost font-black (900,
+        unsourced -- would synthesize a fake bold that serializes into the
+        PNG export) with the size/tracking already in place here.
+      */}
       <p
-        className="text-[26px] leading-[1.05] font-black tracking-tight uppercase"
+        className="font-display text-[26px] leading-[1.05] font-normal tracking-tight uppercase"
         style={{ color: RECAP_LITERAL_COLORS.beliHeadline }}
       >
         {recap.period_label}

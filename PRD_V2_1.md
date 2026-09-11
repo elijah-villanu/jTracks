@@ -452,33 +452,52 @@ landing page, rides Tailwind's default `font-sans` stack. This is deliberately i
 distinct from R11.5's still-open radius/density question: the goal is a typeface that reads as
 chosen, not as an unstyled default.
 
-**R17.1 — Structure. Confirmed: a Display + Text pairing**, not a single family. A distinct Display
-family carries hero/section headings, the logo wordmark, and the large stat/recap numbers; a
-separate Text family carries body copy, buttons, tables, forms, and general UI chrome. Proposed role
-mapping, derived from the sizes/weights already in use across the shipped app (subject to revision
-once real font choices are in hand):
+**R17.1 — Structure and families. Confirmed: a Display + Text pairing**, not a single family, with
+specific families chosen:
 
-| Role | Surface | Family | Weight(s) in use today |
+- **Display** — [Hedvig Letters Sans](https://fonts.google.com/specimen/Hedvig+Letters+Sans)
+  (Kanon Foundry; Google Fonts, SIL OFL 1.1).
+- **Text** — [Roboto](https://fonts.google.com/specimen/Roboto) (Google Fonts, Apache License 2.0).
+
+**Weight-availability finding, verified against Google's font-delivery API
+(`fonts.googleapis.com/css2`), not assumed:** Hedvig Letters Sans is a **single-weight family** —
+`wght@600` alone returns `400 Bad Request`, and a `400;500;600;700` request silently collapses to
+just weight **400 (Regular)**, plus a matching 400 italic. This is intentional per the typeface's
+own design brief (drawn "in one weight" for the Hedvig insurance brand) — not a fetch error or a
+missing style to chase down. Roboto, by contrast, confirmed all of 400/500/600/700 as real,
+independently requestable static weights.
+
+This forced a decision, since R11's original role mapping assumed Display carried 600 (headings)
+and 700 (recap hero stats): **Hedvig Letters Sans stays Display for identity/headline roles at its
+one weight (400) only** — hierarchy there comes from size and tracking, not weight — **and the
+"big number" emphasis roles move to the Text family (Roboto) at 700**, since Roboto genuinely
+supports it and a robust grotesque is a common, well-tested choice for numeric/data display anyway.
+Confirmed role mapping:
+
+| Role | Surface | Family | Weight |
 |---|---|---|---|
-| Hero H1 | `LandingPage.tsx` | Display | 600 |
-| Section H2 | `LandingPage.tsx` | Display | 600 |
-| Logo wordmark ("jTracks") | `AppLayout.tsx`, footers, recap cards | Display | 600 |
-| Stat-tile numbers (`NumberTicker`) | `stat-tile.tsx` | Display | 600 |
-| Recap hero stats | `strava-skin.tsx`, `duolingo-skin.tsx`, and the Beli skin once it lands | Display | 700 |
-| App page H1 (Applications/Analytics/Settings/Login/Signup) | route headers | Text | 600 |
-| Hero eyebrow, feature-card H3, footer nav H2 | `LandingPage.tsx` | Text | 500 |
-| Body copy | paragraphs, subheads | Text | 400 |
-| UI chrome (buttons, table, form labels, badges) | app-wide, shadcn defaults | Text | 400–500 |
-| Meta/caption | table caption, timestamps | Text | 400 |
+| Hero H1 | `LandingPage.tsx` | Display (Hedvig Letters Sans) | 400 |
+| Section H2 | `LandingPage.tsx` | Display (Hedvig Letters Sans) | 400 |
+| Logo wordmark ("jTracks") | `AppLayout.tsx`, footers, recap cards | Display (Hedvig Letters Sans) | 400 |
+| Stat-tile numbers (`NumberTicker`) | `stat-tile.tsx` | Text (Roboto) | 700 |
+| Recap hero stats | `strava-skin.tsx`, `duolingo-skin.tsx`, and the Beli skin once it lands | Text (Roboto) | 700 |
+| App page H1 (Applications/Analytics/Settings/Login/Signup) | route headers | Text (Roboto) | 600 |
+| Hero eyebrow, feature-card H3, footer nav H2 | `LandingPage.tsx` | Text (Roboto) | 500 |
+| Body copy | paragraphs, subheads | Text (Roboto) | 400 |
+| UI chrome (buttons, table, form labels, badges) | app-wide, shadcn defaults | Text (Roboto) | 400–500 |
+| Meta/caption | table caption, timestamps | Text (Roboto) | 400 |
 
-**R17.2 — Weights to source.** Display needs **600 (Semibold)** required and **700 (Bold)**
-required for the recap hero stats (R12.7) — 2 static weights, or one variable-font file covering
-that range. Text needs **400 (Regular)**, **500 (Medium)**, and **600 (Semibold)** — 3 static
-weights, or one variable-font file. No italic is used anywhere in the shipped app; no dedicated
-monospace family is needed (the only `font-mono` reference is internal to shadcn's chart-tooltip
-component and is not required to change). Both families must provide clean tabular/lining figures —
-`stat-tile.tsx` and the recap hero stats already rely on `tabular-nums`, and this must keep working
-against whatever ships.
+**R17.2 — Weights to source. Resolved.** Display: **Hedvig Letters Sans, weight 400 only** (its
+sole available weight; 400 italic also exists but is not used anywhere in the mapping above). Text:
+**Roboto 400 (Regular), 500 (Medium), 600 (Semibold), 700 (Bold)** — 4 static weight files (Roboto
+ships as discrete static weights, not a variable font, confirmed via the same API check). No italic
+is used anywhere in the shipped app; no dedicated monospace family is needed (the only `font-mono`
+reference is internal to shadcn's chart-tooltip component and is not required to change). Both
+families must provide clean tabular/lining figures — `stat-tile.tsx` and the recap hero stats
+already rely on `tabular-nums`, and Roboto's numerals must keep that working. Both are Google
+Fonts and downloadable for self-hosting under their respective licenses (R17.3) — no attribution
+string is required in-app for either license, but keeping the license files alongside the font
+assets in the repo is good practice.
 
 **R17.3 — Token discipline, matching R11.4.** Fonts are self-hosted (the user supplies the font
 files — never a runtime Google Fonts `<link>`/`@import`, which would violate R10's landing bundle-
@@ -714,7 +733,8 @@ Proposed ordering. Each stage is independently shippable and leaves the app work
 7. **R17 — typeface overhaul.** Last, deliberately: it's a token swap applied retroactively across
    R10/R12/R13's already-built surfaces (R17.6), not new layout work, so it lands once those
    surfaces — including R12.7's recap skins — are stable rather than re-verifying it mid-flight.
-   Waits on the user supplying the actual font files (R17.2).
+   Families resolved (R17.1/R17.2: Hedvig Letters Sans + Roboto); ready to implement once R12.7's
+   recap skins are stable.
 
 **R15 (Mobbin MCP)** is not a stage — it was adopted ahead of stage 4's landing-page design work
 (R10.3), and no stage waited on it.

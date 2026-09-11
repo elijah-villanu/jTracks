@@ -135,7 +135,8 @@ export function RecapFooter({ recap, color, mutedColor, className, style }: Reca
       className={`flex items-center justify-between text-[9px] ${className ?? ""}`}
       style={{ color: mutedColor, ...style }}
     >
-      <span className="flex items-center gap-1 font-semibold" style={{ color }}>
+      {/* F57/R17.1: Display role, weight 400 only. Sits inside the html-to-image export subtree (F60 verifies it in the PNG, not on screen). */}
+      <span className="flex items-center gap-1 font-display font-normal" style={{ color }}>
         <Briefcase className="size-3" aria-hidden="true" />
         jTracks
       </span>

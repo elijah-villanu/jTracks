@@ -131,7 +131,8 @@ export function AppLayout() {
       <BlurFade delay={0}>
         <header className="border-b border-border">
           <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-3">
-            <div className="flex items-center gap-2 font-semibold">
+            {/* F57/R17.1: Display role, weight 400 only -- no heavier file exists. */}
+            <div className="flex items-center gap-2 font-display font-normal">
               <Briefcase className="size-5 text-primary" aria-hidden="true" />
               <span>jTracks</span>
             </div>
@@ -188,7 +189,8 @@ export function AppLayout() {
               </SheetTrigger>
               <SheetContent side="right" className="lg:hidden">
                 <SheetHeader>
-                  <SheetTitle className="flex items-center gap-2">
+                  {/* F57/R17.1: Display role, weight 400 only -- overrides SheetTitle's default font-medium/text-base at this call site only. */}
+                  <SheetTitle className="flex items-center gap-2 font-display font-normal">
                     <Briefcase className="size-5 text-primary" aria-hidden="true" />
                     jTracks
                   </SheetTitle>

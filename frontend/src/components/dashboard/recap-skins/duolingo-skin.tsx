@@ -76,7 +76,8 @@ export const DuolingoSkin = forwardRef<HTMLDivElement, RecapSkinProps>(function 
           boxShadow: `inset 0 0 0 1px ${RECAP_LITERAL_COLORS.duolingoHairline}`,
         }}
       >
-        <p className="text-[80px] leading-none font-black" style={{ color: "#ffffff" }}>
+        {/* F59/R17.1: font-black (900) has no sourced file and would synthesize a fake bold that then serializes into the PNG export. font-bold (700) is the heaviest real weight in the project. */}
+        <p className="text-[80px] leading-none font-bold" style={{ color: "#ffffff" }}>
           {hero.value}
         </p>
         <p
