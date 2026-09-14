@@ -130,6 +130,52 @@ incoming ribbon's computed width may exceed it), but it's a real visual
 edge case F16 and F15's legibility pass should be aware of and decide how
 to handle, since it isn't the R5.4 shortfall this task was scoped to solve.
 
+> **Resolved 2026-09-11 — and the observation above was right, but it was a
+> payload bug, not a rendering case to "handle."** F16 never acted on this
+> flag, and it survived F36–F39's whole visual pass plus F47's close-out,
+> because nothing about it is visible unless you measure it.
+>
+> The real rule, confirmed against `backend/app/services/dashboard_service.py`'s
+> `build_sankey` (*"A node's `value` is its inflow"*) and against `PRD_V2.md`
+> R5.5's own example payload (`interviewing_oa` node **34**, inflow link
+> **34**, current status count **12**): **a node's `value` is its inflow, not
+> its current-status count.** The backend has always done this correctly. The
+> two MSW handlers (`mocks/handlers/dashboard.ts`, `mocks/handlers/recap.ts`)
+> and the landing page's `routes/landing/demo-data.ts` all set the
+> `interviewing_oa` node to `countOf("interviewing_oa")` instead, so dev, the
+> mocked recap, and the **public landing page** rendered a payload the real
+> product never produces.
+>
+> Two consequences, both measured rather than eyeballed:
+> 1. **Geometry.** With the landing page's own demo numbers, the
+>    `applied → interviewing_oa` ribbon laid out at **65.8px** against a node
+>    rect of **32.9px** — exactly 2×, overshooting the node by its full
+>    in-flight amount and running into the slot below it.
+> 2. **F37/R12.2 was silently dead at that node.** The shortfall is
+>    `node.value − Σ(outgoing)`; with the node undercounted to exactly its
+>    outflow, the shortfall computed as **0**, so the "N in flight" label, the
+>    dashed remainder cap, *and* the `ChartDataTable`'s "Still in flight" row
+>    never appeared for `interviewing_oa` — only for `applied`. A stated V2.1
+>    success metric ("a user can tell which applications are still in flight")
+>    was therefore only half met, in the exact place where it matters most.
+>
+> Fixed in all three payload producers. Verified in a real browser at
+> `/app/analytics`: the node rect and its incoming ribbon now measure
+> identically (66.94px each: 33.47 filled + 33.47 dashed in-flight cap), the
+> label reads `Interviewing / OA (7 · 3 in flight)`, the overlay trigger's
+> accessible name reads "Interviewing / OA: 7 applications, 3 still in
+> flight", and the text alternative gained its
+> `Interviewing / OA | Still in flight | 3` row.
+>
+> `SankeyChart` also gained a **DEV-only invariant check** (a `console.error`,
+> not a throw — R5.5 forbids it from re-deriving or repairing topology, so
+> saying so out loud is the most it may do) for both directions: a node that
+> emits more than its value, and a node that receives more than its value.
+> `demo-data.ts`'s `assertDemoContract` was corrected too — it had been
+> asserting `link === node + offer + failed`, which only holds while the node
+> carries the *wrong* number, i.e. the assertion was locking the bug in rather
+> than catching it.
+
 ## Export verification
 
 **Confirmed working.** Verified live in a real Chrome tab (via the `/dev/sankey-spike` page) by calling the

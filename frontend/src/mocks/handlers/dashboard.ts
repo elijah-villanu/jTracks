@@ -121,7 +121,9 @@ function buildStatusBreakdown(cohort: Application[]): StatusBreakdownEntry[] {
  * value = total submitted in range; `applied->interviewing_oa` =
  * `interviewing_oa + offer + failed`; `applied->rejected` = `rejected`;
  * `applied->ghosted` = `ghosted`; `interviewing_oa->offer` = `offer`;
- * `interviewing_oa->failed` = `failed`. Rows still sitting in `applied` or
+ * `interviewing_oa->failed` = `failed`. Node values are *inflows*, so the
+ * `interviewing_oa` node equals that same `interviewing_oa + offer + failed`
+ * sum rather than the current `interviewing_oa` count. Rows still sitting in `applied` or
  * `interviewing_oa` don't flow anywhere -- no synthetic "pending" node or
  * edge (R5.4). When `total` is 0, still returns the full shape: all 6
  * nodes at value 0, empty `links`.
@@ -139,9 +141,25 @@ function buildSankey(cohort: Application[]): Sankey {
 
   const appliedToInterviewingOa = interviewingOa + offer + failed
 
+  // A node's `value` is its **inflow**, not its current-status count. Every
+  // submitted row entered `Applied`, and every row now in `offer` or
+  // `failed` necessarily passed through `interviewing_oa` on the way -- so
+  // the `interviewing_oa` node is worth `interviewing_oa + offer + failed`,
+  // exactly the value of the `applied -> interviewing_oa` link feeding it.
+  // This matches `backend/app/services/dashboard_service.py`'s `build_sankey`
+  // and PRD_V2.md R5.5's example payload (node 34 == inflow 34, with a
+  // current count of 12). Using the current count here instead made the
+  // node rect render at half the height of its own incoming ribbon (the
+  // ribbon overshot it by the in-flight amount), and made F37/R12.2's
+  // shortfall -- `node.value - outgoing` -- come out as 0, so the dashboard
+  // never showed "N in flight" at the interview stage at all.
   const nodes: SankeyNode[] = [
     { key: "applied", label: STATUS_LABEL.applied, value: total },
-    { key: "interviewing_oa", label: STATUS_LABEL.interviewing_oa, value: interviewingOa },
+    {
+      key: "interviewing_oa",
+      label: STATUS_LABEL.interviewing_oa,
+      value: appliedToInterviewingOa,
+    },
     { key: "rejected", label: STATUS_LABEL.rejected, value: rejected },
     { key: "ghosted", label: STATUS_LABEL.ghosted, value: ghosted },
     { key: "offer", label: STATUS_LABEL.offer, value: offer },

@@ -8,12 +8,8 @@ import {
   type StatusFilter,
 } from "@/components/table/applications-toolbar"
 import { ApplicationsCardList } from "@/components/table/applications-card-list"
-import {
-  ApplicationsTable,
-  COLUMN_LABEL,
-  type SortDirection,
-  type SortKey,
-} from "@/components/table/applications-table"
+import { ApplicationsTable } from "@/components/table/applications-table"
+import { COLUMN_LABEL, type SortDirection, type SortKey } from "@/components/table/columns"
 import { statusSelectId } from "@/components/table/status-select"
 import { BlurFade } from "@/components/ui/blur-fade"
 import { useApplicationsContext } from "@/hooks/useApplicationsContext"
@@ -87,13 +83,15 @@ export function ApplicationsPage() {
     }
   }
 
-  // The card rendering's sort control (F32) is a single combobox whose
-  // value already spells out both field and direction ("Company,
-  // ascending") -- unlike the table header's click-to-toggle SortButton,
-  // it picks an exact key/direction pair directly rather than toggling.
-  // Both still land in the same `sortKey`/`sortDirection` state that
-  // drives `visibleApplications` below, so the two renderings can never
-  // disagree about the current sort.
+  // The shared `SortSelect` (components/table/sort-select.tsx) is a single
+  // combobox whose value already spells out both field and direction
+  // ("Company, ascending") -- unlike the table header's click-to-toggle
+  // SortButton, it picks an exact key/direction pair directly rather than
+  // toggling. Used by the card rendering (F32) and, per R13.6, by the
+  // table itself whenever it is hiding a column, so the keys F31 drops
+  // stay sortable. Every path lands in the same `sortKey`/`sortDirection`
+  // state that drives `visibleApplications` below, so no two renderings --
+  // or two controls in the same rendering -- can disagree about the sort.
   function handleSortSelect(key: SortKey, direction: SortDirection) {
     setSortKey(key)
     setSortDirection(direction)
@@ -260,9 +258,23 @@ export function ApplicationsPage() {
         </div>
       </BlurFade>
 
-      {(error || actionError) && (
+      {/*
+        Two independent failures, two alerts. They used to share one
+        element rendering `error ?? actionError`, which meant a load
+        failure permanently masked every subsequent status-change failure
+        underneath it -- the user would click a status, watch nothing
+        happen, and see only the stale "couldn't load" banner. They are
+        also different in kind: `error` describes the list you are looking
+        at, `actionError` describes the edit you just attempted.
+      */}
+      {error && (
         <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {error ?? actionError}
+          {error}
+        </p>
+      )}
+      {actionError && (
+        <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {actionError}
         </p>
       )}
 
@@ -321,6 +333,7 @@ export function ApplicationsPage() {
               sortKey={sortKey}
               sortDirection={sortDirection}
               onSort={handleSort}
+              onSortSelect={handleSortSelect}
               onStatusChange={handleStatusChange}
               updatingId={updatingId}
             />

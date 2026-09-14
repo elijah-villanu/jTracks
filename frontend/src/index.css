@@ -240,54 +240,42 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
-  /*
-    F56/R17.3: Display + Text font tokens. Each carries a real fallback
-    stack after the family name so a blocked/missing font file degrades
-    to today's system-stack look instead of to Times. These re-point
-    Tailwind's `font-sans` utility *and* preflight's body stack, landing
-    R17.1's "body copy"/"UI chrome" rows without touching a single
-    component. Unlike --color-*/--radius-* above, fonts are
-    theme-independent -- do NOT duplicate --font-display/--font-sans
-    into :root/.dark, there is no light/dark variant of a typeface.
-  */
-  --font-display: "Hedvig Letters Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-sans: "Roboto", ui-sans-serif, system-ui, sans-serif;
+  /* Font tokens deliberately live in their own plain `@theme` block below, not here -- see the comment on it. */
 }
 
 /*
-  F60 fix (browser-verified regression), root cause confirmed live in a real
-  browser, not assumed:
+  F56/R17.3: Display + Text font tokens. Each carries a real fallback stack
+  after the family name so a blocked/missing font file degrades to today's
+  system-stack look instead of to Times. These re-point Tailwind's
+  `font-sans` utility *and* preflight's body stack (via
+  `--default-font-family`), landing R17.1's "body copy"/"UI chrome" rows
+  without touching a single component, and give `font-display` a real
+  utility for the headline roles. Fonts are theme-independent -- do NOT
+  duplicate these into `:root`/`.dark`, there is no light/dark variant of a
+  typeface.
 
-  Tailwind v4 only auto-generates a `font-family` utility for its three
-  reserved keys (sans/serif/mono) -- `--font-sans` above reaches the page for
-  free via preflight's `--default-font-family` (a build-time substitution
-  Tailwind does internally for those 3 keys specifically), but a *custom*
-  theme key like `--font-display` gets no such treatment, so an explicit
-  `@utility` is required to get a `.font-display` class at all.
-
-  The real trap: `@theme inline` (used here, deliberately, so `--font-sans`
-  can drive `--default-font-family`) never emits `--font-display` as an
-  actual runtime CSS custom property -- Tailwind substitutes `@theme inline`
-  values directly into ITS OWN generated utilities at build time instead of
-  keeping them queryable. So `@utility font-display { font-family:
-  var(--font-display); }` compiles, and its selector genuinely matches
-  (confirmed via `h1.matches('.font-display')` => true and inspecting the
-  served CSS directly), but `var(--font-display)` resolves to nothing --
-  making the whole declaration "invalid at computed-value time" per the CSS
-  Variables spec. An invalid declaration still WINS the cascade (browsers
-  don't discover the invalid var() until after cascade resolution), which is
-  why even `!important` and moving it outside any layer didn't help and were
-  red herrings -- but once "won," it computes to the property's inherited
-  value instead of the invalid one, silently falling back to Roboto. Proven
-  by setting the literal string directly via an inline style (no var()
-  indirection): it worked immediately, at normal priority, no !important
-  needed -- isolating the bug to the var() reference itself, not cascade
-  order. Fix: reference the literal fallback stack directly, matching how
-  Tailwind's own build-time substitution works for its reserved keys,
-  instead of a runtime var() this theme mode never provides.
+  **A plain `@theme`, deliberately not the `@theme inline` block above, and
+  this is the whole fix for the bug F61 found in a real browser.**
+  `@theme inline` substitutes a key's value straight into Tailwind's own
+  generated utilities at build time and never emits it as a runtime custom
+  property -- which is correct for the `--color-*` keys above, whose values
+  are themselves `var(--background)`-style references that must not be
+  frozen. Fonts are the opposite case: their values are literals, and
+  something has to be able to *read* them back. Under `@theme inline` the
+  generated `.font-display` compiled to `font-family: var(--font-display)`
+  against a property that was never emitted, making the declaration invalid
+  at computed-value time -- it still won the cascade, then computed to the
+  inherited value, so every Display heading silently rendered in Roboto
+  while the class matched perfectly. That was previously patched around
+  with a hand-written `@utility font-display` repeating the literal stack,
+  which worked but left two copies of the Display stack to keep in sync.
+  Under a plain `@theme` the property is emitted on `:root` (verified in
+  the built CSS, not assumed), Tailwind generates `.font-display` from the
+  `--font-*` namespace by itself, and the stack is written exactly once.
 */
-@utility font-display {
-  font-family: "Hedvig Letters Sans", ui-sans-serif, system-ui, sans-serif;
+@theme {
+  --font-display: "Hedvig Letters Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Roboto", ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer base {

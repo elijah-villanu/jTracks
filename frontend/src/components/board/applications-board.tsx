@@ -1,7 +1,7 @@
 import { useId, useState } from "react"
 import { CalendarDays, MapPin, Pencil } from "lucide-react"
 import { ALL_STATUSES, STATUS_LABEL } from "@/components/StatusBadge"
-import { COLUMN_LABEL } from "@/components/table/applications-table"
+import { COLUMN_LABEL } from "@/components/table/columns"
 import { StatusControl } from "@/components/table/status-control"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -292,17 +292,27 @@ function BoardCard({
           are decorative shorthand for the visually-hidden <dt>, not a
           replacement for it, so the value is still programmatically
           tied to the field name it belongs to.
+
+          The icon sits *inside* the <dd>, and the flex row moved onto the
+          <dd> with it, because a <div> child of a <dl> may contain only
+          <dt> and <dd> elements -- an <svg> as their sibling is invalid
+          HTML, which is also how some assistive tech stops treating the
+          group as a term/description pair at all. Visually identical.
         */}
         <dl className="flex flex-col gap-1 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1.5">
-            <MapPin className="size-3.5 shrink-0" aria-hidden="true" />
+          <div>
             <dt className="sr-only">{COLUMN_LABEL.location}</dt>
-            <dd className="m-0 break-words">{application.location ?? "—"}</dd>
+            <dd className="m-0 flex items-center gap-1.5 break-words">
+              <MapPin className="size-3.5 shrink-0" aria-hidden="true" />
+              {application.location ?? "—"}
+            </dd>
           </div>
-          <div className="flex items-center gap-1.5">
-            <CalendarDays className="size-3.5 shrink-0" aria-hidden="true" />
+          <div>
             <dt className="sr-only">{COLUMN_LABEL.date_applied}</dt>
-            <dd className="m-0">{application.date_applied ?? "—"}</dd>
+            <dd className="m-0 flex items-center gap-1.5">
+              <CalendarDays className="size-3.5 shrink-0" aria-hidden="true" />
+              {application.date_applied ?? "—"}
+            </dd>
           </div>
         </dl>
 

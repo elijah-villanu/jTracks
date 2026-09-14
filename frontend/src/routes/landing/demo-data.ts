@@ -31,7 +31,9 @@ import type {
  *    would make the landing page render a chart the product never could:
  *      - all six non-`saved` nodes are present, including zero-value ones;
  *      - links with `value: 0` are omitted entirely;
- *      - `applied -> interviewing_oa === interviewing_oa + offer + failed`.
+ *      - node values are *inflows*, so `applied -> interviewing_oa` equals
+ *        the `interviewing_oa` node's own value, and no node emits more
+ *        than it took in.
  *    `buildDemoSankey` below enforces all three *by construction* -- the
  *    hand-authored numbers are per-status counts, and every node value and
  *    link value is derived from them. Editing a count changes the chart;
@@ -104,9 +106,20 @@ function stillApplied(counts: DemoFunnelCounts): number {
 function buildDemoSankey(counts: DemoFunnelCounts): Sankey {
   const appliedToInterviewingOa = counts.interviewingOa + counts.offer + counts.failed
 
+  // A node's `value` is its **inflow**, matching the backend
+  // (`dashboard_service.build_sankey`) and PRD_V2.md R5.5's example
+  // payload: `interviewing_oa` is worth everyone who ever reached the
+  // interview stage, which is exactly the link feeding it. It is *not*
+  // `counts.interviewingOa`, the number currently sitting there -- that is
+  // the node's shortfall (inflow minus outflow), which is what F37 draws
+  // as "N in flight" and what `status_breakdown` reports.
   const nodes: SankeyNode[] = [
     { key: "applied", label: STATUS_LABEL.applied, value: counts.total },
-    { key: "interviewing_oa", label: STATUS_LABEL.interviewing_oa, value: counts.interviewingOa },
+    {
+      key: "interviewing_oa",
+      label: STATUS_LABEL.interviewing_oa,
+      value: appliedToInterviewingOa,
+    },
     { key: "rejected", label: STATUS_LABEL.rejected, value: counts.rejected },
     { key: "ghosted", label: STATUS_LABEL.ghosted, value: counts.ghosted },
     { key: "offer", label: STATUS_LABEL.offer, value: counts.offer },
@@ -221,11 +234,31 @@ function assertDemoContract(label: string, sankey: Sankey): void {
   if (sankey.links.some((link) => link.value === 0)) {
     throw new Error(`${label}: links with value 0 must be omitted.`)
   }
-  const expected = nodeValue("interviewing_oa") + nodeValue("offer") + nodeValue("failed")
-  if (linkValue("applied", "interviewing_oa") !== expected) {
+  // Node values are inflows, so the `applied -> interviewing_oa` link and the
+  // `interviewing_oa` node it feeds must carry the same number. (This
+  // previously asserted `link === node + offer + failed`, which only held
+  // while the node wrongly carried the *current* interviewing_oa count --
+  // i.e. the assertion was locking in the bug rather than catching it.)
+  if (linkValue("applied", "interviewing_oa") !== nodeValue("interviewing_oa")) {
     throw new Error(
-      `${label}: applied->interviewing_oa must equal interviewing_oa + offer + failed (${expected}).`
+      `${label}: the applied->interviewing_oa link (${linkValue(
+        "applied",
+        "interviewing_oa"
+      )}) must equal the interviewing_oa node's value (${nodeValue("interviewing_oa")}).`
     )
+  }
+  // No node may emit more than it took in -- a node whose outgoing links
+  // outweigh its own value renders as a rect shorter than the ribbons
+  // leaving it, and makes F37's shortfall go negative.
+  for (const node of sankey.nodes) {
+    const outgoing = sankey.links
+      .filter((link) => link.source === node.key)
+      .reduce((sum, link) => sum + link.value, 0)
+    if (outgoing > node.value) {
+      throw new Error(
+        `${label}: ${node.key} emits ${outgoing} but is only worth ${node.value}.`
+      )
+    }
   }
 }
 

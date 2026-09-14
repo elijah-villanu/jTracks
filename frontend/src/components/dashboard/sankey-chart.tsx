@@ -343,6 +343,58 @@ export function SankeyChart({
     return shortfalls
   }, [data.nodes, data.links])
 
+  /*
+    Dev-only payload invariant check. This component renders whatever
+    `data` says and must never re-derive the topology (R5.5), which also
+    means it has no way to *repair* a payload that contradicts itself --
+    so the least it can do is say so out loud instead of drawing a broken
+    picture in silence.
+
+    The invariant that matters: a node's `value` is its **inflow**, so it
+    can never be smaller than the sum of its own outgoing links. When it
+    is, d3-sankey still lays the graph out -- `fixedValue` sets the rect's
+    height from `value` while ribbon widths come from the links -- and the
+    result is a node rect visibly shorter than the ribbons attached to it,
+    plus an F37 shortfall of 0 where there should be one. That is exactly
+    the shape the MSW handlers and the landing page's demo data shipped
+    until they were corrected to match `dashboard_service.build_sankey`,
+    and it is invisible unless you measure it, which is why it survived
+    several visual passes.
+
+    A `console.error` rather than a throw: a contradictory payload is a
+    bug in whoever produced it, not a reason to take the dashboard down
+    for the user. Stripped from production builds by `import.meta.env.DEV`.
+  */
+  useEffect(() => {
+    if (!import.meta.env.DEV) {
+      return
+    }
+    const outgoing = new Map<ApplicationStatus, number>()
+    const incoming = new Map<ApplicationStatus, number>()
+    for (const link of data.links) {
+      outgoing.set(link.source, (outgoing.get(link.source) ?? 0) + link.value)
+      incoming.set(link.target, (incoming.get(link.target) ?? 0) + link.value)
+    }
+    for (const node of data.nodes) {
+      const out = outgoing.get(node.key) ?? 0
+      const inn = incoming.get(node.key) ?? 0
+      if (out > node.value) {
+        console.error(
+          `SankeyChart: node "${node.key}" is worth ${node.value} but emits ${out}. ` +
+            "Node values are inflows and must be >= their outgoing links; " +
+            "its rect will render shorter than the ribbons leaving it."
+        )
+      }
+      if (inn > node.value) {
+        console.error(
+          `SankeyChart: node "${node.key}" is worth ${node.value} but receives ${inn}. ` +
+            "A node's value must equal its inflow (see PRD_V2.md R5.5); " +
+            "its incoming ribbon will overshoot the rect and no shortfall will be reported."
+        )
+      }
+    }
+  }, [data])
+
   const graph = useMemo<SankeyGraph<NodeExtra, LinkExtra> | null>(() => {
     if (!hasLinks || effectiveWidth <= 0) {
       return null

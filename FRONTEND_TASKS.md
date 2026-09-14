@@ -2442,7 +2442,7 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   session (no browser/canvas measurement tool available) — Roboto ships genuine tabular figures by
   font design, but this is an assumption, not a verified measurement; flagged for F61.
 
-- [ ] **F60 — `document.fonts.ready` gate in the export path, and re-baseline all three skins** (L)
+- [x] **F60 — `document.fonts.ready` gate in the export path, and re-baseline all three skins** (L)
   R17.4, extending R12.5, and this milestone's hard gate. `RecapCard` and its skins render inside the
   `html-to-image`-captured subtree; a custom font that hasn't finished loading when `toBlob` fires exports
   with the browser's fallback baked into the PNG, silently. Fix it in
@@ -2476,24 +2476,91 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   SHA-256-compared, with the byte counts recorded in this entry in F48's table format; deliberately
   blocking one font file makes the export visibly fall back rather than hang; `tsc -b` and lint clean.
   Depends on: F57, F58, F59 (everything inside the exported subtree must be final first), and F35's recipe.
-  **Still not fully verified — left unchecked — but real progress 2026-09-10 via claude-in-chrome.**
-  Code fix confirmed correct by inspection: `recap-dialog.tsx`'s `REQUIRED_RECAP_FONTS` list
-  (`'400 1rem "Hedvig Letters Sans"'` plus Roboto at 400/500/600/700) and `ensureRecapFontsLoaded()`
-  correctly `document.fonts.load()`s each face before awaiting `document.fonts.ready` —
-  load-then-ready, not ready-alone — wired into `exportCardToBlob()` before `toBlob`, with the
-  rejection path surfaced via `exportError` rather than thrown.
-  **Ran a real export in a live browser this session** (logged in via the mock user, Analytics page,
-  All-time range, Duolingo skin, clicked Download): completed with no `exportError`, no console
-  errors, and the dialog's own `role="status"` region announced "Recap image downloaded as
-  jtracks-recap-all-duolingo.png." This is real signal the gate doesn't break the happy path, but it
-  is **not** the task's actual acceptance bar.
-  **Still outstanding, and why it stays unchecked:** no cold-cache-vs-warm-cache byte diff was taken,
-  no deliberate font-blocking test was run, and the five `frontend/reference/*.png` baselines were
-  **not** regenerated (they still reflect the pre-FV12 typeface). A future session needs to run F35's
-  recipe verbatim (the local receiver server + patched `URL.createObjectURL`) to actually produce and
-  diff those bytes before this box can be checked.
 
-- [ ] **F61 — Both-theme, 375px and legibility/contrast re-verification sweep** (M)
+  **Done 2026-09-13.** Run against the MSW mock on port 5173 (F35's recipe verbatim: local Node
+  receiver writing `POST /save?name=<n>` into `frontend/reference/`, `URL.createObjectURL` patched to
+  `fetch` the blob to it, `HTMLAnchorElement.prototype.click` no-op'd for `[download]` anchors, Chrome
+  window genuinely visible). The receiver additionally guards on the **PNG magic number** and reports
+  bytes/dimensions/SHA-256 per save, so a JSON error page or an empty blob cannot overwrite a good
+  baseline — the exact way F48 lost one.
+
+  Two setup notes that cost real time and are worth leaving here:
+  - **`.env` carries `VITE_ENABLE_MOCKS=false`**, so a plain `npm run dev` talks to the real backend.
+    The baselines are MSW-based (F35's `inflight-only` copy reads "All **17** applications are still in
+    flight", which is the MSW fixture's all-time cohort exactly), so the server must be started as
+    `VITE_ENABLE_MOCKS=true npx vite --port 5173`. Symptom when you get this wrong: login fails with
+    `{"detail":"Incorrect email or password."}` — FastAPI's `detail` shape, not the mock's `message`
+    shape — and `navigator.serviceWorker.controller` is `null`. The real backend's seeded account
+    (`scripts/seed.py`) has `hashed_password=None` and cannot password-login at all.
+  - **A stale `vite` process will silently hold 5173** and `--strictPort` then kills the new one.
+    Check `Get-CimInstance Win32_Process -Filter "Name='node.exe'"` first.
+
+  **The five baselines, all 1080×1920 RGBA with all four corner alphas 0** (verified by decoding the
+  saved files, not by trusting the export), each with a centre-pixel sample confirming it is a real
+  card and not a blank transparent sheet:
+
+  | File | State | Bytes | SHA-256 (first 16) | Centre px |
+  |---|---|---|---|---|
+  | `recap-baseline-strava.png` | Strava, all-time | 192,766 | `81561d1d3833c8b3` | `rgba(15,23,42,235)` scrim |
+  | `recap-baseline-duolingo.png` | Duolingo, all-time | 995,316 | `80ea482a4ea985e6` | `rgb(34,83,89)` teal gradient |
+  | `recap-baseline-beli.png` | Beli, all-time | 167,676 | `0d43c75ee94276e5` | `rgb(253,244,233)` `#fdf4e9` |
+  | `recap-baseline-empty-total.png` | Strava, `total === 0` (Week) | 173,357 | `c221e6604b2d195e` | `rgba(15,23,42,235)` |
+  | `recap-baseline-inflight-only.png` | Strava, `links.length === 0` | 178,603 | `acaa8ea09615b167` | `rgba(15,23,42,235)` |
+
+  The `inflight-only` payload was produced by stubbing the `/dashboard/recap` response's
+  `sankey.links` to `[]`, and — per this entry's own warning — the refetch was forced by a **range
+  change** (Week → All), never by restoring a stubbed `fetch`. Card copy confirmed before capture:
+  "All 17 applications are still in flight — outcomes will appear here as they land."
+
+  **Cold-cache vs warm-cache diff: the gate holds.** A fresh page load reproduces F60's trap exactly —
+  `document.fonts.status` is already `"loaded"` (so a bare `await document.fonts.ready` would resolve
+  immediately) while `400 "Hedvig Letters Sans"` and `700 "Roboto"` both `check()` **false**. Two of
+  the five required faces unfetched, with `ready` claiming done. That is precisely why
+  `ensureRecapFontsLoaded` must `document.fonts.load()` each face *before* awaiting `ready`.
+
+  | Skin | warm SHA-256 (first 16) | cold SHA-256 (first 16) | Result |
+  |---|---|---|---|
+  | Strava | `81561d1d3833c8b3` | `81561d1d3833c8b3` | **byte-identical** |
+  | Beli | `0d43c75ee94276e5` | `0d43c75ee94276e5` | **byte-identical** |
+  | Duolingo | `80ea482a4ea985e6` | `80ea482a4ea985e6` | **byte-identical** (see below) |
+
+  **Duolingo is not byte-deterministic to the last pixel, and that is not a cold-cache effect.** Its
+  first-ever capture came back 59 bytes larger than the next two. Pixel-diffed: **4 differing pixels
+  out of 2,073,600** (0.0002%), max channel delta **2**, all in a single column (x=595, rows 756–759)
+  on the antialiased edge of the white stat tile. A second *warm* export then matched the *cold* one
+  byte-for-byte (`80ea482a…` twice), which rules out fonts entirely — it is subpixel rasterisation
+  rounding on one tile edge. The baseline was re-shot at the reproducible value. **Consequence for
+  future diffs:** F48's "byte-identical, so future diffs are signal" holds for Strava, Beli and both
+  degenerate states, but for the Duolingo skin the right gate is a pixel-difference threshold, not
+  byte equality. Anything at or under ~10 px with a channel delta ≤ 2 is noise.
+
+  **Deliberate font-blocking test — the decisive one.** `Roboto-Bold.woff2` was moved aside and the
+  page reloaded; `document.fonts.check('700 1rem "Roboto"')` then reported `false` for real. The
+  export:
+  - **completed in 404 ms — it did not hang**, which is this entry's stated acceptance;
+  - surfaced the failure through the existing path rather than swallowing it or throwing:
+    `exportError` = *"Recap fonts may not have finished loading (A network error occurred.); exporting
+    anyway."*;
+  - **visibly fell back**: diffed against the good Strava baseline, **14,800 differing pixels (0.714%),
+    max channel delta 240**, spanning rows 295–956 — the three Roboto-700 hero figures rendering in a
+    fallback face.
+
+  That last number is also what makes the cold-vs-warm byte-identity *meaningful* rather than vacuous:
+  a real font fallback in this card is 14,800 px at delta 240, four orders of magnitude away from the
+  4 px at delta 2 of rasterisation noise. The font file was restored and a post-restore export
+  reproduced `81561d1d3833c8b3` exactly.
+
+  **One honest limitation.** By the time the Download button is clickable, the dialog has already
+  mounted and rendered all three cards, which warms every required face — so at click time
+  `preGateFonts` showed all five `true` even on a cold load. The cold-vs-warm diff therefore proves the
+  gate does no *harm* and that the export is reproducible; it is the font-blocking test above, not the
+  diff, that proves the gate does real *work*. Reproducing a genuine mid-flight race would need
+  server-side font-delay injection, which was not set up.
+
+  `tsc -b` exits 0 and `oxlint` is clean apart from the 17 pre-existing `only-export-components`
+  fast-refresh warnings.
+
+- [x] **F61 — Both-theme, 375px and legibility/contrast re-verification sweep** (M)
   R17.6 plus the standing Accessibility non-regression NFR. Run it the way F29, F33 and F47 were run: a
   real browser, a genuine narrow layout viewport (a same-origin iframe — `resize_window` is a no-op in
   this environment and would silently test desktop twice), and a **written** checklist. Not an assertion
@@ -2523,50 +2590,100 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   every `text-xs`/`text-[9px]`/`text-[10px]` role; any contrast that dropped below AA either fixed or
   recorded with a reason, the same standard as F21/F24/F47.
   Depends on: F57, F58, F59, F60
-  **Still not fully verified — left unchecked — but substantial real progress 2026-09-10 via
-  claude-in-chrome, including one genuine regression found and fixed.**
 
-  **Regression found and fixed first (see F56's correction note above): `.font-display` never
-  actually worked.** Every Display heading computed to Roboto despite the class matching correctly —
-  root cause was `@theme inline` never emitting `--font-display` as a real runtime CSS custom
-  property, so `var(--font-display)` in the hand-written `@utility` was invalid at computed-value
-  time and silently fell back to the inherited value. Fixed by referencing the literal font stack
-  directly instead of `var()`. This means F57–F59 were checked off previously on `npm run build` +
-  grep evidence alone, which this session's real-browser check proves was **not sufficient** — worth
-  keeping in mind for any future `@theme inline` custom key.
+  **Done 2026-09-13.** Real browser, MSW on 5173, axe-core 4.10.2, contrast computed from
+  **rasterised** colours (see the note below). Narrow cells used a **fresh iframe mounted at 375px** —
+  never a resized one, per FV13's environment note.
 
-  **Re-verified after the fix, in a real logged-in browser session** (mock user
-  `demo@jtracks.dev`), via `getComputedStyle`, not assumed:
-  - Landing hero `<h1>` and both section `<h2>`s: `"Hedvig Letters Sans", ui-sans-serif, system-ui,
-    sans-serif`, confirmed both by computed style and a zoomed screenshot showing genuinely different
-    letterforms from Roboto (single-story "a", distinct "g").
-  - `/login`'s `CardTitle` ("Login to your account"): weight 600, Roboto — F58's primitive-vs-call-site
-    fix confirmed correct.
-  - `/app/analytics` stat-tile figure: weight 700, Roboto — F59's fix confirmed.
-  - All three recap skins (Strava, Duolingo, Beli), generated against real "All time" data (17
-    applications): hero stat figures all Roboto 700; the Beli headline ("All time in applications")
-    computed to Hedvig Letters Sans 400 as F59 defaulted it to, and the card holds it fine at that
-    size — no fallback to Text 700 needed, this can be recorded as resolved rather than open in
-    `docs/decisions/typography.md`; the recap footer's "jTracks" wordmark (inside the exported
-    subtree) also correctly resolves to Hedvig 400.
-  - Dark mode (via the real theme toggle, not a forced class): checked visually on `/app/analytics`
-    including the open `RecapDialog` — legible, no obvious contrast problems, fonts unchanged from
-    light mode as expected.
-  - 375px: `resize_window` confirmed to genuinely be a no-op in this environment (window stayed at
-    1536px), so used the same-origin-iframe technique F33/F44 established instead. `/login` and `/`
-    (landing) both measured `scrollWidth === clientWidth` with **zero** overflow margin (357/357 on
-    `/`), matching F44's prior "zero margin" finding rather than regressing it. The landing header —
-    wordmark + 3 theme-toggle icons + "Get started" — still fits on one line at 375px with the new
-    Hedvig wordmark; confirmed visually, not just by absence-of-scrollbar.
+  **Full matrix. `ovf` is `documentElement.scrollWidth − clientWidth`; `axe` is
+  violations/evaluated-nodes, per F47's caveat that a zero-violation run with zero scored nodes is not
+  a pass. Every cell: 0 violations, non-zero node count, no horizontal scroll.**
 
-  **Still outstanding — not covered this session:** `/app` Table+Board, `/app/profile`, `/signup`,
-  `ApplicationFormDialog`, `AutofillDialog`, `ConfirmAppliedDialog` (route/dialog matrix incomplete);
-  no dark-mode check at 375px specifically (checked each independently, not combined); no axe run at
-  all (F47's evaluated-node-count caveat still applies whenever this runs); no contrast
-  re-measurement of the specific borderline values on record (`--primary` body text at 3.44:1, the
-  Strava scrim table, the Beli hex trio); no pixel-measured tabular-figure digit-width check (F59's
-  flagged gap, still open). A future session should finish this matrix rather than redo what's
-  confirmed above.
+  | Cell | light | dark |
+  |---|---|---|
+  | `/` landing (desktop 1521) | ovf 0 · 0v/217n · worst 4.74:1 | ovf 0 · 0v/217n · worst 7.66:1 |
+  | `/` landing (375) | ovf 0 · 0v/215n · worst 4.74:1 | ovf 0 · 0v/215n · worst 7.66:1 |
+  | `/login` (375) | ovf 0 · 0v/43n | ovf 0 · 0v/43n |
+  | `/signup` (375) | ovf 0 · 0v/72n | ovf 0 · 0v/72n |
+  | `/app` Table (desktop) | ovf 0 · 0v/698n · worst 4.74:1 | ovf 0 · 0v/698n · worst 7.66:1 |
+  | `/app` Board (desktop) | ovf 0 · 0v/864n · worst 4.62:1 | ovf 0 · 0v/864n · worst 6.94:1 |
+  | `/app` card list (375) | ovf 0 · 0v/772n · worst 4.74:1 | ovf 0 · 0v/772n · worst 6.94:1 |
+  | `/app` Board (375) | ovf 0 · 0v/811n · worst 4.62:1 | ovf 0 · 0v/811n · worst 6.94:1 |
+  | `/app/analytics` (desktop) | ovf 0 · 0v/187n · worst 4.74:1 | ovf 0 · 0v/187n · worst 6.94:1 |
+  | `/app/analytics` (375) | ovf 0 · 0v/135n · worst 4.74:1 | ovf 0 · 0v/135n · worst 6.94:1 |
+  | `/app/profile` (desktop) | ovf 0 · 0v/113n · worst 4.74:1 | ovf 0 · 0v/113n · worst 6.94:1 |
+  | `/app/profile` (375) | ovf 0 · 0v/61n · worst 4.74:1 | ovf 0 · 0v/61n · worst 6.94:1 |
+  | `ApplicationFormDialog` (desktop / 375) | 0v/264n / 0v/142n | 0v/325n / 0v/325n |
+  | `AutofillDialog` (desktop / 375) | 0v/183n / 0v/81n | 0v/242n / 0v/242n |
+  | `ConfirmAppliedDialog` (desktop / 375) | 0v/197n / 0v/226n | 0v/226n / 0v/226n |
+  | `RecapDialog` Strava (desktop / 375) | 0v/267n / 0v/258n | 0v/267n / 0v/258n |
+  | `RecapDialog` Duolingo (desktop / 375) | 0v/257n / 0v/248n | 0v/257n / 0v/248n |
+  | `RecapDialog` Beli (desktop / 375) | 0v/275n / 0v/266n | 0v/275n / 0v/266n |
+
+  `/login` and `/signup` report "no roles" because they carry none of the small-type roles below (no
+  table caption, no `<dt>`, no meta line) — not because the check was skipped.
+
+  **Metrics re-measured.** `/` and `/app` at 375px both report `scrollWidth === clientWidth` with
+  **zero** overflow, matching F33/F44's prior finding rather than regressing it. F44's landing-header
+  budget changed shape and is worth recording: the header now **wraps to two rows** at 375px (the
+  outer `flex-wrap` doing exactly the job its comment claims), so instead of one ~315px row there is a
+  wordmark row (16→207px) and an action row (16→**208px**) inside a 355px content box. "Log in" is
+  still `display: none` below `sm`. Wrapping is the documented safety net engaging after R18's logo
+  size increase, not an overflow.
+
+  **Small-size legibility, per-role verdicts.** All AA (4.5:1 floor — none of these are large text):
+
+  | Role | px/weight | light | dark |
+  |---|---|---|---|
+  | `TableCaption` count sentence | 14/400 Roboto | 4.74:1 | 7.66:1 |
+  | Card-list / board `<dt>` captions | 12/400 Roboto | 4.74:1 | 6.94:1 |
+  | Card-list / board values + timestamps | 12/400 Roboto | 4.74:1 | 6.94:1 |
+  | `stat-tile.tsx` `text-xs uppercase` caption | 12/500 Roboto | 4.74:1 | 6.94:1 |
+  | Board column count `(N)` | 12/400 Roboto | 4.62:1 | 6.94:1 |
+
+  **Recap-skin fixed-palette type, read off the real 4× PNG** (F61 asks for the PNG, not the on-screen
+  dialog). A caution for whoever runs this next: a contrast walker that only reads `background-color`
+  reports the Duolingo skin at **1.63:1** and looks like a catastrophic failure. It is an artifact —
+  that skin's background is a `linear-gradient`, i.e. a background *image*, so the walker falls through
+  to the page behind the card. Measuring against the actual painted pixels sampled from
+  `recap-baseline-duolingo.png` gives the truth:
+
+  | Skin | Role | px/weight | Contrast |
+  |---|---|---|---|
+  | Strava | eyebrow / stat labels | 10/500–600 | 9.76:1 |
+  | Strava | Sankey node labels | 6/400 | 13.84:1 |
+  | Strava | footer date range | 9/400 | 9.76:1 |
+  | Duolingo | eyebrow "All time" | 10/600 | 6.00:1 |
+  | Duolingo | "Applications sent" | 11/600 | 5.24:1 |
+  | Duolingo | tile stat labels | 9/500 | 7.24:1 |
+  | Duolingo | footer date range | 9/400 | 8.45:1 |
+  | Beli | stat + section labels | 9/600 | 6.48:1 |
+  | Beli | footer date range | 9/400 | 6.48:1 |
+
+  **The specific borderline values this entry named, re-measured:**
+  - **`--primary` as body text (F29's 3.44:1 carry-over): still has no caller.** Scanned every leaf
+    text node on `/`, `/app`, `/app/analytics` and `/app/profile` for a computed colour matching
+    `--primary` — **zero hits on every route**. The constraint held; the landing eyebrow's deliberate
+    choice of `text-muted-foreground` over `text-primary` is still the only place it nearly happened.
+  - **F48's Strava scrim table reproduces exactly**: `#f8fafc` on the scrim measures 13.84:1 over white
+    and 17.36:1 over black; `#cbd5e1` measures 9.76:1 / 12.24:1. Identical to the recorded numbers.
+  - **F50's Beli trio on `#fdf4e9`**: `#c2381c` **4.98:1**, `#14425a` **9.86:1**, `#4a5b66` **6.48:1** —
+    all AA. `#c2381c` is the tightest value in the project at 4.98:1 but it is used for the Beli
+    headline at 26px, where the large-text floor is 3:1, so it clears with room either way.
+
+  **F59's flagged-open gap (pixel-measured tabular figures) — now closed, with a twist.** Measured the
+  advance width of digits 0–9 in Roboto at both the stat-tile figure (700/24px) and the small-meta
+  role (400/12px): **all ten digits share a single advance width at both sizes** (13.775px and 6.75px
+  respectively). Worth knowing: the *proportional* control measures identically, i.e. Roboto's default
+  figures are already tabular, so `tabular-nums` in `stat-tile.tsx` and the recap skins is a harmless
+  safety net rather than a load-bearing declaration. That is why the typeface swap never disturbed
+  digit alignment.
+
+  **Method note for the next session.** Contrast was computed by **rasterising** every colour through a
+  1×1 canvas, not by regex-parsing `getComputedStyle`. This project's tokens are `oklch()`, and both
+  `getComputedStyle().color` and canvas `fillStyle` hand `oklch(...)` straight back rather than
+  normalising to `rgb()` — a regex parser returns `null` on literally every token and the whole sweep
+  silently measures nothing.
 
 - [x] **F62 — Typography decision record, and the conventions-doc cross-link** (S)
   R17's Documentation NFR, following F29's precedent of recording a design-token decision where the next
@@ -2644,3 +2761,110 @@ wrong**: descope it (PRD_V2_1.md's Non-goals say so explicitly), don't expand th
   the roles, and **F60 re-baselines the recap export only after all three** — re-shooting the PNGs midway
   just means shooting them twice. F55 depends on font files **the user supplies** (R17.3), so it can block
   on something no agent can resolve; start it first.
+
+---
+
+## Milestone FV13: correctness review pass (2026-09-11)
+
+Not planned scope. A review of the V2.1 implementation against `PRD_V2.md`, `PRD_V2_1.md` and this
+file, looking specifically for things the build, `tsc` and the visual passes could all report clean
+while still being wrong. Each item below was **measured or reproduced in a real browser**, not
+inferred, and each is fixed in the working tree.
+
+- [x] **F63 — The Sankey's `interviewing_oa` node carried the wrong value in every payload the
+  frontend produces** (`mocks/handlers/dashboard.ts`, `mocks/handlers/recap.ts`,
+  `routes/landing/demo-data.ts`).
+  A node's `value` is its **inflow** — `backend/app/services/dashboard_service.py`'s `build_sankey`
+  says so outright (*"A node's `value` is its inflow"*) and `PRD_V2.md` R5.5's example payload shows
+  it (node 34, inflow link 34, current count 12). All three frontend producers used the *current
+  status count* instead, so dev, the mocked recap and the **public landing page** rendered a payload
+  the real backend never emits.
+  Measured with the landing page's own demo numbers: the `applied → interviewing_oa` ribbon laid out
+  at 65.8px against a 32.9px node rect — exactly 2×, overshooting into the slot below. And because
+  F37's shortfall is `node.value − Σ(outgoing)`, undercounting the node to exactly its outflow made
+  the shortfall **0**, so the "N in flight" label, the dashed remainder cap *and* the
+  `ChartDataTable`'s "Still in flight" row never rendered for `interviewing_oa` at all — only for
+  `applied`. R12.2 and the V2.1 success metric "a user can tell which applications are still in
+  flight" were half-met, in the one place a job seeker most needs it.
+  **F14's spike caught this and wrote it down** (see `docs/decisions/sankey-library.md`'s R5.4
+  section, which flagged it to F16 as "a real visual edge case F16 and F15's legibility pass should
+  be aware of"). F16 never acted on it, and F36–F39, F42 and F47 all passed over it, because nothing
+  about it is visible unless you measure the ribbon against the rect.
+  Verified fixed live at `/app/analytics`: rect and incoming ribbon both 66.94px (33.47 filled +
+  33.47 dashed cap), label `Interviewing / OA (7 · 3 in flight)`, overlay name "…7 applications, 3
+  still in flight", and the text alternative gained its `Interviewing / OA | Still in flight | 3`
+  row. `SankeyChart` also gained a DEV-only `console.error` invariant check in both directions
+  (emits-more-than-value, receives-more-than-value) — a warning, not a throw, since R5.5 forbids it
+  from re-deriving or repairing topology. `demo-data.ts`'s `assertDemoContract` was asserting
+  `link === node + offer + failed`, which only holds while the node is wrong — it was locking the
+  bug in rather than catching it; corrected to `link === node` plus a no-node-over-emits check.
+
+- [x] **F64 — `@theme inline` replaced by a plain `@theme` for the font tokens; the duplicated
+  Display stack is gone** (`index.css`).
+  F56's correction fixed the *symptom* (a hand-written `@utility font-display` repeating the literal
+  stack) and left `--font-display` in `@theme inline` as a dead, never-emitted, misleading-looking
+  source of truth — two copies with nothing syncing them. The lever is the `inline` keyword: it
+  exists for keys whose values are themselves `var()` references (the `--color-*` block) and is
+  wrong for literals that something must read back. Moving just the two font tokens to a plain
+  `@theme` emits them as real properties on `:root,:host`, makes Tailwind generate `.font-display`
+  from the `--font-*` namespace by itself, and leaves `--default-font-family: var(--font-sans)`
+  resolving correctly. Verified at F56's own bar — `getComputedStyle` in a live browser, not build
+  output: landing `<h1>` and both `<h2>`s at Hedvig Letters Sans 400, `document.fonts.check` true,
+  body Roboto, no horizontal overflow. See `docs/decisions/typography.md`'s follow-up for the
+  generalisable rule.
+
+- [x] **F65 — Circular import between `applications-table.tsx` and the sort control; column
+  vocabulary extracted to `components/table/columns.ts`.**
+  Found while doing F66 and worth recording on its own, because of *how* it failed: `tsc -b` and
+  `vite build` both reported clean, and the app rendered a **blank page** with
+  `ReferenceError: Cannot access 'COLUMN_LABEL' before initialization`. A `const` temporal-dead-zone
+  violation across an import cycle is a runtime fact, not a type or bundling one. `COLUMNS`,
+  `COLUMN_LABEL`, `SortKey` and `SortDirection` now live in a leaf module with no imports of its
+  own, which cannot participate in a cycle; the table, card list, board, `SortSelect` and
+  `ApplicationsPage` all read it from there. `madge --circular` reports none.
+
+- [x] **F66 — R13.6 regression: sorting by a column F31 hides was unreachable**
+  (`components/table/sort-select.tsx`, new; `applications-table.tsx`, `applications-card-list.tsx`,
+  `ApplicationsPage.tsx`).
+  Hiding a column removes its `<th>`, and the `<th>` is the only place that column's `SortButton`
+  and its `aria-sort` ever existed. So between 640px and 1023px there was **no way to sort by
+  Location at all**, between 640px and 767px none for Date Applied, and an already-active sort on a
+  hidden column stopped being reported to assistive tech entirely. R13.6 says sorting behaviour is
+  unchanged by V2.1 — "a layout requirement, not a data one" — and F31 quietly broke it.
+  The card rendering already had a complete, accessible answer (F32's combobox, whose *value* states
+  the full sort state and which R13.5 already accepted as the `aria-sort` substitute). It was
+  extracted to a shared `SortSelect` and the table now mounts it whenever it is hiding a column,
+  absent at full width where every column has its own header control. Verified live at 795px: the
+  option list carries all five keys, choosing "Location, ascending" reorders the rows (Austin →
+  Boston → Chicago → Cleveland), the trigger reads back "Location, ascending", and the live region
+  announces "19 of 19 applications shown, sorted by Location ascending."
+
+- [x] **F67 — Invalid `<dl>` markup in the board cards** (`components/board/applications-board.tsx`).
+  A `<div>` child of a `<dl>` may contain only `<dt>` and `<dd>` elements; the board's cards put a
+  decorative `<svg>` (the `MapPin`/`CalendarDays` icons) in as their sibling. The icon moved inside
+  the `<dd>` and the flex row moved with it — visually identical, structurally valid. Verified at
+  375px: zero non-`dt`/`dd` children across every `<dl>` on the board, page scroll still
+  370 === 370 while the board's own region scrolls (2088 vs 323) exactly as R16.1 intends.
+
+- [x] **F68 — A load failure permanently masked every status-change failure**
+  (`ApplicationsPage.tsx`).
+  One alert element rendered `error ?? actionError`, so once `GET /applications` had failed, a
+  subsequent failed status change showed nothing new — the user clicked a status, watched nothing
+  happen, and saw only the stale "couldn't load" banner. They are different in kind (`error`
+  describes the list you are looking at, `actionError` the edit you just attempted) and now render
+  as two independent alerts.
+
+**Environment note for the next session, alongside `resize_window` being a no-op:** the same-origin
+iframe technique F33/F44 established **cannot be used to test a responsive swap by resizing an
+existing iframe**. Resizing the iframe element updates `matchMedia(...).matches` but fires **no
+`change` event** (measured: `fired: 0` across two resizes), so `useMediaQuery` never re-renders and
+you are silently reading the layout the iframe first mounted at. Mount a **fresh iframe already at
+the target width** instead. Separately, `toBlob` still hangs when `document.visibilityState` is
+`"hidden"`, exactly as F35 recorded — so a recap export cannot be exercised unless the Chrome window
+is genuinely visible.
+
+~~**Still outstanding and untouched by this pass: F60 and F61.**~~ **Both completed 2026-09-13** —
+see their own entries above for the results. F63's payload fix did change the recap's Sankey geometry
+as predicted, so the five `frontend/reference/*.png` baselines were stale for two reasons (typeface
+*and* geometry) and were re-shot against the corrected payload rather than diffed against the old
+ones. F61's sweep also closed F59's flagged-open tabular-figures gap.
