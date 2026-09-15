@@ -14,7 +14,13 @@
 
 import { getAccessToken, setAccessToken } from "@/lib/token-store"
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000"
+/**
+ * The localhost fallback is dev-only. A production build without
+ * `VITE_API_URL` is refused by `vite.config.ts`, rather than silently
+ * shipping a bundle that sends credentials to `http://localhost:8000`.
+ */
+export const API_BASE_URL: string =
+  import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? "http://localhost:8000" : "")
 
 export class ApiError extends Error {
   status: number

@@ -9,7 +9,7 @@ V2 (PRD R7) replaces V1's single 7-day access token with a two-token session:
 
 Signup, login and Google OAuth all additionally set the refresh cookie; their
 JSON shape is unchanged. `/auth/refresh` exchanges the cookie for a new access
-token, `/auth/logout` revokes it. Cookie attributes live in
+token and a rotated refresh cookie (R7.5), `/auth/logout` revokes it. Cookie attributes live in
 `app/core/cookies.py`; the reasoning is in
 `docs/decisions/cookie-topology-samesite.md`.
 """
@@ -23,7 +23,11 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_refresh_csrf_header
 from app.core.config import settings
-from app.core.cookies import clear_refresh_cookie, set_refresh_cookie
+from app.core.cookies import (
+    clear_refresh_cookie,
+    read_refresh_cookies,
+    set_refresh_cookie,
+)
 from app.core.rate_limit import limiter
 from app.core.security import create_access_token
 from app.db.session import get_db
@@ -127,36 +131,58 @@ def oauth_google(
 @limiter.limit(settings.RATE_LIMIT_REFRESH)
 def refresh(
     request: Request,
+    response: Response,
     db: Session = Depends(get_db),
     _csrf: None = Depends(require_refresh_csrf_header),
 ) -> TokenResponse:
     """Exchange a valid refresh cookie for a new access token (R7.4).
 
-    No rotation: the refresh token is unchanged by this call and the cookie is
-    not re-issued. That is deliberate and documented (R7.5) — reuse detection
-    and token families are explicitly out of scope for V2.
+    Rotates (R7.5): the presented refresh token is consumed and its successor
+    is set as the new cookie. A rotated token replayed after the grace window
+    revokes the whole session and gets the same `401` as any other failure —
+    the response must not tell a thief that they were detected.
+
+    Inside the grace window the response carries an access token and **no**
+    `Set-Cookie`, because the browser already holds the successor.
     """
-    raw = request.cookies.get(settings.REFRESH_COOKIE_NAME) or ""
-    token_row = refresh_token_service.validate(db, raw)
-    if token_row is None:
+    # A request can carry several cookies with this name (see
+    # `read_refresh_cookies`). Live tokens are tried first so a stray value
+    # can't shadow the real one; the rest still go through `rotate()` so a
+    # just-rotated token gets its grace and a replayed one trips detection.
+    candidates = read_refresh_cookies(request)
+    live = [c for c in candidates if refresh_token_service.validate(db, c)]
+    rotation = None
+    for raw in live + [c for c in candidates if c not in live]:
+        rotation = refresh_token_service.rotate(db, raw)
+        if rotation is not None:
+            break
+    if rotation is None:
         raise _INVALID_SESSION
 
-    user = db.get(User, token_row.user_id)
+    user = db.get(User, rotation.user_id)
     if user is None:
         # The FK cascades, so this should be unreachable; treat a dangling row
         # as an invalid session rather than a 500.
         raise _INVALID_SESSION
 
+    if rotation.raw_token is not None:
+        set_refresh_cookie(response, rotation.raw_token, rotation.expires_at)
     return TokenResponse(access_token=create_access_token(user.id))
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+# V2 audit L1: the one unauthenticated auth route that writes to the DB had no
+# budget. Shares refresh's, which is far above any real logout rate.
+@limiter.limit(settings.RATE_LIMIT_REFRESH)
 def logout(
     request: Request,
     db: Session = Depends(get_db),
     _csrf: None = Depends(require_refresh_csrf_header),
 ) -> Response:
-    """Revoke the presented refresh token and clear the cookie (R7.4).
+    """Revoke the presented refresh token's session and clear the cookie (R7.4).
+
+    "Session" is the token's rotation family (R7.5), so logging out with an
+    older cookie from the same login still ends it.
 
     Idempotent: always `204`, whether the cookie is absent, malformed, unknown,
     already revoked or expired. There is nothing useful to report and plenty to
@@ -165,8 +191,9 @@ def logout(
     The cookie is cleared unconditionally, including on the no-cookie path, so a
     stale cookie the server has no row for still gets removed from the browser.
     """
-    raw = request.cookies.get(settings.REFRESH_COOKIE_NAME)
-    if raw:
+    # Every same-named value: revoking an unknown one is a no-op, and picking
+    # just one could leave the real session alive behind a stray cookie.
+    for raw in read_refresh_cookies(request):
         refresh_token_service.revoke(db, raw)
 
     # The cookie must be set on the returned response: FastAPI does not merge

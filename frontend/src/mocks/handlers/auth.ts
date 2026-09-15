@@ -32,8 +32,14 @@ const authResponse: AuthResponse = {
  * no cross-site `SameSite=None`) so it actually gets stored and resent
  * by the browser over plain HTTP -- this is a mock-only deviation, not a
  * statement about the real backend's contract.
+ *
+ * Deliberately NOT named `jtracks_refresh`. Cookies ignore ports, so a
+ * mock cookie set while on `localhost:5173` is also sent to the real
+ * backend on `localhost:8000` -- and when it shared the real cookie's
+ * name, it shadowed the genuine refresh token after switching mocks off,
+ * so every page reload logged the user out.
  */
-const REFRESH_COOKIE_NAME = "jtracks_refresh"
+const REFRESH_COOKIE_NAME = "jtracks_refresh_mock"
 const SET_REFRESH_COOKIE = `${REFRESH_COOKIE_NAME}=mock-refresh-value; Path=/; SameSite=Lax`
 const CLEAR_REFRESH_COOKIE = `${REFRESH_COOKIE_NAME}=; Path=/; SameSite=Lax; Max-Age=0`
 
@@ -56,7 +62,7 @@ function hasRefreshCookie(request: Request): boolean {
  * fixture user regardless of the signup email supplied above, since
  * this mock only ever tracks a single account.
  *
- * F21: login/signup/oauth all also set the mock `jtracks_refresh` cookie
+ * F21: login/signup/oauth all also set the mock `jtracks_refresh_mock` cookie
  * (see `SET_REFRESH_COOKIE` above) so `POST /auth/refresh` and a
  * boot-time silent-refresh (`AuthProvider.hydrate`) can be exercised
  * against a genuine browser-stored cookie, not just an always-succeeds
@@ -131,7 +137,7 @@ export const authHandlers = [
   /**
    * Mock `POST /auth/refresh` for F20/F21/R7.6, mirroring B25's real
    * contract: requires the `X-Refresh-Request: 1` CSRF-defense header
-   * (missing -> `403`), requires the mock `jtracks_refresh` cookie to
+   * (missing -> `403`), requires the mock `jtracks_refresh_mock` cookie to
    * actually be present (missing -> `401`, F21 -- this is what makes a
    * post-logout or never-logged-in refresh attempt genuinely fail rather
    * than always succeeding), and on success returns a fresh

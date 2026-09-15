@@ -1,6 +1,7 @@
 .env
 .env.local
 .env.mcp.local
+.env.mocks
 node_modules/
 .continue/
 backend/.venv/

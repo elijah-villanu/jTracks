@@ -65,7 +65,8 @@ that application to `ghosted` is wrong and destroys the signal.
 - **No enforcement of the pre/post-interview split** as a transition rule. The distinction is
   a reporting convention, not a validation constraint.
 - **No "log out all devices" / multi-session management.** Single-session logout only.
-- **No refresh-token rotation or reuse detection.**
+- ~~No refresh-token rotation or reuse detection.~~ Reversed 2026-09-14 — now in scope, see
+  R7.5.
 - **No onboarding/education UX** explaining the status distinction — deferred, see
   [Deferred: status-distinction onboarding](#deferred-status-distinction-onboarding).
 - **No back-compatibility** for the old `interviewing` enum value or the old `rejection_rate`
@@ -369,20 +370,61 @@ would be cosmetic and a stolen refresh token would stay valid until natural expi
 | `token_hash` | Hash of the token, never the raw value |
 | `expires_at` | Absolute expiry |
 | `revoked_at` | Nullable; non-null means revoked |
+| `family_id` | UUID, indexed; shared by every token in one login session (R7.5) |
+| `replaced_by_id` | Nullable; the successor's id when revoked by rotation (R7.5) |
 | `created_at` | |
 
 **R7.4 — Endpoints.**
 
 | Method | Path | Behavior |
 |---|---|---|
-| `POST` | `/auth/refresh` | Reads the refresh cookie, validates against the store (exists, not expired, not revoked), returns a new access token. `401` on any failure. |
-| `POST` | `/auth/logout` | Revokes the presented refresh token (sets `revoked_at`) and clears the cookie. Idempotent — always `204`, even with no/invalid cookie. |
+| `POST` | `/auth/refresh` | Reads the refresh cookie, validates against the store (exists, not expired, not revoked), rotates it (R7.5), and returns a new access token plus the successor refresh cookie. `401` on any failure, including detected reuse. |
+| `POST` | `/auth/logout` | Revokes the presented refresh token's session (every token in its family, R7.5) and clears the cookie. Idempotent — always `204`, even with no/invalid cookie. |
 
 `POST /auth/signup`, `/auth/login` and `/auth/oauth/google` are all modified to additionally set
 the refresh cookie. Their JSON bodies still return the access token.
 
-**R7.5 — No rotation.** The refresh token is static until expiry. Reuse detection and
-token-family revocation are explicitly out of scope. Documented as an accepted trade-off.
+**R7.5 — Rotation with reuse detection.** *(Revised 2026-09-14, ahead of the Azure App
+Service deployment. The original V2 decision was "no rotation — the refresh token is static
+until expiry; reuse detection and token families are out of scope", accepted on the basis
+that a stolen refresh token would stay usable until expiry or manual logout. That risk was
+judged no longer acceptable for a public deployment, so this requirement now reverses it.)*
+
+- **Single-use refresh tokens.** Every successful `POST /auth/refresh` revokes the presented
+  refresh token and sets its successor as the new refresh cookie, alongside the new access
+  token. The cookie attributes are unchanged (R7.2).
+- **Token families.** Every token issued by one signup, login or Google OAuth exchange, and
+  every successor rotated out of it, shares a `family_id`. A family is one login session on
+  one device.
+- **Reuse detection.** If a refresh token that has *already been rotated* is presented
+  again, two parties hold the same session and the server cannot tell which is legitimate.
+  The entire family is revoked, both parties must log in again, and the event is logged at
+  `WARNING` (ids only, never token material). The response is the same generic `401` as every
+  other refresh failure (R7.4), so an attacker learns nothing about having been detected.
+- **Grace window for concurrent refreshes.** Two browser tabs can both send the old cookie
+  before either response arrives. For `REFRESH_TOKEN_REUSE_GRACE_SECONDS` (default **30s**,
+  bounded 0–120, `0` disables it) after a rotation, the just-rotated token is still accepted:
+  it earns a new access token but **no** new refresh cookie, since the browser already holds
+  the successor from the first response. It is honoured only while the family still has a live
+  token, so a session logged out moments after rotating stays dead. Accepted cost: reuse inside
+  that window goes undetected.
+- **Rotation does not extend a session.** A successor inherits its predecessor's
+  `expires_at`, and the cookie's `Max-Age` is the time remaining. `REFRESH_TOKEN_EXPIRE_DAYS`
+  (14) therefore remains an absolute limit on how long one login lasts, no matter how
+  actively it is used.
+- **Logout revokes the family** (R7.4, R7.8): presenting any generation of a session's cookie
+  ends that session, so a stale cookie cannot leave its successor alive. Other families (the
+  user's other devices) are untouched.
+- **Concurrency.** Consuming a token is a conditional update (`... WHERE revoked_at IS
+  NULL`), so two simultaneous refreshes with the same token cannot both rotate it and fork the
+  family. The request that loses the race takes the grace path.
+- **Schema.** `refresh_tokens` gains `family_id` (UUID, not null, indexed) and
+  `replaced_by_id` (UUID, nullable — set only when a token was revoked *by rotation*, which is
+  what separates reuse from an ordinary logout). Migration `0005` backfills existing rows as
+  single-member families.
+- **Known edge case:** if a refresh response is lost in transit, the browser keeps the old
+  cookie. Retries inside the grace window still succeed; the first refresh after it trips reuse
+  detection and the user is logged out. This fails closed and costs a login, not security.
 
 **R7.6 — Frontend session handling.**
 - On app boot, attempt `POST /auth/refresh` to recover a session before deciding the user is
@@ -559,8 +601,13 @@ on top of the current-status model.
   fonts) do not serialize cleanly. **Verify export compatibility before committing.**
 - **`year` vs `all` may be indistinguishable in practice** for a user whose search is under a
   year old. Not a blocker, but the two ranges may look identical for a while.
-- **No rotation means a stolen refresh token is usable until expiry or manual logout** (R7.5).
-  Accepted; documented so it isn't rediscovered as a surprise.
+- **Refresh-token theft (R7.5, revised).** Rotation with reuse detection means a stolen
+  refresh token is caught the next time either the thief or the real user refreshes after the
+  other did, and the whole session is revoked. Residual risks, accepted: reuse inside the 30s
+  grace window is undetected; a thief whose stolen token is never contested (the real user
+  never returns) keeps the session until its absolute 14-day expiry; access tokens already
+  issued stay valid for up to 30 minutes after detection; and a lost refresh response can log a
+  user out.
 - **Signup enumeration via `409`** remains a conscious V1 trade-off, unchanged in V2.
 
 ---
@@ -616,7 +663,8 @@ status-event-log work.
 ### Also out of scope for V2
 
 - Status-history / event-log table (see [Known limitation](#known-limitation-status-only-analytics))
-- Refresh-token rotation, reuse detection, "log out all devices", session management UI
+- "Log out all devices", session management UI (refresh-token rotation and reuse detection
+  were moved into scope on 2026-09-14 — see R7.5)
 - Any back-compat shim for the `interviewing` enum value or the `rejection_rate` field
 - Hard validation enforcing the pre/post-interview stage split
 - Configurable staleness threshold (R3.3 is hard-coded at 28 days)

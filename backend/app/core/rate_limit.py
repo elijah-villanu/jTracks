@@ -18,19 +18,44 @@ from starlette.requests import Request
 from app.core.config import settings
 
 
+def _strip_port(entry: str) -> str:
+    """`203.0.113.7:51234` -> `203.0.113.7`; `[2001:db8::1]:443` -> `2001:db8::1`.
+
+    Azure's front end appends the client *with its source port*. Keying on
+    ip:port would give an attacker a fresh bucket per TCP connection.
+    """
+    entry = entry.strip()
+    if entry.startswith("["):
+        return entry[1:].split("]", 1)[0]
+    if entry.count(":") == 1:  # IPv4 with port; bare IPv6 has several colons
+        return entry.split(":", 1)[0]
+    return entry
+
+
 def client_key(request: Request) -> str:
     """Identify the caller for limiting purposes.
 
-    `X-Forwarded-For` is client-controlled unless a proxy you own overwrites it,
-    so it is only consulted when TRUST_PROXY_HEADERS is explicitly enabled.
-    Trusting it by default would let an attacker rotate the header per request
-    and evade every limit.
+    `X-Forwarded-For` is only consulted when TRUST_PROXY_HEADERS is enabled.
+
+    SECURITY (pre-deploy audit): this used to take the LEFT-most entry. Proxies
+    such as Azure App Service's front end *append* the real peer to whatever the
+    client sent, so the left-most value is attacker-chosen: rotating it per
+    request evaded the login limit entirely (confirmed by PoC). The only entries
+    a client cannot forge are the ones trusted proxies appended, so the client
+    is the entry TRUSTED_PROXY_HOPS positions from the right.
+
+    Leaving TRUST_PROXY_HEADERS off on App Service is not the safe option either:
+    every request then arrives from the platform's front end, all users share
+    one bucket, and five bad passwords from anyone lock the owner out.
     """
     if settings.TRUST_PROXY_HEADERS:
         forwarded = request.headers.get("x-forwarded-for")
         if forwarded:
-            # Left-most entry is the original client per RFC 7239 conventions.
-            return forwarded.split(",")[0].strip()
+            hops = [h for h in (p.strip() for p in forwarded.split(",")) if h]
+            if len(hops) >= settings.TRUSTED_PROXY_HOPS:
+                client = _strip_port(hops[-settings.TRUSTED_PROXY_HOPS])
+                if client:
+                    return client
     return get_remote_address(request)
 
 

@@ -6,10 +6,12 @@ All values are read from environment variables (or a local `.env`). See
 from __future__ import annotations
 
 import logging
+import os
 import secrets
 from functools import lru_cache
+from urllib.parse import urlsplit
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger("jtracks.config")
@@ -17,6 +19,13 @@ logger = logging.getLogger("jtracks.config")
 # Environments treated as "local, not internet-facing". Anything else (staging,
 # production, ...) is held to the strict secret requirements below.
 _DEV_ENVIRONMENTS = frozenset({"development", "dev", "local", "test", "testing"})
+
+# Environment variables the Azure App Service runtime injects into every app
+# (code and custom-container deployments alike). Their presence means "this
+# process is internet-facing", whatever ENVIRONMENT claims.
+_AZURE_APP_SERVICE_MARKERS = ("WEBSITE_INSTANCE_ID", "WEBSITE_SITE_NAME")
+
+_VALID_SAMESITE = frozenset({"lax", "strict", "none"})
 
 # Placeholder secrets that have appeared in this repo's docs/compose/history.
 # They are public, so they are never acceptable outside development.
@@ -40,6 +49,10 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
+        # SECURITY (pre-deploy audit): a failed startup validation otherwise
+        # echoes the input dict — JWT_SECRET and DATABASE_URL (with its
+        # password) included — into the container / App Service log stream.
+        hide_input_in_errors=True,
     )
 
     # --- App ---
@@ -78,13 +91,23 @@ class Settings(BaseSettings):
     # a bearer credential with no revocation path of its own; revocation lives
     # entirely on the refresh side. 30 minutes is the top of the PRD's 15-30
     # minute band, chosen so a working session rarely hits a mid-action refresh.
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    # Refresh lifetime. The PRD's band is 7-30 days; 14 is the middle. R7.5
-    # explicitly declines rotation and reuse detection, so this number *is* the
-    # worst-case window a stolen refresh token stays usable for if the user
-    # never logs out. Halving 30 halves that window at the cost of a login
-    # every fortnight.
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 14
+    #
+    # SECURITY (pre-deploy audit): bounded. The access token cannot be revoked,
+    # so an operator copying a stale V1 value (10080 = 7 days) into App
+    # Settings would silently turn "logout" into "logout in a week".
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30, ge=1, le=60)
+    # Refresh lifetime. The PRD's band is 7-30 days; 14 is the middle. This is
+    # an *absolute* session lifetime: R7.5 rotation hands each new token its
+    # predecessor's expiry rather than a fresh 14 days, so a session that is
+    # used constantly still ends 14 days after login.
+    # Bounded to the PRD's upper limit (V2 audit L6).
+    REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=14, ge=1, le=30)
+    # R7.5 — how long a just-rotated refresh token is still honoured (with a
+    # new access token but no new cookie) instead of being treated as reuse.
+    # Covers two tabs whose refreshes were both sent with the old cookie. Every
+    # second of it is also a second a thief racing the real user is not
+    # detected, so keep it short; 0 disables the grace entirely.
+    REFRESH_TOKEN_REUSE_GRACE_SECONDS: int = Field(default=30, ge=0, le=120)
     # Bound claims (audit L4). A token minted for some other service that
     # happens to share this secret won't validate here, and vice versa.
     JWT_ISSUER: str = "jtracks"
@@ -119,10 +142,16 @@ class Settings(BaseSettings):
     RATE_LIMIT_SIGNUP: str = "3/hour"
     RATE_LIMIT_OAUTH: str = "10/minute"
     RATE_LIMIT_AUTOFILL: str = "10/minute"
-    # Only enable behind a proxy you control, and make sure that proxy strips
-    # inbound X-Forwarded-For. Otherwise clients spoof the header and evade
-    # every limit above.
+    # Enable when the API sits behind a reverse proxy — REQUIRED on Azure App
+    # Service. There, every request reaches the app from the platform's front
+    # end, so without this all clients share one rate-limit bucket and anyone
+    # can lock the real user out of /auth/login (see app/core/rate_limit.py).
     TRUST_PROXY_HEADERS: bool = False
+    # How many proxies in front of the app *append* to X-Forwarded-For. The
+    # client IP is taken this many entries from the RIGHT, which is the only
+    # position a client cannot forge. Azure App Service alone = 1; App Service
+    # behind Front Door / Application Gateway = 2.
+    TRUSTED_PROXY_HOPS: int = Field(default=1, ge=1, le=5)
 
     # --- Google OAuth ---
     # The Google OAuth 2.0 Web client ID that ID tokens are verified against.
@@ -209,6 +238,88 @@ class Settings(BaseSettings):
             raise ValueError(
                 "CORS_ORIGINS must be an explicit list of origins; '*' is not "
                 "allowed on an authenticated API."
+            )
+        for origin in self.cors_origins_list:
+            parts = urlsplit(origin)
+            # An origin is scheme://host[:port] and nothing else. A trailing
+            # slash or path never matches the browser's Origin header, so the
+            # frontend silently loses the API — the usual "fix" for which is
+            # reaching for '*'. Fail at startup instead.
+            if (
+                parts.scheme not in {"http", "https"}
+                or not parts.hostname
+                or parts.path
+                or parts.query
+                or parts.fragment
+                or "@" in parts.netloc
+            ):
+                raise ValueError(
+                    f"CORS_ORIGINS entry {origin!r} is not a bare origin; use "
+                    "scheme://host[:port] with no path or trailing slash."
+                )
+            # SECURITY (pre-deploy audit): credentialed CORS to a plain-http
+            # origin lets anyone on that network path inject script into the
+            # "trusted" page and drive /auth/refresh with the user's cookie.
+            # Loopback is exempt: it isn't reachable from another machine, and
+            # the dev defaults must not make a production boot explode.
+            if (
+                not self.is_development
+                and parts.scheme != "https"
+                and parts.hostname not in {"localhost", "127.0.0.1", "::1"}
+            ):
+                raise ValueError(
+                    f"CORS_ORIGINS entry {origin!r} must use https outside "
+                    "development."
+                )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_refresh_cookie(self) -> "Settings":
+        """Make the cookie ADR's invariants unrepresentable (V2 audit M2).
+
+        See docs/decisions/cookie-topology-samesite.md: `Secure` is
+        unconditional and `Path` is what confines the CSRF surface. Both were
+        env-overridable with no guard, and `SameSite=lax` + `Secure=false` is a
+        combination browsers happily accept — the refresh token then rides any
+        plain-http request to the API host.
+        """
+        samesite = self.REFRESH_COOKIE_SAMESITE.strip().lower()
+        if samesite not in _VALID_SAMESITE:
+            raise ValueError(
+                "REFRESH_COOKIE_SAMESITE must be 'lax', 'strict' or 'none'."
+            )
+        self.REFRESH_COOKIE_SAMESITE = samesite
+        if self.REFRESH_COOKIE_SECURE is not True:
+            raise ValueError(
+                "REFRESH_COOKIE_SECURE must stay true (see docs/decisions/"
+                "cookie-topology-samesite.md). Chrome and Firefox accept Secure "
+                "cookies over http://localhost, so local development does not "
+                "need it relaxed."
+            )
+        path = self.REFRESH_COOKIE_PATH.rstrip("/")
+        if not path.startswith("/") or not path.endswith("/auth"):
+            raise ValueError(
+                "REFRESH_COOKIE_PATH must be the auth router's prefix (e.g. "
+                "'/auth'); a wider path sends the refresh token to every endpoint."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _refuse_development_mode_on_app_service(self) -> "Settings":
+        """Fail closed when ENVIRONMENT is left at its dev default on Azure.
+
+        `ENVIRONMENT` defaults to "development" so a fresh clone just runs. On
+        an internet-facing App Service that default silently serves /docs and
+        /openapi.json, drops HSTS, allows http CORS origins, and signs tokens
+        with an ephemeral per-process secret — all at once, with no error.
+        """
+        if self.is_development and any(
+            os.environ.get(marker) for marker in _AZURE_APP_SERVICE_MARKERS
+        ):
+            raise ValueError(
+                "ENVIRONMENT is a development value but this process is running "
+                "on Azure App Service. Set ENVIRONMENT=production (and a strong "
+                "JWT_SECRET) in the App Service configuration."
             )
         return self
 

@@ -30,9 +30,24 @@ class RefreshToken(Base):
         String, unique=True, nullable=False, index=True
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # R7.5 — every token minted by one login/signup/OAuth exchange, and every
+    # token rotated out of those, shares a family. Reuse of a rotated token
+    # revokes the whole family, which is what ends a stolen session.
+    family_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), nullable=False, default=uuid.uuid4, index=True
+    )
     # Non-null means revoked.
     revoked_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
+    )
+    # R7.5 — set when this token was revoked *by rotation* (it names the token
+    # that replaced it). This is what separates "used again after rotation"
+    # (reuse: a theft signal) from "revoked by logout or the session cap"
+    # (just an invalid session). No FK: `purge_expired` deletes rows, and a
+    # successor always outlives its predecessor, so it would never dangle in
+    # the direction that matters.
+    replaced_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
