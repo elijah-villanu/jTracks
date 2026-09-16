@@ -4,7 +4,6 @@ import { cn } from "@/lib/utils"
 import { ApiError } from "@/lib/api-client"
 import { useAuth } from "@/hooks/useAuth"
 import { BlurFade } from "@/components/ui/blur-fade"
-import { BorderBeam } from "@/components/ui/border-beam"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -78,15 +77,13 @@ export function LoginForm({
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       {/*
-        Single entrance for the whole auth card + a single, slow BorderBeam
-        accent (the card is the one thing on this page) -- see
-        docs/decisions/magicui-conventions.md. `relative` is required so the
-        beam's `absolute inset-0` overlay positions against the card, not the
-        page.
+        Single entrance for the whole auth card -- see
+        docs/decisions/magicui-conventions.md. The card used to carry a
+        looping BorderBeam too; removed app-wide 2026-09-15 (WCAG 2.2.2: an
+        endless animation with no way to pause it).
       */}
       <BlurFade delay={0}>
-        <Card className="relative">
-          <BorderBeam duration={24} colorFrom="var(--foreground)" colorTo="var(--muted-foreground)" />
+        <Card>
           <CardHeader>
             {/*
               A11y (WCAG 1.3.1 / 2.4.6): `CardTitle` renders a plain <div>, so
@@ -121,9 +118,17 @@ export function LoginForm({
                 )}
                 <Field>
                   <FieldLabel htmlFor="email">Email</FieldLabel>
+                  {/*
+                    A11y (WCAG 1.3.5 Identify Input Purpose, and 3.3.8
+                    Accessible Authentication): `autoComplete` tokens let
+                    browsers and password managers fill these reliably, so
+                    signing in doesn't depend on recalling or retyping
+                    credentials.
+                  */}
                   <Input
                     id="email"
                     type="email"
+                    autoComplete="email"
                     placeholder="m@example.com"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
@@ -137,19 +142,28 @@ export function LoginForm({
                   <Input
                     id="password"
                     type="password"
+                    autoComplete="current-password"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
                     required
                   />
                 </Field>
                 <Field>
-                  <Button type="submit" disabled={isSubmitting}>
+                  {/*
+                    A11y (WCAG 2.4.3): `focusableWhenDisabled` on both. A
+                    natively disabled button can't hold focus, so activating
+                    either one from the keyboard dropped focus to <body> --
+                    and on a failed sign-in the user then had to tab back
+                    through the whole page to try again.
+                  */}
+                  <Button type="submit" disabled={isSubmitting} focusableWhenDisabled>
                     {isSubmitting ? "Logging in..." : "Login"}
                   </Button>
                   <Button
                     variant="outline"
                     type="button"
                     disabled={isSubmitting}
+                    focusableWhenDisabled
                     onClick={handleGoogleLogin}
                   >
                     Login with Google

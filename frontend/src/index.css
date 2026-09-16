@@ -97,9 +97,30 @@
   --muted-foreground: oklch(0.556 0 0);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
+  /*
+    A11y (WCAG 1.4.3): darkened from shadcn's stock oklch(0.577 0.245
+    27.325). That value clears white (4.87:1) but not the surfaces it's
+    actually used on: every error banner in the app is `text-destructive`
+    on `bg-destructive/10` (4.09:1), and the destructive Button's hover is
+    its text on `/20` over the dialog footer's `bg-muted/50` (3.3:1). Same
+    hue, lower lightness: 5.75:1 on the banner tint, 4.55:1 on that hover
+    -- the lightest value that clears both. Dark mode's value already
+    passes (6.23:1 on its own tint) and is unchanged.
+  */
+  --destructive: oklch(0.49 0.2 27.4);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
+  /*
+    A11y (WCAG 1.4.11 Non-text Contrast): the outline of a text field or
+    select trigger is the only thing that shows a sighted user where to
+    type, and `--input` drew it at 1.26:1 against white -- effectively
+    invisible to low-vision users. Split out rather than darkening
+    `--input` itself, because `.dark` also uses `--input` as a *fill*
+    (`dark:bg-input/30`) and that surface should not change. Measured:
+    3.64:1 on white/card, 3.35:1 on the lightest status-cell tint
+    (`bg-blue-50`) the table's status trigger sits on.
+  */
+  --input-border: oklch(0.62 0 0);
   --ring: #0F57FE;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
@@ -156,6 +177,9 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
+  /* See :root's --input-border. 15% white measured 1.48:1 (--background) /
+     1.57:1 (--card); 40% clears 3.77:1 / 3.83:1. */
+  --input-border: oklch(1 0 0 / 40%);
   --ring: oklch(0.623 0.214 259.815);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
@@ -211,6 +235,7 @@
   --color-destructive: var(--destructive);
   --color-border: var(--border);
   --color-input: var(--input);
+  --color-input-border: var(--input-border);
   --color-ring: var(--ring);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
@@ -280,7 +305,15 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    /*
+      A11y (WCAG 2.4.7 / 1.4.11): this outline color is what every focusable
+      element *without* its own focus-visible styling falls back to -- nav
+      links, footer links, inline "Sign up"/"Sign in" links, the skip link.
+      At `/50` the browser's focus ring measured 2.26:1 (light) / 2.12:1
+      (dark) against the page, under the 3:1 minimum for a focus indicator.
+      Full `--ring` is 5.50:1 / 5.33:1.
+    */
+    @apply border-border outline-ring;
     /*
       F56/R17.3: Hedvig Letters Sans has exactly one real weight (400).
       Without this, a stray font-semibold/font-bold on a Display element

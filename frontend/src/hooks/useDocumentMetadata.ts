@@ -1,5 +1,27 @@
 import { useEffect } from "react"
 
+/** Suffix every route title carries, so a tab or history entry still names the product. */
+const TITLE_SUFFIX = "JourneyJob"
+
+/**
+ * A11y (WCAG 2.4.2 Page Titled): title-only sibling of
+ * `useDocumentMetadata` below, for the routes that aren't the crawlable
+ * entry point. Every one of them used to inherit `index.html`'s landing
+ * title, so `/login`, `/app` and `/app/analytics` were all announced --
+ * and listed in tabs and history -- as "JourneyJob — see where your job
+ * search stalls". Same write-on-mount / restore-on-unmount contract, so it
+ * composes with the landing route's hook in either direction.
+ */
+export function useDocumentTitle(pageTitle: string): void {
+  useEffect(() => {
+    const previousTitle = document.title
+    document.title = `${pageTitle} — ${TITLE_SUFFIX}`
+    return () => {
+      document.title = previousTitle
+    }
+  }, [pageTitle])
+}
+
 /**
  * F44 (R10.6): route-scoped `<title>` + description meta.
  *

@@ -13,6 +13,7 @@ import { COLUMN_LABEL, type SortDirection, type SortKey } from "@/components/tab
 import { statusSelectId } from "@/components/table/status-select"
 import { BlurFade } from "@/components/ui/blur-fade"
 import { useApplicationsContext } from "@/hooks/useApplicationsContext"
+import { useDocumentTitle } from "@/hooks/useDocumentMetadata"
 import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { useViewMode } from "@/hooks/useViewMode"
 import { ApiError } from "@/lib/api-client"
@@ -29,11 +30,35 @@ import type { Application, ApplicationStatus } from "@/types/api"
 const CARD_LAYOUT_QUERY = "(max-width: 639px)"
 
 /**
+ * Fallback focus target for a status change whose row can no longer be
+ * found -- see `resolveStatusFocusTarget`. The status filter is the only
+ * control that can hide a row as a *result* of changing its status, so
+ * it's also the control that explains where the row went.
+ */
+const STATUS_FILTER_TRIGGER_ID = "applications-status-filter"
+
+/**
+ * Where keyboard focus belongs after `applicationId`'s status changed:
+ * its own status trigger, re-resolved by id because the board renders
+ * each status as a separate column and so *remounts* a card that changes
+ * status (a new trigger node, same id) -- or, if the card is no longer
+ * rendered at all (filtered out, or past a collapsed board column's
+ * "Show N more" cut-off), the status filter.
+ */
+function resolveStatusFocusTarget(applicationId: string): HTMLElement | null {
+  return (
+    document.getElementById(statusSelectId(applicationId)) ??
+    document.getElementById(STATUS_FILTER_TRIGGER_ID)
+  )
+}
+
+/**
  * The Pipeline View (UXPLAN.md): a single sortable/filterable
  * spreadsheet of every application, with a toolbar for filtering by
  * status and a search bar. Replaces F1's static placeholder table.
  */
 export function ApplicationsPage() {
+  useDocumentTitle("Applications")
   const { applications, isLoading, error, updateApplication } = useApplicationsContext()
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
@@ -50,7 +75,7 @@ export function ApplicationsPage() {
   // F32: JS-driven, not a CSS `hidden`/`sm:block` swap -- a CSS-only swap
   // would mount both ApplicationsTable and ApplicationsCardList at once,
   // duplicating every row's `statusSelectId` DOM id (ConfirmAppliedDialog's
-  // `finalFocusRef` resolves its target lazily by that id, so a duplicate
+  // `finalFocus` resolves its target lazily by that id, so a duplicate
   // would silently break focus restore).
   const isCardLayout = useMediaQuery(CARD_LAYOUT_QUERY)
 
@@ -97,6 +122,36 @@ export function ApplicationsPage() {
     setSortDirection(direction)
   }
 
+  /**
+   * A11y (WCAG 2.4.3 Focus Order): on the board, a status change moves the
+   * card into another column, and React has to remount it there -- the
+   * trigger that held focus is destroyed and focus falls to <body>, so a
+   * keyboard user was thrown to the top of the document on every move. A
+   * status filter that no longer matches does the same thing in the table
+   * and card views. Put focus back only if it was actually lost (never
+   * steal it from wherever the user has since moved). Two frames: one for
+   * React to commit the re-render, one for Base UI to finish its own
+   * focus return from the closed popup.
+   */
+  function restoreStatusFocus(applicationId: string) {
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const active = document.activeElement
+        if (active && active !== document.body) {
+          return
+        }
+        resolveStatusFocusTarget(applicationId)?.focus()
+      })
+    )
+  }
+
+  /** Appended to a move announcement when the move hides the row, so the disappearance isn't silent. */
+  function hiddenByFilterSuffix(status: ApplicationStatus): string {
+    return statusFilter !== "all" && statusFilter !== status
+      ? " It no longer matches the status filter, so it's hidden from the list."
+      : ""
+  }
+
   async function applyStatusChange(id: string, patch: Partial<Application>) {
     const company = applications.find((application) => application.id === id)?.company ?? "Application"
 
@@ -107,9 +162,10 @@ export function ApplicationsPage() {
       await updateApplication(id, patch)
       setActionStatus(
         patch.status
-          ? `${company} moved to ${STATUS_LABEL[patch.status]}.`
+          ? `${company} moved to ${STATUS_LABEL[patch.status]}.${hiddenByFilterSuffix(patch.status)}`
           : `${company} updated.`
       )
+      restoreStatusFocus(id)
     } catch (err) {
       setActionStatus("")
       setActionError(
@@ -127,22 +183,22 @@ export function ApplicationsPage() {
   // element to hand focus back to on close -- focus was being dropped to
   // <body>, dumping a keyboard user at the top of the document and
   // costing them their place in the table. Point Base UI's `finalFocus`
-  // at the row's status trigger instead. Resolved lazily from the id
-  // (rather than captured from `document.activeElement` at open time,
-  // which is the *select popup item* and is unmounted by the time the
-  // dialog closes) and re-read on close, so it still works if the row
-  // re-rendered while the dialog was open.
-  const confirmFocusRef = useRef<HTMLElement | null>(null)
-
-  function trackConfirmFocusTarget(applicationId: string) {
-    confirmFocusRef.current = document.getElementById(statusSelectId(applicationId))
-  }
+  // at the row's status trigger instead.
+  //
+  // Only the *id* is stored here, and the node is looked up by the
+  // function passed as `finalFocus`, which Base UI calls at close time.
+  // An element captured any earlier goes stale: the popup item focused at
+  // open time is unmounted by then, and on the board a confirmed move
+  // remounts the card in the Applied column, so even the trigger node
+  // read right after the save resolved was already detached (verified --
+  // focus still fell to <body> from the board with that approach).
+  const confirmFocusIdRef = useRef<string | null>(null)
 
   function handleStatusChange(id: string, status: ApplicationStatus) {
     const current = applications.find((application) => application.id === id)
 
     if (current?.status === "saved" && status === "applied") {
-      trackConfirmFocusTarget(id)
+      confirmFocusIdRef.current = id
       setConfirmAppliedError(null)
       setConfirmApplied({ id, company: current.company })
       return
@@ -161,15 +217,14 @@ export function ApplicationsPage() {
     setIsConfirmingApplied(true)
     try {
       await updateApplication(id, { status: "applied", date_applied: dateApplied })
-      // Re-resolve the focus target: the row just re-rendered with its new
-      // status, so the node captured when the dialog opened may be stale.
-      trackConfirmFocusTarget(id)
       setConfirmApplied(null)
       // This path bypasses `applyStatusChange`, so it has to do its own
       // announcing -- otherwise the one status transition that takes an
       // extra confirmation step was also the only one that completed
       // silently.
-      setActionStatus(`${company} moved to Applied, dated ${dateApplied}.`)
+      setActionStatus(
+        `${company} moved to Applied, dated ${dateApplied}.${hiddenByFilterSuffix("applied")}`
+      )
     } catch (err) {
       setConfirmAppliedError(
         err instanceof ApiError
@@ -294,6 +349,7 @@ export function ApplicationsPage() {
       ) : (
         <>
           <ApplicationsToolbar
+            statusFilterTriggerId={STATUS_FILTER_TRIGGER_ID}
             statusFilter={statusFilter}
             onStatusFilterChange={setStatusFilter}
             search={search}
@@ -347,7 +403,9 @@ export function ApplicationsPage() {
         error={confirmAppliedError}
         onConfirm={handleConfirmApplied}
         onCancel={handleCancelApplied}
-        finalFocusRef={confirmFocusRef}
+        finalFocus={() =>
+          confirmFocusIdRef.current ? resolveStatusFocusTarget(confirmFocusIdRef.current) : true
+        }
       />
     </div>
   )

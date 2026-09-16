@@ -5,6 +5,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { useAuth } from "@/hooks/useAuth"
+import { useDocumentTitle } from "@/hooks/useDocumentMetadata"
 import { ApiError } from "@/lib/api-client"
 
 function extractErrorMessage(err: unknown, fallback: string): string {
@@ -23,6 +24,7 @@ function extractErrorMessage(err: unknown, fallback: string): string {
  * not here.
  */
 export function SettingsPage() {
+  useDocumentTitle("Settings")
   const { user, isLoading, updateSettings } = useAuth()
 
   const [value, setValue] = useState("")
@@ -95,8 +97,7 @@ export function SettingsPage() {
         <p className="text-sm text-muted-foreground">Sign in to manage your settings.</p>
       ) : (
         // Single once-per-mount entrance for the form card -- no numeric
-        // KPI on this page, so no NumberTicker, and no headline stat to
-        // justify a BorderBeam accent; see
+        // KPI on this page, so no NumberTicker; see
         // docs/decisions/magicui-conventions.md.
         <BlurFade delay={0}>
           {/*
@@ -114,10 +115,13 @@ export function SettingsPage() {
           <Card className="max-w-xl">
             <form onSubmit={handleSubmit}>
               <CardHeader className="border-b">
-                <CardTitle>Ghosting</CardTitle>
+                {/* A11y (WCAG 1.3.1): a real <h2> under the page's <h1>, same nesting AnalyticsPage uses -- `CardTitle` alone is a <div>. */}
+                <CardTitle>
+                  <h2>Ghosting</h2>
+                </CardTitle>
               </CardHeader>
 
-              <CardContent>
+              <CardContent className="p-4">
                 <FieldGroup>
                   {submitError && (
                     <p
@@ -169,7 +173,7 @@ export function SettingsPage() {
                 </FieldGroup>
               </CardContent>
 
-              <CardFooter className="justify-between gap-3">
+              <CardFooter className="justify-between gap-3 -m-1">
                 {/*
                   A11y (WCAG 4.1.3): the "Saved." confirmation appeared and
                   auto-cleared after 2s with nothing announced -- focus stays
@@ -184,7 +188,8 @@ export function SettingsPage() {
                 <span role="status" aria-live="polite" className="text-sm text-muted-foreground">
                   {isSaving ? "Saving..." : savedAt !== null ? "Settings saved." : ""}
                 </span>
-                <Button type="submit" disabled={isSaving}>
+                {/* `focusableWhenDisabled`: see button.tsx -- keeps focus here while saving instead of dropping it to <body>. */}
+                <Button type="submit" disabled={isSaving} focusableWhenDisabled>
                   {isSaving ? "Saving..." : "Save"}
                 </Button>
               </CardFooter>

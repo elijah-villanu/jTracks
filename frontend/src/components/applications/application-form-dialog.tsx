@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react"
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type RefObject } from "react"
 import { AlertTriangle, CheckCircle2, Trash2 } from "lucide-react"
 import {
   AlertDialog,
@@ -36,7 +36,7 @@ import { useApplicationsContext } from "@/hooks/useApplicationsContext"
 import { useAuth } from "@/hooks/useAuth"
 import { ApiError } from "@/lib/api-client"
 import type { ApplicationInput } from "@/lib/applications-context"
-import { cn, todayIsoDate } from "@/lib/utils"
+import { canReceiveFocus, cn, todayIsoDate } from "@/lib/utils"
 import type { Application, ApplicationStatus } from "@/types/api"
 
 const EMPTY_VALUES: ApplicationInput = {
@@ -96,6 +96,15 @@ function extractErrorMessage(err: unknown, fallback: string): string {
   return fallback
 }
 
+interface ApplicationFormDialogProps {
+  /**
+   * Focus fallback for when the element that opened this dialog no longer
+   * exists by the time it closes -- see `resolveFinalFocus` below. AppLayout
+   * points this at whichever header control started the flow.
+   */
+  returnFocusRef?: RefObject<HTMLElement | null>
+}
+
 /**
  * F4's add/edit application dialog, rendered once (see AppLayout) and
  * driven entirely by `ApplicationsProvider`'s `formState` -- opening it
@@ -105,7 +114,7 @@ function extractErrorMessage(err: unknown, fallback: string): string {
  * component. Covers every user-editable field in the shared contract,
  * including F6's `ghost_days_override`.
  */
-export function ApplicationFormDialog() {
+export function ApplicationFormDialog({ returnFocusRef }: ApplicationFormDialogProps) {
   const { formState, closeForm, createApplication, updateApplication, deleteApplication } =
     useApplicationsContext()
   const { user } = useAuth()
@@ -123,6 +132,55 @@ export function ApplicationFormDialog() {
 
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  // A11y (WCAG 4.1.3): adding, saving and deleting all closed the dialog
+  // with nothing announced -- the new/changed/removed row just appeared or
+  // vanished somewhere behind it. Lives outside <Dialog> so it survives
+  // the close it reports on.
+  const [announcement, setAnnouncement] = useState("")
+
+  /*
+    A11y (WCAG 2.4.3): this dialog is opened from state, so Base UI returns
+    focus to whatever was focused when it opened. Two real flows left that
+    element gone by close time and dropped focus to <body>: deleting an
+    application (its Edit button is removed with the row/card), and the
+    autofill hand-off (focus was inside the autofill dialog, which closes as
+    this one opens). Capture the opener ourselves and fall back when it
+    can't take focus.
+  */
+  const openerRef = useRef<HTMLElement | null>(null)
+  const didDeleteRef = useRef(false)
+
+  useLayoutEffect(() => {
+    if (isOpen) {
+      // <body> is not an opener: it's what `activeElement` reads when focus
+      // was already lost (the autofill input disables itself mid-request),
+      // and "returning" to it sent focus to the skip link.
+      const active = document.activeElement
+      openerRef.current = active instanceof HTMLElement && active !== document.body ? active : null
+      didDeleteRef.current = false
+    }
+  }, [isOpen])
+
+  function resolveFinalFocus(): HTMLElement | boolean {
+    const main = document.getElementById("main-content")
+    // After a delete the opener is gone by definition, so aim at the page's
+    // main region (AppLayout's route-change focus target). Base UI hands
+    // focus to the first tabbable element inside a non-tabbable target, so
+    // in practice focus lands on the first control of the page content --
+    // the Table/Board toggle on the tracker -- and the announcement above
+    // says what happened.
+    if (didDeleteRef.current) {
+      return main ?? true
+    }
+    if (canReceiveFocus(openerRef.current)) {
+      return openerRef.current
+    }
+    if (canReceiveFocus(returnFocusRef?.current)) {
+      return returnFocusRef.current
+    }
+    return main ?? true
+  }
 
   // Reset the dialog-local state every time it opens (for a new
   // create, a possibly-different application to edit, or -- F5 --  a
@@ -192,10 +250,13 @@ export function ApplicationFormDialog() {
     setSubmitError(null)
     setIsSubmitting(true)
     try {
+      const subject = `${values.company} — ${values.title}`
       if (mode === "edit" && application) {
         await updateApplication(application.id, values)
+        setAnnouncement(`Saved changes to ${subject}.`)
       } else {
         await createApplication(values)
+        setAnnouncement(`Added ${subject}.`)
       }
       closeForm()
     } catch (err) {
@@ -214,6 +275,8 @@ export function ApplicationFormDialog() {
     setIsDeleting(true)
     try {
       await deleteApplication(application.id)
+      didDeleteRef.current = true
+      setAnnouncement(`Deleted ${application.company} — ${application.title}.`)
       closeForm()
     } catch (err) {
       setDeleteError(extractErrorMessage(err, "Failed to delete application. Please try again."))
@@ -223,333 +286,376 @@ export function ApplicationFormDialog() {
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{mode === "edit" ? "Edit application" : "Add application"}</DialogTitle>
-          <DialogDescription>
-            {mode === "edit"
-              ? "Update the details for this application."
-              : "Track a new job application in your pipeline."}
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <p aria-live="polite" aria-atomic="true" className="sr-only">
+        {announcement}
+      </p>
+      <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+        <DialogContent
+          className="max-h-[85vh] overflow-y-auto sm:max-w-lg"
+          finalFocus={resolveFinalFocus}
+        >
+          <DialogHeader>
+            <DialogTitle>{mode === "edit" ? "Edit application" : "Add application"}</DialogTitle>
+            <DialogDescription>
+              {mode === "edit"
+                ? "Update the details for this application."
+                : "Track a new job application in your pipeline."}{" "}
+              {/* A11y (WCAG 3.3.2): explains the visual `*` on required labels below. */}
+              Fields marked * are required.
+            </DialogDescription>
+          </DialogHeader>
 
-        {/*
-          A11y: the autofill review notice. `role="status"` (polite) rather
-          than `role="alert"` -- even the failure cases are a recoverable
-          "fill this in yourself", not an error, and the dialog is opening
-          at the same moment, so an assertive announcement would interrupt
-          the dialog title/description. Announced *and* visible, so neither
-          a screen reader user nor a sighted user has to infer the outcome
-          from which inputs happen to be blank.
-        */}
-        {/*
-          F52: visual pass only. The tone colors are left exactly as
-          F28/F29 measured them (9.14:1 / 14.88:1 success, 8.73:1 /
-          15.42:1 warning -- see docs/decisions/magicui-conventions.md's
-          both-theme sweep) rather than being re-pointed at the
-          `--status-*` tokens: those tokens carry *pipeline status*
-          meaning, and an autofill result is not a pipeline status, so
-          reusing them would make a successful parse read as "Offer".
-          What changed is structure -- a tone icon and a leading-aligned
-          two-column layout, so the outcome is legible before the
-          sentence is read. The icon is `aria-hidden`, so what the
-          `role="status"` region announces is unchanged.
-        */}
-        {notice && (
-          <p
-            role="status"
-            className={cn(
-              "flex items-start gap-2 rounded-md border px-3 py-2.5 text-sm",
-              notice.tone === "success"
-                ? "border-emerald-600/40 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100"
-                : "border-amber-600/40 bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
-            )}
-          >
-            {notice.tone === "success" ? (
-              <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            ) : (
-              <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            )}
-            <span>{notice.message}</span>
-          </p>
-        )}
-
-        <form id="application-form" onSubmit={handleSubmit}>
-          <FieldGroup>
-            {submitError && (
-              <p
-                role="alert"
-                className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-              >
-                {submitError}
-              </p>
-            )}
-
-            {/*
-              A11y (WCAG 3.3.1 Error Identification / 1.3.1 Info and
-              Relationships): each input carried `aria-invalid` but was
-              never pointed at its own message, so a screen reader
-              announced a bare "invalid entry" with no reason -- and if
-              the user tabbed back to the field later, nothing at all.
-              Every `FieldError`/`FieldDescription` below now has a
-              stable id referenced by its input's `aria-describedby`.
-            */}
-            <Field data-invalid={fieldErrors.company}>
-              <FieldLabel htmlFor="application-company">Company</FieldLabel>
-              <Input
-                id="application-company"
-                value={values.company}
-                onChange={(event) => updateField("company", event.target.value)}
-                aria-invalid={fieldErrors.company}
-                aria-describedby={fieldErrors.company ? "application-company-error" : undefined}
-              />
-              {fieldErrors.company && (
-                <FieldError id="application-company-error">Company is required.</FieldError>
+          {/*
+            A11y: the autofill review notice. `role="status"` (polite) rather
+            than `role="alert"` -- even the failure cases are a recoverable
+            "fill this in yourself", not an error, and the dialog is opening
+            at the same moment, so an assertive announcement would interrupt
+            the dialog title/description. Announced *and* visible, so neither
+            a screen reader user nor a sighted user has to infer the outcome
+            from which inputs happen to be blank.
+          */}
+          {/*
+            F52: visual pass only. The tone colors are left exactly as
+            F28/F29 measured them (9.14:1 / 14.88:1 success, 8.73:1 /
+            15.42:1 warning -- see docs/decisions/magicui-conventions.md's
+            both-theme sweep) rather than being re-pointed at the
+            `--status-*` tokens: those tokens carry *pipeline status*
+            meaning, and an autofill result is not a pipeline status, so
+            reusing them would make a successful parse read as "Offer".
+            What changed is structure -- a tone icon and a leading-aligned
+            two-column layout, so the outcome is legible before the
+            sentence is read. The icon is `aria-hidden`, so what the
+            `role="status"` region announces is unchanged.
+          */}
+          {notice && (
+            <p
+              role="status"
+              className={cn(
+                "flex items-start gap-2 rounded-md border px-3 py-2.5 text-sm",
+                notice.tone === "success"
+                  ? "border-emerald-600/40 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100"
+                  : "border-amber-600/40 bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
               )}
-            </Field>
-
-            <Field data-invalid={fieldErrors.title}>
-              <FieldLabel htmlFor="application-title">Job Title</FieldLabel>
-              <Input
-                id="application-title"
-                value={values.title}
-                onChange={(event) => updateField("title", event.target.value)}
-                aria-invalid={fieldErrors.title}
-                aria-describedby={fieldErrors.title ? "application-title-error" : undefined}
-              />
-              {fieldErrors.title && (
-                <FieldError id="application-title-error">Job title is required.</FieldError>
-              )}
-            </Field>
-
-            <Field data-invalid={fieldErrors.status}>
-              <FieldLabel htmlFor="application-status">Status</FieldLabel>
-              <Select
-                value={values.status}
-                onValueChange={(value) => {
-                  if (!value) {
-                    return
-                  }
-                  const nextStatus = value as ApplicationStatus
-                  setValues((prev) => ({
-                    ...prev,
-                    status: nextStatus,
-                    // Moving off "saved" implies the user has applied --
-                    // default date_applied to today (still editable/
-                    // required below) rather than leaving it blank.
-                    date_applied:
-                      nextStatus !== "saved" && !prev.date_applied
-                        ? todayIsoDate()
-                        : prev.date_applied,
-                  }))
-                }}
-              >
-                <SelectTrigger
-                  id="application-status"
-                  className="w-full"
-                  aria-invalid={fieldErrors.status}
-                  aria-describedby={fieldErrors.status ? "application-status-error" : undefined}
-                >
-                  {/*
-                    A11y (WCAG 4.1.2): `<SelectValue />` on its own shows
-                    Base UI's raw value, so this trigger read "saved" /
-                    "interviewing_oa" instead of the real labels, both
-                    visually and to a screen reader. Format via
-                    STATUS_LABEL, the same map the options use.
-                  */}
-                  <SelectValue>
-                    {(value: ApplicationStatus | null) =>
-                      value ? STATUS_LABEL[value] : "Select a status"
-                    }
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {ALL_STATUSES.map((status) => (
-                    <SelectItem key={status} value={status}>
-                      {STATUS_LABEL[status]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {fieldErrors.status && (
-                <FieldError id="application-status-error">Status is required.</FieldError>
-              )}
-            </Field>
-
-            <Field>
-              <FieldLabel htmlFor="application-job-url">Job URL</FieldLabel>
-              <Input
-                id="application-job-url"
-                type="url"
-                placeholder="https://..."
-                value={values.job_url ?? ""}
-                onChange={(event) => updateField("job_url", event.target.value || null)}
-              />
-            </Field>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field>
-                <FieldLabel htmlFor="application-location">Location</FieldLabel>
-                <Input
-                  id="application-location"
-                  value={values.location ?? ""}
-                  onChange={(event) => updateField("location", event.target.value || null)}
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="application-salary">Salary</FieldLabel>
-                <Input
-                  id="application-salary"
-                  value={values.salary ?? ""}
-                  onChange={(event) => updateField("salary", event.target.value || null)}
-                />
-              </Field>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <Field>
-                <FieldLabel htmlFor="application-date-posted">Date Posted</FieldLabel>
-                <Input
-                  id="application-date-posted"
-                  type="date"
-                  value={values.date_posted ?? ""}
-                  onChange={(event) => updateField("date_posted", event.target.value || null)}
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="application-date-saved">Date Saved</FieldLabel>
-                <Input
-                  id="application-date-saved"
-                  type="date"
-                  value={values.date_saved ?? ""}
-                  onChange={(event) => updateField("date_saved", event.target.value || null)}
-                />
-              </Field>
-              <Field data-invalid={fieldErrors.date_applied}>
-                <FieldLabel htmlFor="application-date-applied">Date Applied</FieldLabel>
-                <Input
-                  id="application-date-applied"
-                  type="date"
-                  value={values.date_applied ?? ""}
-                  onChange={(event) => updateField("date_applied", event.target.value || null)}
-                  aria-invalid={fieldErrors.date_applied}
-                  aria-describedby={
-                    fieldErrors.date_applied ? "application-date-applied-error" : undefined
-                  }
-                />
-                {fieldErrors.date_applied && (
-                  <FieldError id="application-date-applied-error">
-                    Date applied is required once status is past Saved.
-                  </FieldError>
-                )}
-              </Field>
-            </div>
-
-            <Field data-invalid={fieldErrors.ghost_days_override}>
-              <FieldLabel htmlFor="application-ghost-days-override">
-                Ghost override (days)
-              </FieldLabel>
-              <Input
-                id="application-ghost-days-override"
-                type="number"
-                min={1}
-                step={1}
-                placeholder={`Default: ${user?.ghost_days_default ?? 14} days`}
-                value={values.ghost_days_override ?? ""}
-                onChange={(event) => {
-                  const raw = event.target.value
-                  updateField("ghost_days_override", raw === "" ? null : Number(raw))
-                }}
-                aria-invalid={fieldErrors.ghost_days_override}
-                aria-describedby={
-                  fieldErrors.ghost_days_override
-                    ? "application-ghost-days-override-error"
-                    : "application-ghost-days-override-hint"
-                }
-              />
-              {fieldErrors.ghost_days_override ? (
-                <FieldError id="application-ghost-days-override-error">
-                  Enter a whole number of days greater than 0, or leave blank.
-                </FieldError>
+            >
+              {notice.tone === "success" ? (
+                <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
               ) : (
-                <FieldDescription id="application-ghost-days-override-hint">
-                  Leave blank to use your global default ({user?.ghost_days_default ?? 14} days).
-                </FieldDescription>
+                <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
               )}
-            </Field>
-
-            <Field>
-              <FieldLabel htmlFor="application-notes">Notes</FieldLabel>
-              <Textarea
-                id="application-notes"
-                rows={3}
-                value={values.notes ?? ""}
-                onChange={(event) => updateField("notes", event.target.value || null)}
-              />
-            </Field>
-          </FieldGroup>
-        </form>
-
-        <DialogFooter className="sm:justify-between">
-          {mode === "edit" ? (
-            <AlertDialog>
-              <AlertDialogTrigger
-                render={
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    disabled={isSubmitting || isDeleting}
-                  />
-                }
-              >
-                <Trash2 />
-                Delete
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete this application?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This permanently removes {application?.company} — {application?.title} from
-                    your pipeline. This can&apos;t be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                {deleteError && (
-                  <p
-                    role="alert"
-                    className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-                  >
-                    {deleteError}
-                  </p>
-                )}
-                <AlertDialogFooter>
-                  <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    variant="destructive"
-                    onClick={handleDelete}
-                    disabled={isDeleting}
-                  >
-                    {isDeleting ? "Deleting..." : "Delete"}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          ) : (
-            <span aria-hidden="true" />
+              <span>{notice.message}</span>
+            </p>
           )}
 
-          <div className="flex flex-col-reverse gap-2 sm:flex-row">
-            <Button type="button" variant="outline" onClick={closeForm} disabled={isSubmitting}>
-              Cancel
-            </Button>
-            {/* F52: same spinner treatment as the autofill step's Continue button, so the two halves of the entry flow show progress the same way. Decorative only -- the existing submitting live region still owns the announcement. */}
-            <Button type="submit" form="application-form" disabled={isSubmitting}>
-              {isSubmitting && <Spinner aria-hidden="true" />}
-              {isSubmitting ? "Saving..." : mode === "edit" ? "Save changes" : "Add application"}
-            </Button>
-          </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <form id="application-form" onSubmit={handleSubmit}>
+            <FieldGroup>
+              {submitError && (
+                <p
+                  role="alert"
+                  className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                >
+                  {submitError}
+                </p>
+              )}
+
+              {/*
+                A11y (WCAG 3.3.1 Error Identification / 1.3.1 Info and
+                Relationships): each input carried `aria-invalid` but was
+                never pointed at its own message, so a screen reader
+                announced a bare "invalid entry" with no reason -- and if
+                the user tabbed back to the field later, nothing at all.
+                Every `FieldError`/`FieldDescription` below now has a
+                stable id referenced by its input's `aria-describedby`.
+              */}
+              <Field data-invalid={fieldErrors.company}>
+                <FieldLabel htmlFor="application-company">
+                  Company <RequiredMark />
+                </FieldLabel>
+                <Input
+                  id="application-company"
+                  aria-required="true"
+                  value={values.company}
+                  onChange={(event) => updateField("company", event.target.value)}
+                  aria-invalid={fieldErrors.company}
+                  aria-describedby={fieldErrors.company ? "application-company-error" : undefined}
+                />
+                {fieldErrors.company && (
+                  <FieldError id="application-company-error">Company is required.</FieldError>
+                )}
+              </Field>
+
+              <Field data-invalid={fieldErrors.title}>
+                <FieldLabel htmlFor="application-title">
+                  Job Title <RequiredMark />
+                </FieldLabel>
+                <Input
+                  id="application-title"
+                  aria-required="true"
+                  value={values.title}
+                  onChange={(event) => updateField("title", event.target.value)}
+                  aria-invalid={fieldErrors.title}
+                  aria-describedby={fieldErrors.title ? "application-title-error" : undefined}
+                />
+                {fieldErrors.title && (
+                  <FieldError id="application-title-error">Job title is required.</FieldError>
+                )}
+              </Field>
+
+              <Field data-invalid={fieldErrors.status}>
+                <FieldLabel htmlFor="application-status">Status</FieldLabel>
+                <Select
+                  value={values.status}
+                  onValueChange={(value) => {
+                    if (!value) {
+                      return
+                    }
+                    const nextStatus = value as ApplicationStatus
+                    setValues((prev) => ({
+                      ...prev,
+                      status: nextStatus,
+                      // Moving off "saved" implies the user has applied --
+                      // default date_applied to today (still editable/
+                      // required below) rather than leaving it blank.
+                      date_applied:
+                        nextStatus !== "saved" && !prev.date_applied
+                          ? todayIsoDate()
+                          : prev.date_applied,
+                    }))
+                  }}
+                >
+                  <SelectTrigger
+                    id="application-status"
+                    className="w-full"
+                    aria-invalid={fieldErrors.status}
+                    aria-describedby={fieldErrors.status ? "application-status-error" : undefined}
+                  >
+                    {/*
+                      A11y (WCAG 4.1.2): `<SelectValue />` on its own shows
+                      Base UI's raw value, so this trigger read "saved" /
+                      "interviewing_oa" instead of the real labels, both
+                      visually and to a screen reader. Format via
+                      STATUS_LABEL, the same map the options use.
+                    */}
+                    <SelectValue>
+                      {(value: ApplicationStatus | null) =>
+                        value ? STATUS_LABEL[value] : "Select a status"
+                      }
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ALL_STATUSES.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {STATUS_LABEL[status]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {fieldErrors.status && (
+                  <FieldError id="application-status-error">Status is required.</FieldError>
+                )}
+              </Field>
+
+              <Field>
+                <FieldLabel htmlFor="application-job-url">Job URL</FieldLabel>
+                <Input
+                  id="application-job-url"
+                  type="url"
+                  placeholder="https://..."
+                  value={values.job_url ?? ""}
+                  onChange={(event) => updateField("job_url", event.target.value || null)}
+                />
+              </Field>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Field>
+                  <FieldLabel htmlFor="application-location">Location</FieldLabel>
+                  <Input
+                    id="application-location"
+                    value={values.location ?? ""}
+                    onChange={(event) => updateField("location", event.target.value || null)}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="application-salary">Salary</FieldLabel>
+                  <Input
+                    id="application-salary"
+                    value={values.salary ?? ""}
+                    onChange={(event) => updateField("salary", event.target.value || null)}
+                  />
+                </Field>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <Field>
+                  <FieldLabel htmlFor="application-date-posted">Date Posted</FieldLabel>
+                  <Input
+                    id="application-date-posted"
+                    type="date"
+                    value={values.date_posted ?? ""}
+                    onChange={(event) => updateField("date_posted", event.target.value || null)}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="application-date-saved">Date Saved</FieldLabel>
+                  <Input
+                    id="application-date-saved"
+                    type="date"
+                    value={values.date_saved ?? ""}
+                    onChange={(event) => updateField("date_saved", event.target.value || null)}
+                  />
+                </Field>
+                <Field data-invalid={fieldErrors.date_applied}>
+                  {/* Required only once status is past Saved -- same rule `handleSubmit` validates. */}
+                  <FieldLabel htmlFor="application-date-applied">
+                    Date Applied {values.status !== "saved" && <RequiredMark />}
+                  </FieldLabel>
+                  <Input
+                    id="application-date-applied"
+                    type="date"
+                    aria-required={values.status !== "saved"}
+                    value={values.date_applied ?? ""}
+                    onChange={(event) => updateField("date_applied", event.target.value || null)}
+                    aria-invalid={fieldErrors.date_applied}
+                    aria-describedby={
+                      fieldErrors.date_applied ? "application-date-applied-error" : undefined
+                    }
+                  />
+                  {fieldErrors.date_applied && (
+                    <FieldError id="application-date-applied-error">
+                      Date applied is required once status is past Saved.
+                    </FieldError>
+                  )}
+                </Field>
+              </div>
+
+              <Field data-invalid={fieldErrors.ghost_days_override}>
+                <FieldLabel htmlFor="application-ghost-days-override">
+                  Ghost override (days)
+                </FieldLabel>
+                <Input
+                  id="application-ghost-days-override"
+                  type="number"
+                  min={1}
+                  step={1}
+                  placeholder={`Default: ${user?.ghost_days_default ?? 14} days`}
+                  value={values.ghost_days_override ?? ""}
+                  onChange={(event) => {
+                    const raw = event.target.value
+                    updateField("ghost_days_override", raw === "" ? null : Number(raw))
+                  }}
+                  aria-invalid={fieldErrors.ghost_days_override}
+                  aria-describedby={
+                    fieldErrors.ghost_days_override
+                      ? "application-ghost-days-override-error"
+                      : "application-ghost-days-override-hint"
+                  }
+                />
+                {fieldErrors.ghost_days_override ? (
+                  <FieldError id="application-ghost-days-override-error">
+                    Enter a whole number of days greater than 0, or leave blank.
+                  </FieldError>
+                ) : (
+                  <FieldDescription id="application-ghost-days-override-hint">
+                    Leave blank to use your global default ({user?.ghost_days_default ?? 14} days).
+                  </FieldDescription>
+                )}
+              </Field>
+
+              <Field>
+                <FieldLabel htmlFor="application-notes">Notes</FieldLabel>
+                <Textarea
+                  id="application-notes"
+                  rows={3}
+                  value={values.notes ?? ""}
+                  onChange={(event) => updateField("notes", event.target.value || null)}
+                />
+              </Field>
+            </FieldGroup>
+          </form>
+
+          <DialogFooter className="sm:justify-between">
+            {mode === "edit" ? (
+              <AlertDialog>
+                <AlertDialogTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      disabled={isSubmitting || isDeleting}
+                    />
+                  }
+                >
+                  <Trash2 />
+                  Delete
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete this application?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This permanently removes {application?.company} — {application?.title} from
+                      your pipeline. This can&apos;t be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  {deleteError && (
+                    <p
+                      role="alert"
+                      className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                    >
+                      {deleteError}
+                    </p>
+                  )}
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      variant="destructive"
+                      onClick={handleDelete}
+                      disabled={isDeleting}
+                      focusableWhenDisabled
+                    >
+                      {isDeleting ? "Deleting..." : "Delete"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            ) : (
+              <span aria-hidden="true" />
+            )}
+
+            <div className="flex flex-col-reverse gap-2 sm:flex-row">
+              <Button type="button" variant="outline" onClick={closeForm} disabled={isSubmitting}>
+                Cancel
+              </Button>
+              {/* F52: same spinner treatment as the autofill step's Continue button, so the two halves of the entry flow show progress the same way. Decorative only -- the existing submitting live region still owns the announcement. */}
+              {/* `focusableWhenDisabled` here and on the delete action: a failed request must leave focus where the user was, not on <body> (see button.tsx). */}
+              <Button
+                type="submit"
+                form="application-form"
+                disabled={isSubmitting}
+                focusableWhenDisabled
+              >
+                {isSubmitting && <Spinner aria-hidden="true" />}
+                {isSubmitting ? "Saving..." : mode === "edit" ? "Save changes" : "Add application"}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
+/**
+ * A11y (WCAG 3.3.2 Labels or Instructions): the visual required marker.
+ * `aria-hidden` because the input itself carries `aria-required` -- a
+ * screen reader already says "required", and would otherwise also read
+ * "star". Deliberately not the native `required` attribute, which would
+ * make the browser's own validation bubble pre-empt this form's
+ * associated, focus-managed error messages.
+ */
+function RequiredMark() {
+  return (
+    <span aria-hidden="true" className="text-destructive">
+      *
+    </span>
   )
 }

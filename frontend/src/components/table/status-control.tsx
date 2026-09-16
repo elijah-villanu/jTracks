@@ -28,7 +28,7 @@ interface StatusControlProps {
  * `statusSelectId(application.id)` stays unique because only *one* of
  * the table/card/board renderings is ever mounted at a time (see
  * ApplicationsPage's view-mode switch and its JS-driven narrow-width
- * swap) -- this is what `ConfirmAppliedDialog`'s `finalFocusRef`
+ * swap) -- this is what `ConfirmAppliedDialog`'s `finalFocus`
  * resolves lazily by id, so the Saved -> Applied confirm dialog returns
  * focus to the right control from the board too.
  *

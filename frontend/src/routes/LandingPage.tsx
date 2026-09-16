@@ -1,11 +1,11 @@
 import { Ghost, Share2, Workflow } from "lucide-react"
 import { Link } from "react-router"
+import { recapTextSummary } from "@/components/dashboard/chart-summaries"
 import { RecapCard } from "@/components/dashboard/recap-card"
 import { SankeyChart } from "@/components/dashboard/sankey-chart"
 import { Logo } from "@/components/layout/logo"
 import { ThemeToggle } from "@/components/layout/theme-toggle"
 import { BlurFade } from "@/components/ui/blur-fade"
-import { BorderBeam } from "@/components/ui/border-beam"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { useDocumentMetadata } from "@/hooks/useDocumentMetadata"
@@ -103,19 +103,19 @@ function Wordmark({ className }: { className?: string }) {
  * (hero, product visual, feature trio, footer) at the component defaults
  * that doc fixes (`duration 0.4s`, `easeOut`, `offset 6px`, `blur 6px`,
  * `direction down` -- only `delay` is customized), staggered by
- * `ENTRANCE_STAGGER_SECONDS` *between* groups and never within one, plus
- * exactly one continuous accent for the entire page: a single 8s
- * `BorderBeam` on the pipeline-flow card (R14.3). No `NumberTicker`
- * anywhere -- this page has no KPI tile, only sample figures inside
- * captions and inside `RecapCard`, and the doc scopes the ticker to
- * numbers that *are* the content.
+ * `ENTRANCE_STAGGER_SECONDS` *between* groups and never within one. No
+ * continuous accent: the pipeline-flow card's `BorderBeam` (R14.3) was
+ * removed app-wide on 2026-09-15 -- an endless loop with no pause control
+ * fails WCAG 2.2.2. No `NumberTicker` anywhere -- this page has no KPI
+ * tile, only sample figures inside captions and inside `RecapCard`, and
+ * the doc scopes the ticker to numbers that *are* the content.
  *
- * **Reduced motion needs nothing local here** (R14.4). Every animated thing
- * on this page is a Motion component under `main.tsx`'s
- * `<MotionConfig reducedMotion="user">`; the route is lazy-loaded inside
- * `BrowserRouter`, which is itself inside that provider, so `/` inherits it
- * like every other route. No per-component `useReducedMotion` check, and
- * nothing portals out of that tree.
+ * **Reduced motion** (R14.4). Every animated thing on this page is a Motion
+ * component under `main.tsx`'s `<MotionConfig reducedMotion="user">`; the
+ * route is lazy-loaded inside `BrowserRouter`, which is itself inside that
+ * provider, so `/` inherits it like every other route, and nothing portals
+ * out of that tree. For `BlurFade` that is enough: Motion skips its offset
+ * and keeps only the short opacity/blur fade.
  *
  * **F35's no-Motion-inside-the-recap rule still applies here.** The
  * `BlurFade` around the product visual wraps `RecapCard` from the outside,
@@ -314,35 +314,12 @@ export default function LandingPage() {
 
             <div className="mt-8 grid gap-6 lg:grid-cols-12">
               {/*
-                R14.3's single continuous accent -- for the whole page, not
-                just this section. The conventions doc reserves `BorderBeam`
-                for "the single most important element" in a view; on `/` that
-                is the visual the headline's claim rests on ("know exactly
-                where your job search stalls"), which is also the wider of the
-                two columns and the first one read. The two alternatives were
-                rejected on the doc's own terms rather than on taste: the
-                recap card beside it would put two beams in one grid row,
-                which is precisely the failure the one-accent rule exists to
-                prevent, and the hero CTA is ruled out by the approved-
-                components table, which lists interactive elements under
-                `border-beam`'s "not for" column (it is a decorative overlay,
-                never a state indicator).
-
-                `relative` is required so the beam's `absolute inset-0`
-                overlay positions against this card instead of the page;
-                `Card`'s own `overflow-hidden` + `rounded-xl` then clip it to
-                the rounded border, the same combination `StatTile` already
-                relies on. `duration={24}` and the two token `var()` colors are
-                the documented values -- MagicUI's `#ffaa40`/`#9c40ff`
-                defaults are never shipped, and the installed component file
-                is not edited to achieve that.
+                This card carried the page's one continuous accent, a looping
+                `BorderBeam`, until 2026-09-15. Removed app-wide by user
+                decision: an animation that never ends and can't be paused
+                fails WCAG 2.2.2, however decorative it is.
               */}
-              <Card className="relative lg:col-span-7">
-                <BorderBeam
-                  duration={24}
-                  colorFrom="var(--foreground)"
-                  colorTo="var(--muted-foreground)"
-                />
+              <Card className="lg:col-span-7">
                 <CardHeader>
                   <h3 className="font-medium">Pipeline flow</h3>
                   <p className="text-sm text-muted-foreground">
@@ -411,7 +388,18 @@ export default function LandingPage() {
                     fits. At `px-2` the card has ~291px to sit in; at `px-4`
                     it would have ~279px and no margin for error.
                   */}
-                  <div className="flex justify-center rounded-lg border border-border bg-muted px-2 py-4 sm:px-3 sm:py-5">
+                  {/*
+                    A11y (WCAG 1.1.1): the card is shown as the image it
+                    exports to, so it gets that image's text alternative --
+                    the same `recapTextSummary` the recap dialog uses.
+                    `role="img"` sits on this wrapper, outside the card
+                    itself, so nothing is added to the export subtree (F35).
+                  */}
+                  <div
+                    role="img"
+                    aria-label={`Sample recap image. ${recapTextSummary(DEMO_RECAP)}`}
+                    className="flex justify-center rounded-lg border border-border bg-muted px-2 py-4 sm:px-3 sm:py-5"
+                  >
                     <RecapCard recap={DEMO_RECAP} skin="beli" />
                   </div>
                 </CardContent>
@@ -486,7 +474,8 @@ export default function LandingPage() {
               */}
               <Link
                 to="/app"
-                className="inline-flex rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                // A11y (WCAG 1.4.11): solid ring -- `ring-ring/50` measured 2.26:1.
+                className="inline-flex rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <Wordmark />
               </Link>

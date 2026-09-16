@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { toBlob } from "html-to-image"
 import { Download, Share2 } from "lucide-react"
+import { recapTextSummary } from "@/components/dashboard/chart-summaries"
 import { DateRangeControl } from "@/components/dashboard/date-range-control"
 import { RecapCard } from "@/components/dashboard/recap-card"
 import { RECAP_SKINS, recapSkinIndex } from "@/components/dashboard/recap-skins"
@@ -359,10 +360,13 @@ export function RecapDialog({ open, onOpenChange }: RecapDialogProps) {
         return
       }
 
+      // A11y (WCAG 1.1.1): the full text alternative rather than just the
+      // headline, so a recipient who can't see the image still gets every
+      // number in it.
       await navigator.share({
         files: [file],
         title: "JourneyJob recap",
-        text: recap?.headline ?? "My JourneyJob recap",
+        text: recap ? recapTextSummary(recap) : "My JourneyJob recap",
       })
     } catch (err) {
       // The user dismissing the native share sheet throws an
@@ -435,13 +439,22 @@ export function RecapDialog({ open, onOpenChange }: RecapDialogProps) {
                       Loading recap...
                     </div>
                   ) : (
-                    <RecapCard
-                      recap={recap}
-                      skin={skin.id}
-                      ref={(node) => {
-                        cardRefs.current[skin.id] = node
-                      }}
-                    />
+                    /*
+                      A11y (WCAG 1.1.1): this preview *is* the image that
+                      Download/Share export, so it's exposed as one, with
+                      the same text alternative `handleShare` sends along
+                      with the file. The wrapper is outside the card's own
+                      ref, so the exported subtree is unchanged (F35).
+                    */
+                    <div role="img" aria-label={`${skin.label} recap image. ${recapTextSummary(recap)}`}>
+                      <RecapCard
+                        recap={recap}
+                        skin={skin.id}
+                        ref={(node) => {
+                          cardRefs.current[skin.id] = node
+                        }}
+                      />
+                    </div>
                   )}
                 </div>
               </CarouselItem>
@@ -481,10 +494,18 @@ export function RecapDialog({ open, onOpenChange }: RecapDialogProps) {
                     aria-label={`Recap design ${index + 1} of ${RECAP_SKINS.length}, ${skin.label}`}
                     aria-current={isActive ? "true" : undefined}
                   >
+                    {/*
+                      A11y (WCAG 1.4.11 / 1.4.1): the dot is the only visual
+                      part of this control, and at `bg-muted-foreground/40` an
+                      inactive one measured 1.69:1 light / 2.15:1 dark. It is
+                      now solid (4.73:1 / 6.91:1), and the selected dot is also
+                      a wider pill, so which design is selected no longer
+                      depends on telling two colors apart.
+                    */}
                     <span
                       className={cn(
-                        "size-2 rounded-full transition-colors",
-                        isActive ? "bg-primary" : "bg-muted-foreground/40"
+                        "h-2 rounded-full transition-all",
+                        isActive ? "w-4 bg-primary" : "w-2 bg-muted-foreground"
                       )}
                     />
                   </button>
@@ -543,11 +564,18 @@ export function RecapDialog({ open, onOpenChange }: RecapDialogProps) {
           text buttons.
         */}
         <DialogFooter className="flex-row justify-center gap-6 sm:justify-center">
+          {/*
+            A11y (WCAG 2.4.3): `focusableWhenDisabled` on both actions --
+            they disable themselves for the length of the export, and a
+            natively disabled button would drop focus to <body> the moment
+            it was activated (see button.tsx).
+          */}
           <Button
             type="button"
             variant="ghost"
             onClick={handleDownload}
             disabled={!recap || isExporting}
+            focusableWhenDisabled
             className="group h-auto flex-col gap-1.5 rounded-xl px-3 py-2 text-[11px] font-medium"
           >
             <span className="flex size-11 items-center justify-center rounded-full border border-border bg-muted transition-colors group-hover:bg-accent">
@@ -562,6 +590,7 @@ export function RecapDialog({ open, onOpenChange }: RecapDialogProps) {
               variant="ghost"
               onClick={handleShare}
               disabled={!recap || isExporting}
+              focusableWhenDisabled
               className="group h-auto flex-col gap-1.5 rounded-xl px-3 py-2 text-[11px] font-medium"
             >
               <span className="flex size-11 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors group-hover:bg-[color-mix(in_oklch,var(--primary),black_15%)]">

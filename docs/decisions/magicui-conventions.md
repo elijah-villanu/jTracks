@@ -16,7 +16,7 @@ MagicUI components animate via **Motion** (`motion/react`, formerly Framer Motio
 WAAPI, not plain CSS `animation`/`transition` properties. `frontend/src/index.css` already has a
 global `@media (prefers-reduced-motion: reduce)` block that neutralizes every CSS-driven
 animation in the app (dialogs, popovers, Recharts' mount animation), but **that block cannot
-reach Motion-driven components** — a `NumberTicker` or `BorderBeam` would keep animating for a
+reach Motion-driven components** — a `NumberTicker` would keep animating for a
 user who has explicitly told their OS to reduce motion, silently regressing WCAG 2.3.3.
 
 The fix is one line, done once, at the app root (`frontend/src/main.tsx`):
@@ -29,15 +29,30 @@ import { MotionConfig } from "motion/react"
 </MotionConfig>
 ```
 
-This makes **every** `motion.*` element anywhere under it — current and future, any page —
-automatically honor the OS setting: reduced-motion users get the final frame instantly instead
-of the animation. **Never re-implement this per-component** (no per-component
-`useReducedMotion()` checks, no bespoke media-query branching) — the provider already covers it
-for anything installed through the normal MagicUI CLI workflow. If a future MagicUI component
-doesn't respect `MotionConfig` (rare — check its source via `getRegistryItem` first), that's a
-signal to reconsider using it, not to work around it locally.
+~~This makes **every** `motion.*` element anywhere under it automatically honor the OS
+setting.~~ **Correction (a11y pass, 2026-09-15): it doesn't, and two of the three components
+approved at the time were still animating for reduced-motion users.** Keep the provider — it is still
+required — but know exactly what it does. Under `reducedMotion="user"`, Motion only
+short-circuits **positional** values: transforms plus `width`/`height`/`top`/`left`/`right`/
+`bottom` (`positionalKeys`, applied in `motion-dom`'s `animation/interfaces/
+visual-element-target.mjs`). Every other value animates normally. Measured in Chromium with
+reduced motion emulated:
 
-**Scope of "never re-implement this per-component": it means Motion components.** A library that
+| Component | What it animates | Covered by `MotionConfig`? | Handling |
+|---|---|---|---|
+| `blur-fade` | `y`/`x` offset, `opacity`, `filter` | Offset yes; opacity/blur fade still runs (0.4s) | None needed — a short fade is the non-vestibular part the setting leaves alone |
+| `number-ticker` | a standalone `useSpring` writing `textContent` | **No** — no visual element involved at all | Call site renders the final value as plain text |
+
+(`border-beam` was the third measured case: its `offsetDistance` loop wasn't stopped either,
+moving 0.39% → 6.67% in 1.5s. It has since been removed from the project; see below.)
+
+So the rule is now: **check what a MagicUI component actually animates before relying on the
+provider.** Anything outside the positional set gets the local check, through the one shared
+hook `frontend/src/hooks/usePrefersReducedMotion.ts` (live `matchMedia`, unlike Motion's own
+`useReducedMotion`, which reads once) — not an ad hoc media query per file. Render the settled
+end state rather than a paused animation: the real number, not a count-up.
+
+**Non-Motion libraries fall through too.** A library that
 animates *without* Motion falls through both safety nets at once — `MotionConfig` only governs
 `motion.*` elements, and `index.css`'s reduced-motion block only governs CSS
 `animation`/`transition`. Anything that moves by writing inline styles from its own
@@ -46,9 +61,18 @@ animates *without* Motion falls through both safety nets at once — `MotionConf
 The live case is **Embla**, behind shadcn's `carousel` in `recap-dialog.tsx` (F48): it slides by
 writing an inline `transform` from its own rAF loop, so it animated regardless of the OS setting
 until given `opts={{ duration: 0 }}` under `useMediaQuery("(prefers-reduced-motion: reduce)")`.
-That branch is required, not redundant — don't delete it as a violation of the rule above. If you
+That branch is required, not redundant. If you
 add another non-Motion animated dependency, it needs the same treatment, and it belongs in the
-inventory table with a note saying so.
+inventory table with a note saying so. (Recharts 3 is *not* such a case: its
+`isAnimationActive` defaults to `"auto"`, which reads `prefers-reduced-motion` itself.)
+
+**WCAG 2.2.2 (Pause, Stop, Hide): no looping animations.** 2.2.2 applies to any auto-starting
+movement that lasts more than 5 seconds alongside other content, decorative or not, and requires
+a way to pause, stop or hide it. Honoring the OS reduced-motion setting is *not* that mechanism —
+it only helps users who have found and turned on an OS setting. `BorderBeam` looped forever with
+no pause control, which is why it was removed (below). **Don't add another continuous or looping
+animation** — marquee, shimmer, animated-beam, particles and the like — unless it stops on its
+own within 5 seconds or ships with a visible pause control.
 
 ## Approved components (so far)
 
@@ -59,13 +83,19 @@ requires the discovery → inspect-real-source → CLI-install workflow in
 
 | Component | Use it for | Not for |
 |---|---|---|
-| `border-beam` | A single slow, looping light traveling a container's border — the **one** continuous accent marking the single most important element in a view. | Multiple simultaneous instances on one screen (reads as noise, not emphasis). Structural/interactive elements — it's a decorative overlay, never a substitute for focus rings or other real state indicators. |
 | `number-ticker` | Counting a KPI number up to its real value on mount — dashboards/stat tiles where the number *is* the content. | Text that isn't actually numeric, or numbers a user needs to read immediately/repeatedly (e.g. inside a live-updating table cell) — the count-up delay works against fast scanning there. |
 | `blur-fade` | A subtle once-per-mount entrance for a content group (a stat row, a chart, a card) — signals "this just loaded" without being a distraction. | Anything that needs to re-trigger on every state change (it's an entrance, not a state-transition effect) — don't wrap something that re-renders on every keystroke/filter change. |
 
+**Removed — not approved: `border-beam`.** Removed from every call site (Login, Signup, Landing, the
+Analytics "Total Applications" stat tile), and its installed file
+`frontend/src/components/ui/border-beam.tsx` deleted, on **2026-09-15 by user decision**. Reason:
+WCAG 2.2.2 — a light that loops forever with no pause control, on pages people are reading and
+typing into. Don't reinstall it. Nothing replaced it: no page has a continuous accent now.
+
 Other components explicitly discussed but **not yet used anywhere** (fine to introduce later
 following the same workflow, but don't assume they're the right call by default): `shimmer-button`,
-`animated-shiny-text`, `magic-card`, `shine-border`, `marquee`, `animated-beam`. Save
+`animated-shiny-text`, `magic-card`, `shine-border`, `marquee`, `animated-beam` (several of these loop — check
+the 2.2.2 rule above first). Save
 attention-grabbing effects (`meteors`, `particles`, confetti-style bursts) for something that
 actually calls for celebration (e.g. a first-offer milestone) — not general page decoration.
 
@@ -82,23 +112,11 @@ picking new numbers per page:
   quick, barely-perceptible cascade rather than everything popping in at once *or* an
   annoyingly-slow reveal. Don't stagger individual items within a group (e.g. each of five stat
   tiles) — stagger *groups*, or the page takes too long to finish settling.
-- **Continuous accent (`BorderBeam`).** `duration=24s` — slow enough to read as ambient, not
-  attention-grabbing. **At most one `BorderBeam` (or any other continuous/looping accent) visible
-  per view at a time**, reserved for the single most important element (a page's headline KPI,
-  not every card). Entrance animations are exempt from this "one at a time" rule since they run
-  once and settle — only *continuous/looping* accents are rationed.
-  *Why 24 and not the 8 this doc used to specify (changed 2026-09-09).* Every call site now passes
-  **24** — `login-form.tsx`, `signup-form.tsx`, `stat-tile.tsx`, `LandingPage.tsx`. The old value
-  was 8 everywhere except `login-form.tsx`, which had quietly shipped 26 since the original
-  animation commit and was surfaced by F46's audit. Aligning login *down* to 8 made the problem
-  obvious on the page: at one lap every 8 seconds the beam reads as active and attention-seeking,
-  which is wrong for an accent whose whole job is to sit at the edge of notice — especially on an
-  auth card someone is trying to type into. 24 is close to what login had always shipped, and it
-  is now the single uniform value rather than a default plus a pile of per-page exceptions.
-  **Match 24 on any new call site; don't reintroduce a per-page duration.**
-  If you are ever tempted to slow a beam down by *lowering* this number: `duration` is handed
-  straight to Motion as the time for one full lap of the border with `ease: "linear"`, so
-  **a higher number is slower**. 8s is the fastest value in the project, not the calmest.
+- **Continuous/looping accents: none.** This bullet used to set `BorderBeam`'s `duration=24s` and
+  an "at most one continuous accent per view" limit. Both are moot: `BorderBeam` was removed on
+  2026-09-15 (WCAG 2.2.2, see above) and no looping accent is approved. The 2.2.2 rule in the
+  reduced-motion section replaces that limit. Entrance animations (`BlurFade`) run once and
+  settle, so they're unaffected.
 - **Counters (`NumberTicker`).** Component's default spring (`damping: 60, stiffness: 100`) —
   don't override unless a specific tile has a concrete reason to feel snappier/slower than the
   rest. Always pass the real number via `numericValue`/`value`, never re-derive or approximate it
@@ -147,21 +165,18 @@ and the surface-by-surface light/dark pass. F46's check is that they are here, t
 are.
 
 **What this means for MagicUI specifically:** the accent hue existing does *not* make it the right
-color for an accent component, and no shipped MagicUI usage uses it. All four `BorderBeam` call
-sites (`stat-tile.tsx`, `login-form.tsx`, `signup-form.tsx`, `LandingPage.tsx`) pass
-`colorFrom="var(--foreground)"` / `colorTo="var(--muted-foreground)"`, and `NumberTicker` passes
-`className="text-foreground dark:text-foreground"` — a teal beam would read as brand/state signal
-competing with the `--primary` CTAs and the teal focus ring rather than as the ambient decoration
-it is. Tokens, yes; the *accent* token, deliberately not.
+color for an accent component, and no shipped MagicUI usage uses it. `NumberTicker` passes
+`className="text-foreground dark:text-foreground"` (the since-removed `BorderBeam` call sites
+passed `--foreground`/`--muted-foreground`). An accent-colored decoration would read as a
+brand or state signal competing with the `--primary` CTAs and the focus ring. Tokens, yes; the
+*accent* token, deliberately not.
 
-MagicUI's own defaults are still not this project's tokens (`border-beam`'s default gradient is
-`#ffaa40` → `#9c40ff`; `number-ticker`'s default text color is literal
+MagicUI's own defaults are still not this project's tokens (`number-ticker`'s default text color is literal
 `text-black dark:text-white`). Per `.claude/rules/magicui-ui.md`'s theming-discipline rule,
 always override these at the call site with the project's CSS variable tokens instead of the
 component's raw defaults:
 
 ```tsx
-<BorderBeam colorFrom="var(--foreground)" colorTo="var(--muted-foreground)" />
 <NumberTicker className="text-foreground dark:text-foreground" />
 ```
 
@@ -173,8 +188,7 @@ losing local edits.
 **Typography follows the same rule (FV12/R17), in its own doc.** `docs/decisions/typography.md`
 records the Display+Text typeface pairing (Hedvig Letters Sans / Roboto), the self-hosted
 `@font-face`/`--font-display`/`--font-sans` tokens in `frontend/src/index.css`, and the recap
-export's font-readiness gate. No MagicUI component takes a font prop the way `BorderBeam` takes
-`colorFrom`/`colorTo`, so every MagicUI call site in this project simply inherits
+export's font-readiness gate. No MagicUI component in use takes a font prop, so every MagicUI call site in this project simply inherits
 `--font-sans`/`--font-display` (or, in practice, whatever the surrounding chrome's `font-*`
 utility already resolves to) rather than shipping a family of its own — the same "never ship the
 library's hardcoded default, always resolve through this project's tokens" principle this section
@@ -316,10 +330,8 @@ before dark mode existed, so the export is unchanged and permanently theme-indep
   the card's own self-contained chrome (R11.4).
 - `status-breakdown-chart.tsx`'s `STATUS_LITERAL_COLORS` (6 literal hexes) — the export-path
   exception above.
-- `border-beam.tsx`'s installed-component default props (`colorFrom = "#ffaa40"`,
-  `colorTo = "#9c40ff"`) and its arbitrary-value CSS mask (`linear-gradient(#000,#000)`) — MagicUI
-  registry file defaults/plumbing, never hand-edited per this doc's own theming rule; every real
-  call site already overrides `colorFrom`/`colorTo` with token `var()`s.
+- ~~`border-beam.tsx`'s installed-component default props~~ — gone; the file was deleted
+  2026-09-15.
 - `chart.tsx`'s `[&_.recharts-*[stroke='#ccc']]:stroke-border` / `[stroke='#fff']:stroke-transparent`
   rules — these are CSS attribute *selectors* matching Recharts' own internally-hardcoded stroke
   attributes, immediately remapped to token classes; installed shadcn chart boilerplate, not a
@@ -352,7 +364,7 @@ themes; this is an observed checklist, not a code-reasoned one.
 | `/login` | ✅ | ✅ | Teal primary + near-black label legible in both; destructive error banner ("Invalid email or password.") checked in dark |
 | `/signup` | ✅ | ✅ | No theme control here — expected, the landing/auth control is F43's scope, not F26's |
 | `/` tracker table + toolbar | ✅ | ✅ | All 7 statuses distinguishable; `rejected` (red) vs `failed` (pink) unmistakable in both (F10's standing constraint holds) |
-| `/analytics` stat tiles | ✅ | ✅ | `NumberTicker` values and `BorderBeam` accent both read correctly on a dark card |
+| `/analytics` stat tiles | ✅ | ✅ | `NumberTicker` values and `BorderBeam` accent both read correctly on a dark card (beam since removed, 2026-09-15) |
 | `/analytics` status-breakdown chart | ✅ | ✅ | `var(--status-*)` fills resolve per theme; `interviewing_oa`/`offer` visibly swap to `#d97706`/`#059669` in dark |
 | `/analytics` applications-over-time chart | ✅ | ✅ | |
 | `/analytics` Sankey (`Pipeline flow`) | ✅ | ✅ | Node fills, ribbon strokes and white in-flight labels all legible in dark |
@@ -479,6 +491,22 @@ unilaterally):
   "echoes the app's accent, not Duolingo's" comment is now stale and the visual distinction from
   real Duolingo blue is weaker than intended.
 
+## A11y pass token changes (2026-09-15)
+
+Recorded here because this file is the palette's decision record. All values are in
+`frontend/src/index.css`, measured with a WCAG contrast calculator against real surfaces and
+confirmed with axe-core in both themes:
+
+| Change | `:root` | `.dark` | Why |
+|---|---|---|---|
+| New `--input-border` (→ `border-input-border` on `Input`/`Textarea`/`SelectTrigger`) | `oklch(0.62 0 0)` | `oklch(1 0 0 / 40%)` | Field outlines were 1.26:1 / 1.48:1, effectively invisible to low-vision users (1.4.11). Now 3.64:1 / 3.77:1. Kept separate from `--input` because `.dark` also uses `--input` as the control *fill*. |
+| `--destructive` | `oklch(0.49 0.2 27.4)` (was `oklch(0.577 0.245 27.325)`) | unchanged | Every error banner is `text-destructive` on `bg-destructive/10`: 4.09:1 → 5.75:1. Also clears the destructive Button's hover over the dialog footer (4.55:1). |
+| Base `outline-ring/50` → `outline-ring` | — | — | The browser's focus ring on links and nav items was 2.26:1 / 2.12:1. Now 5.50:1 / 5.33:1. |
+| `Button` `default` variant focus | `ring-2 ring-ring ring-offset-2` | same | Its `border-ring` cue matched its own fill, leaving only the `/50` halo (2.26:1). |
+| `Button` `destructive` variant focus | `border-destructive` (was `/40`) | same | 2.26:1 / 1.98:1 → 4.91:1+. |
+
+None of these touch a MagicUI call site's colors.
+
 ## Install workflow (reminder)
 
 Same as `.claude/rules/magicui-ui.md`: discover via `searchRegistryItems`/`listRegistryItems`,
@@ -490,7 +518,7 @@ npx shadcn@latest add @magicui/<name>
 ```
 
 This writes through `components.json`'s existing aliases/`cssVariables`/`baseColor` instead of
-hand-copying source, and is how `border-beam`, `number-ticker`, and `blur-fade` were added.
+hand-copying source, and is how `number-ticker` and `blur-fade` (and the since-removed `border-beam`) were added.
 
 ## Per-page inventory
 
@@ -499,11 +527,11 @@ already used where," so a future session can check for consistency instead of re
 
 | Page | Components | Notes |
 |---|---|---|
-| Analytics (`AnalyticsPage.tsx`) | `BorderBeam` (1x, `duration={24}`, on the "Total Applications" stat tile only), `NumberTicker` (all 5 stat tiles), `BlurFade` (3 groups at `ENTRANCE_STAGGER_SECONDS * N`: stat row, the status-breakdown/applications-over-time chart row, the pipeline-flow card) | First page to adopt MagicUI, and the source of the `ENTRANCE_STAGGER_SECONDS = 0.08` constant every other multi-group page copies. `StatTile` (`components/dashboard/stat-tile.tsx`) takes the animation as optional props (`numericValue`/`suffix`/`decimalPlaces`/`accent`) so every existing caller without them is unaffected. **FV11 revision (F54, 2026-09-09):** `StatTile`'s *shell* was restyled toward the Monarch stat-card reference — `[--card-spacing:--spacing(5)]` (16px → 20px padding), an uppercase/letter-spaced `text-xs` caption, and `flex-col-reverse` on the `<dl>` so the figure reads above the label (DOM order stays `<dt>`-then-`<dd>`, so the announcement is unchanged). **No animation value moved:** the `BorderBeam` line is byte-for-byte the same — `duration={24}`, `colorFrom="var(--foreground)"`, `colorTo="var(--muted-foreground)"`, still gated on `accent` — and `NumberTicker` keeps its default spring and its `text-foreground dark:text-foreground` override. The one presentational consequence, recorded here because F54's acceptance asks for it explicitly: the beam traces the card's border, and the card is now 4px roomier per side, so one lap covers a *marginally* longer path at the same 24s. It is still one beam, on the same single tile, and still the page's only continuous accent. **FV8 revision (checked against the code, not assumed):** the third `BlurFade` still wraps the same "Pipeline flow" `Card`, but what's inside it changed — F36 dropped the fixed `width={343}` so `SankeyChart` now measures its own container via `ResizeObserver`, and F38 added `interactive` (focusable per-node buttons plus the `ChartDataTable` fallback). Both are still fine under an entrance wrapper: `BlurFade` only translates and blurs, never scales, so the observer measures the same content width during the entrance as after it, and the card carries no beam competing with those nodes' focus rings. No timing or grouping change was needed. |
-| Login (`LoginPage.tsx` / `login-form.tsx`) | `BlurFade` (1 group: the whole auth `Card`), `BorderBeam` (1x, on the same `Card`, `duration={24}` — the project-wide value) | Single view, single element (the card), so both an entrance and the one allowed continuous accent live on it together — not a "pick one" conflict, since `BlurFade` is exempt from the one-accent rule (runs once and settles). `Card` gained `className="relative"` so the beam's `absolute inset-0` overlay positions correctly; `<form>`/`Input`/`Label`/submit logic untouched. |
-| Signup (`SignupPage.tsx` / `signup-form.tsx`) | `BlurFade` (1 group: the whole auth `Card`), `BorderBeam` (1x, on the same `Card`, `duration={24}` — the project-wide value) | Same treatment as Login for consistency between the two auth routes. `SignupForm` now destructures `className` and merges it via `cn("relative", className)` instead of spreading it straight onto `Card`, so a future caller-supplied `className` still composes correctly. |
-| Applications / Tracker (`ApplicationsPage.tsx`) | `BlurFade` (1 group: the page header — title, description and the F51 Table/Board toggle) | Highest-risk page (real data table + toolbar wired to filter/search/sort state). Deliberately minimal: only the header row is wrapped. **FV11 revision (F51, 2026-09-09):** that header row now also contains the `ViewModeToggle`, so the group is no longer purely static text. Still one group and still the correct scope: `BlurFade` is an entrance, and the header mounts once with the route, so the toggle animates in with the title and then never re-animates — it is not re-keyed or re-mounted when the view mode changes (that switch only swaps the sibling table/board subtree, which is outside every `BlurFade` on this page). No `BorderBeam` was added to the board: seven columns of cards is exactly the "crown the single most important element" case that has no single most important element. The toolbar and table are explicitly left unanimated — both live inside the `isLoading` branch and update on every keystroke/filter/sort/status change, which the "don't re-trigger on state changes" rule for `BlurFade` and the "no marquee/no per-row wrapping" guidance both rule out. No `BorderBeam`: there's no single most-important element to crown on a page that's entirely about scanning/editing rows. |
-| Settings / Profile (`SettingsPage.tsx`) | `BlurFade` (1 group: the settings form `Card`) | No numeric KPI on this page (the ghost-days value is an editable form input, not a displayed stat), so no `NumberTicker`. No `BorderBeam` either — no headline stat to justify a continuous accent, unlike Analytics' "Total Applications" tile. Page title header left static, matching Analytics' convention of only animating content groups, not the title. |
+| Analytics (`AnalyticsPage.tsx`) | `NumberTicker` (all 5 stat tiles), `BlurFade` (3 groups at `ENTRANCE_STAGGER_SECONDS * N`: stat row, the status-breakdown/applications-over-time chart row, the pipeline-flow card) | First page to adopt MagicUI, and the source of the `ENTRANCE_STAGGER_SECONDS = 0.08` constant every other multi-group page copies. `StatTile` (`components/dashboard/stat-tile.tsx`) takes the animation as optional props (`numericValue`/`suffix`/`decimalPlaces`) so every existing caller without them is unaffected. **FV11 revision (F54, 2026-09-09):** `StatTile`'s *shell* was restyled toward the Monarch stat-card reference — `[--card-spacing:--spacing(5)]` (16px → 20px padding), an uppercase/letter-spaced `text-xs` caption, and `flex-col-reverse` on the `<dl>` so the figure reads above the label (DOM order stays `<dt>`-then-`<dd>`, so the announcement is unchanged). `NumberTicker` keeps its default spring and its `text-foreground dark:text-foreground` override. **FV8 revision:** the third `BlurFade` wraps the "Pipeline flow" `Card`, whose `SankeyChart` measures its own container via `ResizeObserver` (F36) and is `interactive` (F38). Both are fine under an entrance wrapper: `BlurFade` only translates and blurs, never scales, so the observer measures the same content width during the entrance as after it. **A11y pass (2026-09-15):** under `prefers-reduced-motion`, `StatTile` renders `value` as static text instead of `NumberTicker`, which `MotionConfig` doesn't stop. The `BorderBeam` on the "Total Applications" tile, and `StatTile`'s `accent` prop that enabled it, were removed (WCAG 2.2.2). |
+| Login (`LoginPage.tsx` / `login-form.tsx`) | `BlurFade` (1 group: the whole auth `Card`) | Single view, single element (the card). `<form>`/`Input`/`Label`/submit logic untouched. **2026-09-15:** the card's `BorderBeam` (and the `relative` class it needed) removed — WCAG 2.2.2. |
+| Signup (`SignupPage.tsx` / `signup-form.tsx`) | `BlurFade` (1 group: the whole auth `Card`) | Same treatment as Login for consistency between the two auth routes. `SignupForm` destructures `className` and merges it via `cn(className)`, so a caller-supplied `className` composes correctly. **2026-09-15:** the card's `BorderBeam` removed, same as Login. |
+| Applications / Tracker (`ApplicationsPage.tsx`) | `BlurFade` (1 group: the page header — title, description and the F51 Table/Board toggle) | Highest-risk page (real data table + toolbar wired to filter/search/sort state). Deliberately minimal: only the header row is wrapped. **FV11 revision (F51, 2026-09-09):** that header row now also contains the `ViewModeToggle`, so the group is no longer purely static text. Still one group and still the correct scope: `BlurFade` is an entrance, and the header mounts once with the route, so the toggle animates in with the title and then never re-animates — it is not re-keyed or re-mounted when the view mode changes (that switch only swaps the sibling table/board subtree, which is outside every `BlurFade` on this page). The toolbar and table are explicitly left unanimated — both live inside the `isLoading` branch and update on every keystroke/filter/sort/status change, which the "don't re-trigger on state changes" rule for `BlurFade` and the "no marquee/no per-row wrapping" guidance both rule out. |
+| Settings / Profile (`SettingsPage.tsx`) | `BlurFade` (1 group: the settings form `Card`) | No numeric KPI on this page (the ghost-days value is an editable form input, not a displayed stat), so no `NumberTicker`. Page title header left static, matching Analytics' convention of only animating content groups, not the title. |
 | Recap dialog (`dashboard/recap-dialog.tsx` + `dashboard/recap-skins/*`) | **None** — and none may be added to the card itself | Listed precisely because it must stay empty. F35's standing rule: the skin components sit inside the subtree handed to `toBlob`, so no MagicUI/Motion component may appear anywhere in them — an in-flight animation serializes at whatever frame it happens to be on, and Motion's inline transforms aren't guaranteed to survive serialization, so the PNG would silently differ from what the user saw. Motion *around* the card, elsewhere in the dialog, would be outside the export refs and is permitted, but nothing has needed it. The one animated thing here is the skin carousel, which is **Embla, not MagicUI** — see the reduced-motion carve-out above for why it carries its own `duration: 0` branch. |
-| Landing (`routes/LandingPage.tsx`) | `BlurFade` (4 groups: hero, product visual, feature trio, footer), `BorderBeam` (1x, `duration={24}`, on the product visual's "Pipeline flow" card only) | **F45 (FV10).** Replaces this row's previous "None — deliberately, for now". Four groups at `delay = ENTRANCE_STAGGER_SECONDS * N` → 0 / 0.08 / 0.16 / 0.24s, using a local copy of Analytics' constant with the same name and value rather than a new number; every other `BlurFade` prop is left at the documented default (`0.4s`, `easeOut`, `offset 6px`, `blur 6px`, `direction down`), so only `delay` varies. `inView` is left at its default `false`, so the two below-the-fold groups animate on mount and have settled long before they're scrolled to — no scroll-triggered variant was introduced, since the convention customizes `delay` only. The `<header>` is deliberately **not** a fifth group: the page frame stays put while the content cascades (`AppLayout`'s header animates for a different reason — it mounts once per session and is that shell's only content). **The one continuous accent for the whole page is the pipeline-flow card's beam**, and both alternatives were rejected on this doc's terms rather than taste: beaming the recap card beside it would put two continuous accents in one grid row, visible simultaneously, which is exactly the failure R14.3 exists to prevent; and the hero CTA is excluded by the approved-components table, which lists interactive elements under `border-beam`'s "not for" column. **No `NumberTicker`:** the page has no KPI tile — its only figures are caption text ("128 applications") and the numbers inside `RecapCard`, and the latter is off-limits regardless. **F35 still applies here:** group 2's `BlurFade` wraps `RecapCard` from the *outside*, which is permitted; nothing may go inside the card or its skins, even though this instance is never exported. Everything runs under the app-root `<MotionConfig reducedMotion="user">` — the route is lazy-loaded (F44) inside `BrowserRouter`, which is inside that provider. Bundle cost of the whole pass: the landing chunk went 9.55 kB → 9.83 kB, because `BlurFade`/`BorderBeam` already ship in the shared entry for the other pages, so only the call sites are new. |
-| App shell (`AppLayout.tsx`) | `BlurFade` (1 group: the whole `<header>` — logo, desktop nav, action buttons, and the mobile Sheet trigger together) | Requested explicitly (user asked to animate the header). Revisits the prior pass's "no `BlurFade`" reasoning: `AppLayout` wraps `<Outlet />` rather than being remounted by it, so the header itself only mounts once per authenticated session (login/refresh) — it does *not* re-enter on every client-side route change the way page content does, so the "don't re-trigger on state changes" concern doesn't actually apply here. Component defaults unchanged (`duration=0.4s`, `ease="easeOut"`, `offset=6px`, `direction="down"`, `blur="6px"`), `delay={0}`, matching every other single-group usage. Wrapped as one group (not staggered per nav link/button) per the "don't stagger individual items within a group" rule. Still no `BorderBeam`: it would be a second simultaneous continuous accent alongside the one already on the current page's own headline element (Analytics' stat tile, Login/Signup's card), and the "one continuous accent per view" rule is scoped to the whole view, not per-component. Structural markup (`Link`/`Button`/`Sheet`/mobile-menu logic) untouched. |
+| Landing (`routes/LandingPage.tsx`) | `BlurFade` (4 groups: hero, product visual, feature trio, footer) | **F45 (FV10).** Four groups at `delay = ENTRANCE_STAGGER_SECONDS * N` → 0 / 0.08 / 0.16 / 0.24s, using a local copy of Analytics' constant with the same name and value rather than a new number; every other `BlurFade` prop is left at the documented default (`0.4s`, `easeOut`, `offset 6px`, `blur 6px`, `direction down`), so only `delay` varies. `inView` is left at its default `false`, so the two below-the-fold groups animate on mount and have settled long before they're scrolled to. The `<header>` is deliberately **not** a fifth group: the page frame stays put while the content cascades. **No `NumberTicker`:** the page has no KPI tile — its only figures are caption text ("128 applications") and the numbers inside `RecapCard`, and the latter is off-limits regardless. **F35 still applies here:** group 2's `BlurFade` wraps `RecapCard` from the *outside*, which is permitted; nothing may go inside the card or its skins, even though this instance is never exported (the a11y pass's `role="img"` wrapper sits outside the card too). Everything runs under the app-root `<MotionConfig reducedMotion="user">` — the route is lazy-loaded (F44) inside `BrowserRouter`, which is inside that provider. **2026-09-15:** the pipeline-flow card's `BorderBeam`, previously the page's one continuous accent, removed (WCAG 2.2.2). |
+| App shell (`AppLayout.tsx`) | `BlurFade` (1 group: the whole `<header>` — logo, desktop nav, action buttons, and the mobile Sheet trigger together) | Requested explicitly (user asked to animate the header). Revisits the prior pass's "no `BlurFade`" reasoning: `AppLayout` wraps `<Outlet />` rather than being remounted by it, so the header itself only mounts once per authenticated session (login/refresh) — it does *not* re-enter on every client-side route change the way page content does, so the "don't re-trigger on state changes" concern doesn't actually apply here. Component defaults unchanged (`duration=0.4s`, `ease="easeOut"`, `offset=6px`, `direction="down"`, `blur="6px"`), `delay={0}`, matching every other single-group usage. Wrapped as one group (not staggered per nav link/button) per the "don't stagger individual items within a group" rule. Structural markup (`Link`/`Button`/`Sheet`/mobile-menu logic) untouched. |

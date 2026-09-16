@@ -72,6 +72,15 @@ export function AppLayout() {
   const [isAutofillOpen, setIsAutofillOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
+  // A11y (WCAG 2.4.3): the header control that started the current
+  // add/autofill flow, handed to both dialogs as their focus-return
+  // fallback -- they're opened from state, and the element focused at the
+  // moment they open is often gone by the time they close (a Sheet item,
+  // or the autofill dialog's own input). From the Sheet, that's the menu
+  // trigger, since the item itself unmounts with the Sheet.
+  const actionOpenerRef = useRef<HTMLElement | null>(null)
+  const menuTriggerRef = useRef<HTMLButtonElement>(null)
+
   // A11y: a client-side route change replaces the whole page body without
   // moving focus or firing anything a screen reader notices -- focus stays
   // on the nav link that was just activated and nothing is announced (WCAG
@@ -123,11 +132,8 @@ export function AppLayout() {
         rather than being remounted by it, so this only plays once per
         authenticated session (login/refresh), not on every client-side
         route change -- unlike page content, which does remount per route.
-        No BorderBeam here: it would be a second simultaneous continuous
-        accent alongside the one already on the current page's own
-        headline element (Analytics' stat tile, Login/Signup's card), and
-        the "one continuous accent per view" rule counts across the whole
-        view, not just per-component.
+        No continuous/looping accent anywhere: `BorderBeam` was removed
+        app-wide on 2026-09-15 (WCAG 2.2.2).
       */}
       <BlurFade delay={0}>
         <header className="border-b border-border">
@@ -165,11 +171,24 @@ export function AppLayout() {
                 </span>
               )}
               <ThemeToggle />
-              <Button size="lg" variant="outline" onClick={() => setIsAutofillOpen(true)}>
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={(event) => {
+                  actionOpenerRef.current = event.currentTarget
+                  setIsAutofillOpen(true)
+                }}
+              >
                 <ClipboardPaste />
                 Paste a Link
               </Button>
-              <Button size="lg" onClick={() => openCreateForm()}>
+              <Button
+                size="lg"
+                onClick={(event) => {
+                  actionOpenerRef.current = event.currentTarget
+                  openCreateForm()
+                }}
+              >
                 <Plus />
                 Add Job
               </Button>
@@ -180,14 +199,25 @@ export function AppLayout() {
             </div>
 
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-              <SheetTrigger render={<Button size="icon-lg" variant="outline" className="lg:hidden" />}>
+              <SheetTrigger
+                render={
+                  <Button ref={menuTriggerRef} size="icon-lg" variant="outline" className="lg:hidden" />
+                }
+              >
                 <Menu />
                 <span className="sr-only">Open menu</span>
               </SheetTrigger>
               <SheetContent side="right" className="lg:hidden">
                 <SheetHeader>
+                  {/*
+                    A11y: the title is the dialog's accessible name, and the
+                    logo's alt alone made that "JourneyJob, dialog" -- which
+                    doesn't say what opened. The hidden word completes it to
+                    "JourneyJob menu" without changing the visual lockup.
+                  */}
                   <SheetTitle className="flex items-center">
                     <Logo className="h-7" />
+                    <span className="sr-only"> menu</span>
                   </SheetTitle>
                 </SheetHeader>
 
@@ -215,12 +245,29 @@ export function AppLayout() {
                     <span className="text-sm text-muted-foreground">{user.email}</span>
                   )}
                   <SheetClose
-                    render={<Button variant="outline" onClick={() => setIsAutofillOpen(true)} />}
+                    render={
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          actionOpenerRef.current = menuTriggerRef.current
+                          setIsAutofillOpen(true)
+                        }}
+                      />
+                    }
                   >
                     <ClipboardPaste />
                     Paste a Link
                   </SheetClose>
-                  <SheetClose render={<Button onClick={() => openCreateForm()} />}>
+                  <SheetClose
+                    render={
+                      <Button
+                        onClick={() => {
+                          actionOpenerRef.current = menuTriggerRef.current
+                          openCreateForm()
+                        }}
+                      />
+                    }
+                  >
                     <Plus />
                     Add Job
                   </SheetClose>
@@ -255,8 +302,12 @@ export function AppLayout() {
         {routeAnnouncement}
       </p>
 
-      <ApplicationFormDialog />
-      <AutofillDialog open={isAutofillOpen} onOpenChange={setIsAutofillOpen} />
+      <ApplicationFormDialog returnFocusRef={actionOpenerRef} />
+      <AutofillDialog
+        open={isAutofillOpen}
+        onOpenChange={setIsAutofillOpen}
+        returnFocusRef={actionOpenerRef}
+      />
     </div>
   )
 }

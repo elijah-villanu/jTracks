@@ -4,7 +4,6 @@ import { ApiError } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/hooks/useAuth"
 import { BlurFade } from "@/components/ui/blur-fade"
-import { BorderBeam } from "@/components/ui/border-beam"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -87,14 +86,12 @@ export function SignupForm({ className, ...props }: React.ComponentProps<typeof 
   }
 
   return (
-    // Single entrance for the whole auth card + a single, slow BorderBeam
-    // accent (the card is the one thing on this page) -- see
-    // docs/decisions/magicui-conventions.md. `relative` is required so the
-    // beam's `absolute inset-0` overlay positions against the card, not the
-    // page.
+    // Single entrance for the whole auth card -- see
+    // docs/decisions/magicui-conventions.md. Same as login-form.tsx: the
+    // looping BorderBeam that used to sit here was removed app-wide
+    // 2026-09-15 (WCAG 2.2.2).
     <BlurFade delay={0}>
-      <Card className={cn("relative", className)} {...props}>
-        <BorderBeam duration={24} colorFrom="var(--foreground)" colorTo="var(--muted-foreground)" />
+      <Card className={cn(className)} {...props}>
         <CardHeader>
           {/*
             A11y (WCAG 1.3.1 / 2.4.6): `CardTitle` renders a plain <div>, so
@@ -133,6 +130,8 @@ export function SignupForm({ className, ...props }: React.ComponentProps<typeof 
                 <Input
                   id="email"
                   type="email"
+                  // A11y (WCAG 1.3.5): see login-form.tsx.
+                  autoComplete="email"
                   placeholder="m@example.com"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
@@ -155,6 +154,7 @@ export function SignupForm({ className, ...props }: React.ComponentProps<typeof 
                 <Input
                   id="password"
                   type="password"
+                  autoComplete="new-password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   required
@@ -172,6 +172,7 @@ export function SignupForm({ className, ...props }: React.ComponentProps<typeof 
                 <Input
                   id="confirm-password"
                   type="password"
+                  autoComplete="new-password"
                   value={confirmPassword}
                   onChange={(event) => setConfirmPassword(event.target.value)}
                   required
@@ -194,13 +195,15 @@ export function SignupForm({ className, ...props }: React.ComponentProps<typeof 
               </Field>
               <FieldGroup>
                 <Field>
-                  <Button type="submit" disabled={isSubmitting}>
+                  {/* A11y (WCAG 2.4.3): `focusableWhenDisabled` -- see login-form.tsx. */}
+                  <Button type="submit" disabled={isSubmitting} focusableWhenDisabled>
                     {isSubmitting ? "Creating account..." : "Create Account"}
                   </Button>
                   <Button
                     variant="outline"
                     type="button"
                     disabled={isSubmitting}
+                    focusableWhenDisabled
                     onClick={handleGoogleSignup}
                   >
                     Sign up with Google
