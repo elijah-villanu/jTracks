@@ -76,7 +76,7 @@ def validate_transition(
     `date_applied_present` = will the record have a non-null date_applied after
     this update is applied (i.e. it already had one OR the patch supplies one).
     """
-    if current != new and not is_allowed(current, new):
+    if not is_allowed(current, new):
         raise TransitionError(
             f"Cannot move an application from '{current.value}' to '{new.value}'."
         )

@@ -10,14 +10,13 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { STATUS_CELL_CLASSES } from "@/components/StatusBadge"
+import { COLUMNS, type SortDirection, type SortKey } from "@/components/table/columns"
+import { SortSelect } from "@/components/table/sort-select"
 import { StatusControl } from "@/components/table/status-control"
 import { useApplicationsContext } from "@/hooks/useApplicationsContext"
 import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { cn } from "@/lib/utils"
 import type { Application, ApplicationStatus } from "@/types/api"
-
-export type SortKey = "title" | "company" | "status" | "location" | "date_applied"
-export type SortDirection = "asc" | "desc"
 
 interface ApplicationsTableProps {
   applications: Application[]
@@ -25,29 +24,15 @@ interface ApplicationsTableProps {
   sortKey: SortKey | null
   sortDirection: SortDirection
   onSort: (key: SortKey) => void
+  /**
+   * Sets an exact key/direction pair, rather than toggling the way
+   * `onSort` does. Used by the `SortSelect` this table mounts whenever
+   * it is hiding a column -- see the `hidesAColumn` note in the body.
+   */
+  onSortSelect: (key: SortKey, direction: SortDirection) => void
   onStatusChange: (id: string, status: ApplicationStatus) => void
   updatingId: string | null
 }
-
-/**
- * All five sortable columns, in display order. This is the single source
- * of truth for column labels -- ApplicationsPage's sort-state
- * announcement and the card rendering's own sort control (F32) both
- * import `COLUMN_LABEL` below rather than hard-coding the strings a
- * second time, so the wording can't drift between the three surfaces.
- */
-export const COLUMNS: { key: SortKey; label: string }[] = [
-  { key: "company", label: "Company" },
-  { key: "title", label: "Job Title" },
-  { key: "status", label: "Status" },
-  { key: "location", label: "Location" },
-  { key: "date_applied", label: "Date Applied" },
-]
-
-export const COLUMN_LABEL: Record<SortKey, string> = COLUMNS.reduce(
-  (labels, column) => ({ ...labels, [column.key]: column.label }),
-  {} as Record<SortKey, string>
-)
 
 /**
  * F31 breakpoints (R13.2 option A, R13 milestone). Chosen to line up
@@ -82,6 +67,7 @@ export function ApplicationsTable({
   sortKey,
   sortDirection,
   onSort,
+  onSortSelect,
   onStatusChange,
   updatingId,
 }: ApplicationsTableProps) {
@@ -108,117 +94,143 @@ export function ApplicationsTable({
   // +1 for the trailing icon-only Edit column, which never hides.
   const columnCount = visibleColumns.length + 1
 
+  /*
+    R13.6 ("sorting, filtering and search behavior are unchanged -- this is
+    a layout requirement, not a data one"). Hiding a column removes its
+    `<th>`, and the `<th>` is the only place that column's `SortButton` and
+    its `aria-sort` ever lived. So F31's column-priority hiding silently
+    took two things away that R13.6 says it must not: between 640px and
+    1023px there was no way to sort by Location at all, and between 640px
+    and 767px no way to sort by Date Applied -- and an already-active sort
+    on a hidden column stopped being reported to assistive tech entirely,
+    since no rendered `<th>` carried `aria-sort` any more.
+
+    Mounting the card rendering's own `SortSelect` here whenever a column
+    is hidden restores both: every key stays reachable, and the combobox's
+    value ("Location, ascending") states the full sort state
+    programmatically, which is exactly the substitute for `aria-sort`
+    R13.5 already accepted for the card list. It is absent at full width,
+    where every column has its own header control and this would just be a
+    second way to do the same thing.
+  */
+  const hidesAColumn = hideLocation || hideDateApplied
+
   return (
-    <div className="overflow-hidden rounded-md border border-border">
-      <Table>
-        <TableCaption>
-          {applications.length === totalCount
-            ? `${totalCount} tracked applications.`
-            : `Showing ${applications.length} of ${totalCount} tracked applications.`}
-        </TableCaption>
-        <TableHeader>
-          <TableRow>
-            {visibleColumns.map((column) => {
-              const active = sortKey === column.key
-              return (
-                // A11y: `aria-sort` belongs on the columnheader (`<th>`),
-                // not on the button inside it -- `role="button"` doesn't
-                // support the property at all, so screen readers were
-                // silently dropping it and no column ever reported as
-                // sorted (WCAG 4.1.2 Name, Role, Value).
-                //
-                // Sort state (`sortKey`/`sortDirection`) lives one level
-                // up in ApplicationsPage and is completely independent of
-                // which columns are currently rendered here -- a column
-                // hidden at this width just stops rendering its `<th>`
-                // and `SortButton`, but sorting by it (if still active)
-                // keeps applying to `applications` exactly as before.
-                <TableHead
-                  key={column.key}
-                  aria-sort={active ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
-                >
-                  <SortButton
-                    label={column.label}
-                    active={active}
-                    direction={sortDirection}
-                    onClick={() => onSort(column.key)}
-                  />
-                </TableHead>
-              )
-            })}
-            <TableHead className="w-9">
-              <span className="sr-only">Edit</span>
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {applications.length === 0 ? (
+    <div className="flex flex-col gap-3">
+      {hidesAColumn && (
+        <SortSelect sortKey={sortKey} sortDirection={sortDirection} onSortChange={onSortSelect} />
+      )}
+      <div className="overflow-hidden rounded-md border border-border">
+        <Table>
+          <TableCaption>
+            {applications.length === totalCount
+              ? `${totalCount} tracked applications.`
+              : `Showing ${applications.length} of ${totalCount} tracked applications.`}
+          </TableCaption>
+          <TableHeader>
             <TableRow>
-              <TableCell colSpan={columnCount} className="h-24 text-center text-muted-foreground">
-                No applications match your filters.
-              </TableCell>
-            </TableRow>
-          ) : (
-            applications.map((application) => (
-              <TableRow key={application.id}>
-                <TableCell className="min-w-36 max-w-64 align-top font-medium whitespace-normal break-words">
-                  {application.company}
-                  {hideLocation && (
-                    // R13.4: Location's own column is hidden below `lg` --
-                    // its value has to stay genuinely present on this same
-                    // screen, not just in the edit dialog, so it's folded
-                    // in here as a secondary line rather than dropped.
-                    <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
-                      <span className="sr-only">Location: </span>
-                      {application.location ?? "—"}
-                    </span>
-                  )}
-                </TableCell>
-                <TableCell className="min-w-40 max-w-72 align-top whitespace-normal break-words">
-                  {application.title}
-                  {hideDateApplied && (
-                    <span className="mt-0.5 block text-xs text-muted-foreground">
-                      <span className="sr-only">Date Applied: </span>
-                      {application.date_applied ?? "—"}
-                    </span>
-                  )}
-                </TableCell>
-                <TableCell
-                  className={cn(
-                    "align-top whitespace-normal transition-colors",
-                    STATUS_CELL_CLASSES[application.status]
-                  )}
-                >
-                  <StatusControl
-                    application={application}
-                    updatingId={updatingId}
-                    onStatusChange={onStatusChange}
-                  />
-                </TableCell>
-                {!hideLocation && (
-                  <TableCell className="align-top whitespace-normal break-words">
-                    {application.location ?? "—"}
-                  </TableCell>
-                )}
-                {!hideDateApplied && (
-                  <TableCell className="align-top">{application.date_applied ?? "—"}</TableCell>
-                )}
-                <TableCell className="align-top">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={`Edit ${application.company} — ${application.title}`}
-                    onClick={() => openEditForm(application)}
+              {visibleColumns.map((column) => {
+                const active = sortKey === column.key
+                return (
+                  // A11y: `aria-sort` belongs on the columnheader (`<th>`),
+                  // not on the button inside it -- `role="button"` doesn't
+                  // support the property at all, so screen readers were
+                  // silently dropping it and no column ever reported as
+                  // sorted (WCAG 4.1.2 Name, Role, Value).
+                  //
+                  // Sort state (`sortKey`/`sortDirection`) lives one level
+                  // up in ApplicationsPage and is completely independent of
+                  // which columns are currently rendered here -- a column
+                  // hidden at this width just stops rendering its `<th>`
+                  // and `SortButton`, but sorting by it (if still active)
+                  // keeps applying to `applications` exactly as before.
+                  <TableHead
+                    key={column.key}
+                    aria-sort={active ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
                   >
-                    <Pencil />
-                  </Button>
+                    <SortButton
+                      label={column.label}
+                      active={active}
+                      direction={sortDirection}
+                      onClick={() => onSort(column.key)}
+                    />
+                  </TableHead>
+                )
+              })}
+              <TableHead className="w-9">
+                <span className="sr-only">Edit</span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {applications.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={columnCount} className="h-24 text-center text-muted-foreground">
+                  No applications match your filters.
                 </TableCell>
               </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
+            ) : (
+              applications.map((application) => (
+                <TableRow key={application.id}>
+                  <TableCell className="min-w-36 max-w-64 align-top font-medium whitespace-normal break-words">
+                    {application.company}
+                    {hideLocation && (
+                      // R13.4: Location's own column is hidden below `lg` --
+                      // its value has to stay genuinely present on this same
+                      // screen, not just in the edit dialog, so it's folded
+                      // in here as a secondary line rather than dropped.
+                      <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                        <span className="sr-only">Location: </span>
+                        {application.location ?? "—"}
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="min-w-40 max-w-72 align-top whitespace-normal break-words">
+                    {application.title}
+                    {hideDateApplied && (
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        <span className="sr-only">Date Applied: </span>
+                        {application.date_applied ?? "—"}
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell
+                    className={cn(
+                      "align-top whitespace-normal transition-colors",
+                      STATUS_CELL_CLASSES[application.status]
+                    )}
+                  >
+                    <StatusControl
+                      application={application}
+                      updatingId={updatingId}
+                      onStatusChange={onStatusChange}
+                    />
+                  </TableCell>
+                  {!hideLocation && (
+                    <TableCell className="align-top whitespace-normal break-words">
+                      {application.location ?? "—"}
+                    </TableCell>
+                  )}
+                  {!hideDateApplied && (
+                    <TableCell className="align-top">{application.date_applied ?? "—"}</TableCell>
+                  )}
+                  <TableCell className="align-top">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={`Edit ${application.company} — ${application.title}`}
+                      onClick={() => openEditForm(application)}
+                    >
+                      <Pencil />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   )
 }

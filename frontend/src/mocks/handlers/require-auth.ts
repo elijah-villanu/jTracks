@@ -12,12 +12,12 @@ import { EXPIRED_ACCESS_TOKEN } from "@/mocks/fixtures/user"
  * Returns an `HttpResponse` (401) if the request should be rejected, or
  * `null` if it's authorized and the handler should proceed.
  */
-export function requireAuth(request: Request): HttpResponse<{ message: string }> | null {
+export function requireAuth(request: Request): HttpResponse<{ detail: string }> | null {
   const authHeader = request.headers.get("Authorization")
   const token = authHeader?.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : ""
 
   if (!token || token === EXPIRED_ACCESS_TOKEN) {
-    return HttpResponse.json({ message: "Unauthorized." }, { status: 401 })
+    return HttpResponse.json({ detail: "Unauthorized." }, { status: 401 })
   }
 
   return null

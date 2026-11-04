@@ -1,5 +1,5 @@
 import { createContext, useCallback, useEffect, useState, type ReactNode } from "react"
-import { apiClient } from "@/lib/api-client"
+import { apiClient, apiErrorMessage } from "@/lib/api-client"
 import type { Application } from "@/types/api"
 
 /**
@@ -49,7 +49,7 @@ export interface ApplicationsContextValue {
   isLoading: boolean
   error: string | null
   /**
-   * Sends `POST /applications` and appends the response to local state
+   * Sends `POST /applications` and prepends the response to local state
    * -- no refetch of the whole list. Rejects (throwing whatever
    * `apiClient.post` throws, typically an `ApiError`) on failure so
    * callers can surface their own error UI.
@@ -103,7 +103,7 @@ export function ApplicationsProvider({ children }: { children: ReactNode }) {
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load applications.")
+          setError(apiErrorMessage(err, "Failed to load applications."))
         }
       } finally {
         if (!cancelled) {
@@ -121,7 +121,8 @@ export function ApplicationsProvider({ children }: { children: ReactNode }) {
 
   const createApplication = useCallback(async (data: ApplicationInput) => {
     const created = await apiClient.post<Application>("/applications", data)
-    setApplications((prev) => [...prev, created])
+    // Prepended: the server lists newest first, so this matches a reload.
+    setApplications((prev) => [created, ...prev])
     return created
   }, [])
 

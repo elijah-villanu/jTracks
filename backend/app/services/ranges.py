@@ -151,10 +151,13 @@ def resolve_range(
         )
 
     if range_ == "custom":
-        assert start is not None and end is not None, (
-            "custom range reached resolve_range() without both bounds; "
-            "RangeQuery should have rejected it with a 422"
-        )
+        # An explicit raise, not `assert` (V2 audit L6): `python -O` strips
+        # asserts, and this precondition should survive that.
+        if start is None or end is None:
+            raise ValueError(
+                "custom range reached resolve_range() without both bounds; "
+                "RangeQuery should have rejected it with a 422"
+            )
         span = custom_span_days(start, end)
         granularity: Granularity = (
             "day" if span <= CUSTOM_DAILY_MAX_SPAN_DAYS else "month"

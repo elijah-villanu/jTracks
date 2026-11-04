@@ -13,7 +13,7 @@ from urllib.parse import quote
 
 import httpx
 
-from app.services.autofill.base import ParsedFields, make_parsed, parse_iso_date
+from app.services.autofill.base import ParsedFields, parse_iso_date
 from app.services.autofill.fetch import fetch_json
 from app.services.autofill.net_guard import host_matches_domain
 
@@ -77,8 +77,8 @@ async def parse(url: str, client: httpx.AsyncClient) -> ParsedFields | None:
 
     company = job.get("company_name") or token.replace("-", " ").title()
 
-    return make_parsed(
-        url,
+    return ParsedFields(
+        job_url=url,
         company=company,
         title=job.get("title"),
         location=location,

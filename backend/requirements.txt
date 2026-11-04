@@ -26,6 +26,8 @@ bcrypt>=4.1
 slowapi>=0.1.9
 # Google OAuth ID-token verification
 google-auth>=2.30
+# Transitive via google-auth; floor pinned for PYSEC-2026-3552 (fixed in 50.0.0).
+cryptography>=50.0.0
 requests>=2.32
 # Autofill (outbound HTTP). Still <0.28: starlette 1.3's TestClient deprecates
 # httpx in favour of httpx2 but continues to work with it, and 0.27 is the last

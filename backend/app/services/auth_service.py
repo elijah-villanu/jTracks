@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import dummy_verify, hash_password, verify_password
 from app.models.user import User
+from app.services import refresh_token_service
 
 
 class AuthError(Exception):
@@ -95,6 +96,21 @@ def upsert_google_user(
     if user is not None:
         if user.google_id is None:
             user.google_id = google_id
+            # SECURITY (pre-deploy audit): pre-account hijacking. Password
+            # signup never proves the address belongs to the person signing up,
+            # so an attacker can register victim@gmail.com first. When the real
+            # owner later signs in with Google, this branch used to link *into
+            # the attacker's row* and leave the attacker's password working —
+            # they then read everything the victim stored (confirmed by PoC).
+            #
+            # Google's verified email is the first real proof of ownership, so
+            # it wins: the unproven password is dropped and every session that
+            # existed before the proof is revoked. Trade-off: a legitimate user
+            # who signed up with a password and later links Google signs in with
+            # Google from then on.
+            if user.hashed_password is not None:
+                user.hashed_password = None
+                refresh_token_service.revoke_all_for_user(db, user.id)
             db.commit()
             db.refresh(user)
         return user

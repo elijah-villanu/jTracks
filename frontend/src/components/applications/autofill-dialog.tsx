@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react"
+import { useRef, useState, type FormEvent, type RefObject } from "react"
 import { Info, Link2 } from "lucide-react"
 import {
   Dialog,
@@ -14,12 +14,20 @@ import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { useApplicationsContext } from "@/hooks/useApplicationsContext"
 import { apiClient } from "@/lib/api-client"
-import { todayIsoDate } from "@/lib/utils"
+import { canReceiveFocus, todayIsoDate } from "@/lib/utils"
 import { isAutofillSuccess, isAutofillUnsupported, type AutofillResponse } from "@/types/api"
 
 interface AutofillDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  /**
+   * A11y (WCAG 2.4.3): where focus returns on close. Opened from state, so
+   * Base UI returns focus to whatever was focused at open -- which, from
+   * the mobile menu, is a Sheet item that has already unmounted, dropping
+   * focus to <body>. AppLayout points this at the control that started the
+   * flow; ignored whenever it can't actually take focus.
+   */
+  returnFocusRef?: RefObject<HTMLElement | null>
 }
 
 const SOURCE_LABEL = { greenhouse: "Greenhouse", workday: "Workday" } as const
@@ -33,14 +41,27 @@ const SOURCE_LABEL = { greenhouse: "Greenhouse", workday: "Workday" } as const
  * end here and the pasted URL is never lost -- every path closes this
  * dialog and calls `openCreateForm` with at least `job_url` set.
  */
-export function AutofillDialog({ open, onOpenChange }: AutofillDialogProps) {
+export function AutofillDialog({ open, onOpenChange, returnFocusRef }: AutofillDialogProps) {
   const { openCreateForm } = useApplicationsContext()
   const [url, setUrl] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // True when this dialog is closing *because* it handed off to the review
+  // form. Focus must then be left alone: the form has already moved focus
+  // into itself, and returning it to the header here would pull focus out
+  // of an open modal (verified -- it did, before this flag existed). The
+  // form owns the eventual return instead, via the same `returnFocusRef`.
+  const handedOffRef = useRef(false)
+
   function reset() {
     setUrl("")
     setIsSubmitting(false)
+  }
+
+  function handOff(...args: Parameters<typeof openCreateForm>) {
+    handedOffRef.current = true
+    handleOpenChange(false)
+    openCreateForm(...args)
   }
 
   function handleOpenChange(nextOpen: boolean) {
@@ -56,6 +77,7 @@ export function AutofillDialog({ open, onOpenChange }: AutofillDialogProps) {
       return
     }
 
+    handedOffRef.current = false
     setIsSubmitting(true)
 
     try {
@@ -63,8 +85,7 @@ export function AutofillDialog({ open, onOpenChange }: AutofillDialogProps) {
 
       if (isAutofillSuccess(response)) {
         const { fields } = response
-        handleOpenChange(false)
-        openCreateForm(
+        handOff(
           {
             job_url: fields.job_url,
             company: fields.company ?? "",
@@ -89,8 +110,7 @@ export function AutofillDialog({ open, onOpenChange }: AutofillDialogProps) {
       // -- each carries its own explanation into the review form, which
       // announces it, so the outcome isn't communicated purely by
       // "some inputs happen to be blank".
-      handleOpenChange(false)
-      openCreateForm(
+      handOff(
         { job_url: url },
         {
           tone: "warning",
@@ -103,8 +123,7 @@ export function AutofillDialog({ open, onOpenChange }: AutofillDialogProps) {
       // Network error, non-2xx, anything else `apiClient.post` threw
       // -- treated identically to the failed/unsupported case so the
       // pasted URL is never lost and the user is never stuck here.
-      handleOpenChange(false)
-      openCreateForm(
+      handOff(
         { job_url: url },
         {
           tone: "warning",
@@ -117,7 +136,15 @@ export function AutofillDialog({ open, onOpenChange }: AutofillDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent
+        className="sm:max-w-md"
+        finalFocus={() => {
+          if (handedOffRef.current) {
+            return false
+          }
+          return canReceiveFocus(returnFocusRef?.current) ? returnFocusRef.current : true
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Paste a job link</DialogTitle>
           <DialogDescription>

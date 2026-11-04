@@ -6,6 +6,8 @@ from the Bearer JWT. Every application/settings query in the API is scoped to
 """
 from __future__ import annotations
 
+import uuid
+
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
@@ -42,9 +44,7 @@ def get_current_user(
     return user
 
 
-def _coerce_uuid(value: str):
-    import uuid
-
+def _coerce_uuid(value: str) -> uuid.UUID:
     try:
         return uuid.UUID(value)
     except (ValueError, AttributeError):

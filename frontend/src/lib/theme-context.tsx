@@ -1,4 +1,6 @@
-import { createContext, useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
+import { createContext, useEffect, useMemo, type ReactNode } from "react"
+import { useMediaQuery } from "@/hooks/useMediaQuery"
+import { useStoredState } from "@/hooks/useStoredState"
 
 export type Theme = "light" | "dark" | "system"
 
@@ -35,18 +37,6 @@ function isTheme(value: unknown): value is Theme {
   return value === "light" || value === "dark" || value === "system"
 }
 
-function readStoredTheme(): Theme {
-  if (typeof window === "undefined") {
-    return "system"
-  }
-  const stored = window.localStorage.getItem(THEME_STORAGE_KEY)
-  return isTheme(stored) ? stored : "system"
-}
-
-function systemPrefersDark(): boolean {
-  return typeof window !== "undefined" && window.matchMedia(MEDIA_QUERY).matches
-}
-
 function applyResolvedTheme(resolved: "light" | "dark") {
   const root = document.documentElement
   root.classList.toggle("dark", resolved === "dark")
@@ -74,26 +64,14 @@ function applyResolvedTheme(resolved: "light" | "dark") {
  * live OS changes.
  */
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(readStoredTheme)
-  const [systemIsDark, setSystemIsDark] = useState<boolean>(systemPrefersDark)
-
-  useEffect(() => {
-    const mediaQueryList = window.matchMedia(MEDIA_QUERY)
-    const handleChange = (event: MediaQueryListEvent) => setSystemIsDark(event.matches)
-    mediaQueryList.addEventListener("change", handleChange)
-    return () => mediaQueryList.removeEventListener("change", handleChange)
-  }, [])
+  const [theme, setTheme] = useStoredState(THEME_STORAGE_KEY, isTheme, () => "system")
+  const systemIsDark = useMediaQuery(MEDIA_QUERY)
 
   const resolvedTheme: "light" | "dark" = theme === "system" ? (systemIsDark ? "dark" : "light") : theme
 
   useEffect(() => {
     applyResolvedTheme(resolvedTheme)
   }, [resolvedTheme])
-
-  const setTheme = useCallback((next: Theme) => {
-    setThemeState(next)
-    window.localStorage.setItem(THEME_STORAGE_KEY, next)
-  }, [])
 
   const value = useMemo<ThemeContextValue>(
     () => ({ theme, resolvedTheme, setTheme }),

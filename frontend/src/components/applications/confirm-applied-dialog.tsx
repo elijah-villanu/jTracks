@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type RefObject } from "react"
+import { useEffect, useState, type ComponentProps, type FormEvent } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -25,8 +25,12 @@ interface ConfirmAppliedDialogProps {
    * from a `DialogTrigger`, so Base UI has no trigger to restore focus to
    * and was dropping focus to `<body>` -- dumping a keyboard user back at
    * the top of the document and losing their place in the table.
+   *
+   * Passed straight through to Base UI, so the function form is available
+   * and is what ApplicationsPage uses: it's evaluated at close time, after
+   * a confirmed move has already remounted the card on the board.
    */
-  finalFocusRef?: RefObject<HTMLElement | null>
+  finalFocus?: ComponentProps<typeof DialogContent>["finalFocus"]
 }
 
 /**
@@ -42,7 +46,7 @@ export function ConfirmAppliedDialog({
   error,
   onConfirm,
   onCancel,
-  finalFocusRef,
+  finalFocus,
 }: ConfirmAppliedDialogProps) {
   const [dateApplied, setDateApplied] = useState(todayIsoDate)
 
@@ -66,7 +70,7 @@ export function ConfirmAppliedDialog({
         }
       }}
     >
-      <DialogContent className="sm:max-w-sm" finalFocus={finalFocusRef}>
+      <DialogContent className="sm:max-w-sm" finalFocus={finalFocus}>
         <DialogHeader>
           <DialogTitle>Mark as applied?</DialogTitle>
           <DialogDescription>
@@ -100,7 +104,13 @@ export function ConfirmAppliedDialog({
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button type="submit" form="confirm-applied-form" disabled={isSubmitting}>
+          {/* `focusableWhenDisabled`: keeps focus on Confirm while saving, so a failed save doesn't strand focus (see button.tsx). */}
+          <Button
+            type="submit"
+            form="confirm-applied-form"
+            disabled={isSubmitting}
+            focusableWhenDisabled
+          >
             {isSubmitting ? "Saving..." : "Confirm"}
           </Button>
         </DialogFooter>

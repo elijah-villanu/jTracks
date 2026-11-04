@@ -12,8 +12,10 @@ export function ProtectedRoute() {
   const location = useLocation()
 
   if (isLoading) {
+    // A11y (WCAG 4.1.3): `role="status"` so a screen reader hears why the
+    // page is momentarily empty during auth hydration. Same on GuestRoute.
     return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
+      <div role="status" className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
         Loading...
       </div>
     )
@@ -37,7 +39,7 @@ export function GuestRoute() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
+      <div role="status" className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
         Loading...
       </div>
     )

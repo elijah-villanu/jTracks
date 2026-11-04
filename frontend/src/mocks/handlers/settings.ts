@@ -41,7 +41,7 @@ export const settingsHandlers = [
 
     if (!isPositiveInteger(body.ghost_days_default)) {
       return HttpResponse.json(
-        { message: "ghost_days_default must be a positive integer." },
+        { detail: "ghost_days_default must be a positive integer." },
         { status: 400 }
       )
     }

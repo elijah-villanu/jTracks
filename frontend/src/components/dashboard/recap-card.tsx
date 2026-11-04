@@ -41,7 +41,7 @@ interface RecapCardProps {
  *    leaves the app. Use the fixed literals in `recap-skins/shared.tsx`
  *    and `STATUS_LITERAL_COLORS`.
  * 2. **No animation in the exported subtree (F35).** No Motion or MagicUI
- *    component (`BlurFade`, `BorderBeam`, `NumberTicker`, ...) may appear
+ *    component (`BlurFade`, `NumberTicker`, ...) may appear
  *    anywhere inside a skin. An in-flight animation serializes at
  *    whatever frame it is on, and Motion's inline transforms are not
  *    guaranteed to survive serialization -- either way the PNG silently

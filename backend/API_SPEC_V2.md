@@ -119,6 +119,7 @@ obtained it.
 - It never appears in any response body.
 - It is validated on **every** use against three independent conditions: the row exists,
   `expires_at` is in the future, and `revoked_at` is null.
+- It is **single-use**: `/auth/refresh` consumes it and issues a successor (§2.6).
 
 ### 2.4 How 401s are produced
 
@@ -146,8 +147,10 @@ two refresh-cookie endpoints (§2.7) — and never by the auth dependency.
 ### 2.5 Obtaining and maintaining a session
 
 Four endpoints mint access tokens: `POST /auth/signup`, `POST /auth/login`,
-`POST /auth/oauth/google` and `POST /auth/refresh`. The first three additionally set the
-refresh cookie; `/auth/refresh` does not (it does not rotate — see §2.6).
+`POST /auth/oauth/google` and `POST /auth/refresh`. The first three set a refresh cookie
+that starts a new session; `/auth/refresh` replaces it with a rotated successor (§2.6).
+Clients must keep the updated cookie — a cookie jar (`-b`/`-c` together in curl) or a
+browser does this automatically.
 
 ```bash
 BASE=http://localhost:8000
@@ -160,8 +163,9 @@ TOKEN=$(curl -sS -c cookies.txt -X POST "$BASE/auth/login" \
 
 curl -sS "$BASE/auth/me" -H "Authorization: Bearer $TOKEN"
 
-# 30 minutes later: swap the cookie for a fresh access token.
-TOKEN=$(curl -sS -b cookies.txt -X POST "$BASE/auth/refresh" \
+# 30 minutes later: swap the cookie for a fresh access token. `-c` saves the
+# rotated cookie; the old one is now spent.
+TOKEN=$(curl -sS -b cookies.txt -c cookies.txt -X POST "$BASE/auth/refresh" \
   -H 'X-Refresh-Request: 1' \
   | python -c 'import sys,json;print(json.load(sys.stdin)["access_token"])')
 
@@ -179,26 +183,34 @@ The expected client lifecycle:
    refresh call.
 4. **On logout**, call `POST /auth/logout` and discard the in-memory access token.
 
-### 2.6 Accepted trade-off: no refresh-token rotation
+### 2.6 Refresh-token rotation and reuse detection
 
 This section replaces V1 §2.5 ("Lifecycle gaps"), which documented the absence of logout.
-Logout now exists. What remains deliberately absent, and is recorded here so it is not
-rediscovered later as a defect:
+It originally recorded "no rotation" as an accepted V2 trade-off; that decision was reversed
+on 2026-09-14 (PRD R7.5).
 
-- **No rotation.** A refresh token is static from issue until expiry or explicit
-  revocation. `POST /auth/refresh` returns a new *access* token and leaves the cookie
-  untouched.
-- **No reuse detection and no token families.** Presenting the same refresh token twice is
-  normal and expected, so there is no signal to detect theft from.
+- **Rotation.** Every successful `POST /auth/refresh` revokes the presented refresh token
+  and returns its successor in `Set-Cookie`. Each refresh token works once.
+- **Token families.** All tokens descending from one signup/login/OAuth exchange share a
+  `family_id` — one family is one session.
+- **Reuse detection.** Presenting a token that was *already rotated* revokes its entire
+  family: the holder of the newest token is logged out too, because the server cannot tell
+  which party is legitimate. The response is the ordinary `401` (§3.2).
+- **Grace window.** For `REFRESH_TOKEN_REUSE_GRACE_SECONDS` (default 30) after a rotation,
+  the just-rotated token is still accepted — with a new access token and **no** `Set-Cookie`
+  — so two tabs refreshing at once don't trip detection. Only while the family has a live
+  token.
+- **No session extension.** A successor keeps its predecessor's `expires_at`; the rotated
+  cookie's `Max-Age` is the time remaining. A session ends 14 days after login however
+  actively it is used.
 - **No "log out all devices", no session listing, no introspection endpoint.** Logout is
-  single-session: it revokes the token presented on that request and no other.
+  single-session: it revokes the family of the token presented and no other family.
 - **Access tokens are not individually revocable.** A leaked access token stays valid for
-  up to 30 minutes. Shortening that window from V1's seven days is the mitigation; the
-  `jti` claim is the hook a denylist would use if that ever stops being enough.
+  up to 30 minutes, including after reuse detection revokes its session. The `jti` claim is
+  the hook a denylist would use if that ever stops being enough.
 
-The consequence, accepted knowingly: **a stolen refresh token is usable until it expires
-(14 days) or the user logs out.** The prerequisite for improving this is rotation with
-reuse detection, which was scoped and declined for V2.
+Residual risk, accepted: reuse inside the grace window is not detected, and a stolen token
+that is never contested (the real user never refreshes again) lasts until its 14-day expiry.
 
 ### 2.7 CSRF protection on the refresh endpoints
 
@@ -456,22 +468,29 @@ No request body and no parameters.
 
 | Status | Trigger | Body |
 |---|---|---|
-| `200` | Cookie present, known, unexpired and unrevoked | [`TokenResponse`](#63-tokenresponse) |
-| `401` | **Any** validation failure | `{"detail": "Invalid or expired session."}` |
+| `200` | Cookie present, known, unexpired and unrevoked | [`TokenResponse`](#63-tokenresponse) + `Set-Cookie` (rotated successor) |
+| `200` | Cookie was rotated within the last `REFRESH_TOKEN_REUSE_GRACE_SECONDS` and its session is still live | [`TokenResponse`](#63-tokenresponse), **no** `Set-Cookie` |
+| `401` | **Any** validation failure, including detected reuse | `{"detail": "Invalid or expired session."}` |
 | `403` | Missing `X-Refresh-Request` header | `{"detail": "This endpoint requires the 'X-Refresh-Request' header."}` |
 | `429` | Over 30/minute | `{"error": "Rate limit exceeded: 30 per 1 minute"}` |
 
 Every `401` cause returns the **same status and the same message** — no cookie at all, a
-cookie whose hash matches no row, an expired token, a revoked token, and an access token
-replayed in the cookie slot are all indistinguishable. This is deliberate: a
-differentiated response would tell an attacker whether a given token value ever existed.
+cookie whose hash matches no row, an expired token, a revoked token, a rotated token replayed
+after the grace window, and an access token replayed in the cookie slot are all
+indistinguishable. This is deliberate: a differentiated response would tell an attacker
+whether a given token value ever existed, or that their reuse was detected.
 
-**The refresh token is not rotated.** The response carries no `Set-Cookie`; the same
-cookie remains valid for its full lifetime and can be exchanged any number of times
-(§2.6).
+**The refresh token is rotated** (§2.6). A successful response revokes the presented token
+and sets its successor with the same attributes as at login; `Max-Age` is the session's
+remaining lifetime, not a fresh 14 days. Replaying a rotated cookie after the grace window
+revokes the whole session.
+
+```
+Set-Cookie: jtracks_refresh=<new opaque>; HttpOnly; Max-Age=<seconds remaining>; Path=/auth; SameSite=none; Secure
+```
 
 ```bash
-curl -sS -b cookies.txt -X POST http://localhost:8000/auth/refresh \
+curl -sS -b cookies.txt -c cookies.txt -X POST http://localhost:8000/auth/refresh \
   -H 'X-Refresh-Request: 1'
 ```
 
@@ -509,8 +528,9 @@ use this endpoint to learn whether a token exists.
 
 Effects:
 
-- If the cookie names a live token, its `revoked_at` is stamped. Replaying that exact
-  cookie value at `/auth/refresh` afterwards returns `401`.
+- If the cookie names a known token, every live token in its family is revoked — so a
+  stale, already-rotated cookie from the same session still ends it. Replaying any cookie
+  from that session at `/auth/refresh` afterwards returns `401`.
 - The cookie is cleared **unconditionally**, including on the no-cookie path, so a stale
   cookie the server has no row for is still removed from the browser.
 - Only the presented session is revoked. Other sessions for the same user survive (§2.6).
@@ -1419,7 +1439,7 @@ move a `ghosted` row back to any other status (see §6.10).
 | "Today" | Every server-side date — `date_saved`/`date_applied` defaults, dashboard and recap windows, the ghosting deadline, refresh-token expiry — comes from `app/core/clock.py` in **UTC**, on the same calendar as the stored timestamps. Near midnight this may not match the client's local date |
 | Deletion | Hard delete, no soft-delete or tombstone. A deleted application vanishes from every analytic figure regardless of its former status. Deleting a user cascades to their applications **and their refresh tokens** (DB-level `ON DELETE CASCADE`); there is no user-deletion endpoint |
 | Status history | **Not persisted.** The `applications` table stores only the *current* status. This is a deliberate V2 decision and it is what limits `avg_time_to_response_days` and the Sankey's accuracy (§3.6) |
-| Refresh tokens | Stored in a `refresh_tokens` table as `(id, user_id, token_hash, expires_at, revoked_at, created_at)`. The raw token value has no column and is never written anywhere |
+| Refresh tokens | Stored in a `refresh_tokens` table as `(id, user_id, family_id, token_hash, expires_at, revoked_at, replaced_by_id, created_at)`. `family_id` groups a session's rotated tokens; `replaced_by_id` is set only when a token was revoked by rotation (§2.6). The raw token value has no column and is never written anywhere |
 
 ---
 
@@ -2186,8 +2206,8 @@ All documented above rather than fixed here:
 - `created_at`/`updated_at` timezone offset presence differs between the SQLite and
   PostgreSQL deployments.
 - Status-transition rules apply to `PATCH` only, not to `POST /applications`.
-- **No refresh-token rotation and no reuse detection** — a stolen refresh token is usable
-  until expiry or explicit logout (§2.6).
+- **Refresh-token reuse inside the 30-second grace window is not detected**, and an
+  uncontested stolen refresh token lasts until its 14-day expiry (§2.6).
 - **Access tokens are not revocable** — a leaked one is valid for up to 30 minutes.
 - **Analytics are derived from current status only.** No status history is persisted, so
   `avg_time_to_response_days` is a proxy, a post-interview outcome recorded as `rejected`

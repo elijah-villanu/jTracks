@@ -1,7 +1,6 @@
-import { BorderBeam } from "@/components/ui/border-beam"
 import { Card, CardContent } from "@/components/ui/card"
 import { NumberTicker } from "@/components/ui/number-ticker"
-import { cn } from "@/lib/utils"
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion"
 
 interface StatTileProps {
   label: string
@@ -19,13 +18,6 @@ interface StatTileProps {
   suffix?: string
   /** Decimal places the animated number counts to; ignored when `numericValue` is omitted. */
   decimalPlaces?: number
-  /**
-   * Adds a single, slow MagicUI `BorderBeam` accent -- reserve this for
-   * the *one* headline stat on a given page (see docs/decisions/
-   * magicui-conventions.md's "one accent per view" rule); every tile
-   * glowing at once reads as noise, not emphasis.
-   */
-  accent?: boolean
 }
 
 /**
@@ -40,23 +32,24 @@ interface StatTileProps {
  * a <dl> may not have arbitrary nested wrappers between it and its
  * <dt>/<dd> children. The animated variant still renders real text (via
  * `NumberTicker`'s `textContent` writes onto its own `<span>` inside the
- * `<dd>`), and the app-wide `MotionConfig reducedMotion="user"` (main.tsx)
- * makes it jump straight to the final value for users with reduced-motion
- * enabled instead of animating.
+ * `<dd>`). Under reduced motion the tile skips `NumberTicker` and renders
+ * `value` directly -- see the note in the body.
  */
-export function StatTile({ label, value, numericValue, suffix, decimalPlaces, accent }: StatTileProps) {
-  const isAnimated = typeof numericValue === "number" && Number.isFinite(numericValue)
+export function StatTile({ label, value, numericValue, suffix, decimalPlaces }: StatTileProps) {
+  // A11y (WCAG 2.3.3): `MotionConfig` doesn't stop `NumberTicker`'s
+  // count-up -- see hooks/usePrefersReducedMotion.ts. Under reduced motion
+  // the tile renders the final `value` as plain text instead.
+  const prefersReducedMotion = usePrefersReducedMotion()
+  const isAnimated =
+    !prefersReducedMotion && typeof numericValue === "number" && Number.isFinite(numericValue)
 
   return (
     // F54 (R16.4): card-shell styling only, nudged toward the Monarch
     // stat-card reference -- roomier padding (`--card-spacing` 4 -> 5,
     // i.e. 16px -> 20px) and the reference's quieter, uppercase,
-    // letter-spaced caption sitting *under* the figure. The BorderBeam
-    // wiring below is untouched (`duration={24}`, the project-wide value
-    // per docs/decisions/magicui-conventions.md), as is every one of the
-    // `numericValue`/`suffix`/`decimalPlaces`/`accent` props.
-    <Card className={cn("[--card-spacing:--spacing(5)]", accent && "relative")}>
-      {accent && <BorderBeam duration={24} colorFrom="var(--foreground)" colorTo="var(--muted-foreground)" />}
+    // letter-spaced caption sitting *under* the figure. (The `accent` prop
+    // and the BorderBeam it added were removed 2026-09-15 -- WCAG 2.2.2.)
+    <Card className="[--card-spacing:--spacing(5)]">
       <CardContent>
         {/*
           `flex-col-reverse` flips only the *visual* order so the number

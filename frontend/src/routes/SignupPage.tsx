@@ -1,11 +1,14 @@
 import { SignupForm } from "@/components/signup-form"
 import { Logo } from "@/components/layout/logo"
+import { useDocumentTitle } from "@/hooks/useDocumentMetadata"
 
 /**
  * F2 signup route (`/signup`, gated by `GuestRoute` in App.tsx so an
  * already-authenticated user is redirected to `/` instead).
  */
 export function SignupPage() {
+  useDocumentTitle("Create an account")
+
   // A11y: <main>, not <div> -- see the note in LoginPage.tsx.
   return (
     <main className="relative flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-6 md:p-10">

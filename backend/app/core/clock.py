@@ -31,8 +31,8 @@ def utc_today() -> date:
     return utc_now().date()
 
 
-def to_utc_date(ts: datetime) -> date:
-    """Calendar date of a stored timestamp, in UTC.
+def as_utc(ts: datetime) -> datetime:
+    """Make a stored timestamp an aware UTC value, comparable to `utc_now()`.
 
     Naive values are assumed to already be UTC: that is what SQLite hands back,
     since it has no timezone type and `func.now()` wrote UTC. Aware values are
@@ -40,5 +40,10 @@ def to_utc_date(ts: datetime) -> date:
     which is not guaranteed to be UTC.
     """
     if ts.tzinfo is None:
-        return ts.date()
-    return ts.astimezone(timezone.utc).date()
+        return ts.replace(tzinfo=timezone.utc)
+    return ts.astimezone(timezone.utc)
+
+
+def to_utc_date(ts: datetime) -> date:
+    """Calendar date of a stored timestamp, in UTC (see `as_utc`)."""
+    return as_utc(ts).date()

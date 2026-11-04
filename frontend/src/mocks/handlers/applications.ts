@@ -55,7 +55,7 @@ export const applicationHandlers = [
 
     if (!body.company || !body.title || !body.status) {
       return HttpResponse.json(
-        { message: "company, title, and status are required." },
+        { detail: "company, title, and status are required." },
         { status: 400 }
       )
     }
@@ -95,7 +95,7 @@ export const applicationHandlers = [
     const index = applicationFixtures.findIndex((application) => application.id === id)
 
     if (index === -1) {
-      return HttpResponse.json({ message: "Application not found." }, { status: 404 })
+      return HttpResponse.json({ detail: "Application not found." }, { status: 404 })
     }
 
     const patch = (await request.json()) as ApplicationPatchBody
@@ -122,7 +122,7 @@ export const applicationHandlers = [
     const index = applicationFixtures.findIndex((application) => application.id === id)
 
     if (index === -1) {
-      return HttpResponse.json({ message: "Application not found." }, { status: 404 })
+      return HttpResponse.json({ detail: "Application not found." }, { status: 404 })
     }
 
     applicationFixtures.splice(index, 1)

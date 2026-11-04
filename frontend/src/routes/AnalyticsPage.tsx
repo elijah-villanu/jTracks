@@ -9,6 +9,7 @@ import { BlurFade } from "@/components/ui/blur-fade"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useDashboardStats } from "@/hooks/useDashboardStats"
+import { useDocumentTitle } from "@/hooks/useDocumentMetadata"
 import { validateCustomRange } from "@/lib/date-range"
 import type { DashboardRange } from "@/types/api"
 
@@ -29,6 +30,7 @@ const ENTRANCE_STAGGER_SECONDS = 0.08
  * src/mocks/handlers/dashboard.ts until BACKEND_TASKS.md's B14 ships).
  */
 export function AnalyticsPage() {
+  useDocumentTitle("Analytics")
   const [range, setRange] = useState<DashboardRange>("month")
   const [customStart, setCustomStart] = useState<string | null>(null)
   const [customEnd, setCustomEnd] = useState<string | null>(null)
@@ -98,7 +100,7 @@ export function AnalyticsPage() {
           <>
             <BlurFade delay={0}>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                <StatTile label="Total Applications" value={String(stats.total)} numericValue={stats.total} accent />
+                <StatTile label="Total Applications" value={String(stats.total)} numericValue={stats.total} />
                 <StatTile
                   label="Response Rate"
                   value={`${stats.response_rate.toFixed(0)}%`}

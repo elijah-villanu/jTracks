@@ -13,6 +13,12 @@ import type { ApplicationStatus } from "@/types/api"
 export type StatusFilter = ApplicationStatus | "all"
 
 interface ApplicationsToolbarProps {
+  /**
+   * DOM id for the status filter's trigger. ApplicationsPage sends focus
+   * here when a status change hides the row the user was working on, so
+   * focus lands on the control that explains why it disappeared.
+   */
+  statusFilterTriggerId?: string
   statusFilter: StatusFilter
   onStatusFilterChange: (status: StatusFilter) => void
   search: string
@@ -27,6 +33,7 @@ interface ApplicationsToolbarProps {
  * client-side in ApplicationsPage -- no new endpoint.
  */
 export function ApplicationsToolbar({
+  statusFilterTriggerId,
   statusFilter,
   onStatusFilterChange,
   search,
@@ -53,7 +60,11 @@ export function ApplicationsToolbar({
         value={statusFilter}
         onValueChange={(value) => onStatusFilterChange((value as StatusFilter) ?? "all")}
       >
-        <SelectTrigger className="w-[180px]" aria-label="Filter by status">
+        <SelectTrigger
+          id={statusFilterTriggerId}
+          className="w-[180px]"
+          aria-label="Filter by status"
+        >
           {/*
             A11y (WCAG 4.1.2 Name, Role, Value): a bare `<SelectValue />`
             renders Base UI's raw *value*, not the chosen item's label --

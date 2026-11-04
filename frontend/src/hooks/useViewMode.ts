@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react"
+import { useStoredState } from "@/hooks/useStoredState"
 
 /**
  * F51 (R16.1): which rendering of the pipeline the viewer last picked --
@@ -47,7 +47,7 @@ export const FALLBACK_VIEW_MODE: ViewMode = "table"
  * nothing else; later resizes never change it.** Don't "improve" this into
  * `useMediaQuery` without re-reading this paragraph.
  *
- * A stored choice still beats it entirely (see `readStoredViewMode`), so
+ * A stored choice still beats it entirely (see `useViewMode`), so
  * this only ever applies to a viewer with no saved preference at all.
  */
 function defaultViewModeForViewport(): ViewMode {
@@ -67,33 +67,7 @@ export function isViewMode(value: string | null): value is ViewMode {
   return value !== null && (VIEW_MODES as string[]).includes(value)
 }
 
-function readStoredViewMode(): ViewMode {
-  // Guarded the same way useRecapSkin.ts is: `localStorage` throws
-  // outright in some privacy modes (and is absent entirely in a
-  // non-browser render), and a stored value can be anything -- a mode
-  // that no longer exists, or hand-edited junk -- so `isViewMode` is
-  // what makes the fallback to the default safe rather than rendering
-  // an unknown view.
-  try {
-    const stored = window.localStorage.getItem(VIEW_MODE_STORAGE_KEY)
-    return isViewMode(stored) ? stored : defaultViewModeForViewport()
-  } catch {
-    return defaultViewModeForViewport()
-  }
-}
-
 export function useViewMode(): [ViewMode, (next: ViewMode) => void] {
-  const [viewMode, setViewModeState] = useState<ViewMode>(readStoredViewMode)
-
-  const setViewMode = useCallback((next: ViewMode) => {
-    setViewModeState(next)
-    try {
-      window.localStorage.setItem(VIEW_MODE_STORAGE_KEY, next)
-    } catch {
-      // Persisting is best-effort: the choice still applies for this
-      // session, it just won't survive a reload.
-    }
-  }, [])
-
-  return [viewMode, setViewMode]
+  // A stored choice beats the viewport default entirely.
+  return useStoredState(VIEW_MODE_STORAGE_KEY, isViewMode, defaultViewModeForViewport)
 }

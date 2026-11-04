@@ -16,10 +16,13 @@ enableMocking().then(() => {
         neutralises plain CSS `animation`/`transition` properties -- it
         can't reach Motion-driven (MagicUI) components, which animate via
         spring/WAAPI, not CSS transitions. `reducedMotion="user"` makes
-        every `motion.*` element under this provider (current and future
-        MagicUI usage alike) honour the OS setting automatically, so no
-        individual component needs its own check. See docs/decisions/
-        magicui-conventions.md.
+        `motion.*` elements under this provider honour the OS setting --
+        but only for *positional* values (transforms, width/height/top/
+        left). Anything else keeps animating -- `NumberTicker`'s standalone
+        spring falls through, so its call site checks
+        `hooks/usePrefersReducedMotion.ts` itself. Check what a new
+        MagicUI component actually animates before assuming this covers
+        it. See docs/decisions/magicui-conventions.md.
       */}
       <MotionConfig reducedMotion="user">
         {/*

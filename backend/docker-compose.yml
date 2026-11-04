@@ -4,10 +4,13 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_PASSWORD: postgres
+      # Local-only default; override POSTGRES_PASSWORD in your shell/.env.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: jtracks
     ports:
-      - "5433:5432"
+      # Loopback only (V2 audit L3). A bare "5433:5432" publishes on 0.0.0.0,
+      # i.e. to every network the machine joins, with a guessable password.
+      - "127.0.0.1:5433:5432"
     volumes:
       - jtracks_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -25,7 +28,7 @@ services:
       # Container-to-container traffic always uses the service name (`db`) and
       # the container's own port (5432) -- the 5433 host-side mapping above is
       # only for reaching Postgres from outside Docker (e.g. `psql` on the host).
-      DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/jtracks
+      DATABASE_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/jtracks
       AUTO_CREATE_TABLES: "false"
       RUN_SCHEDULER: "true"
       # Never hardcode this. Compose refuses to start if JWT_SECRET is unset in
@@ -36,7 +39,7 @@ services:
       CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
       GOOGLE_CLIENT_ID: ""
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
 
 volumes:
   jtracks_pgdata:

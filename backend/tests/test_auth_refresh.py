@@ -105,14 +105,15 @@ def test_refresh_returns_a_usable_access_token(sclient):
     assert me.json()["email"] == "cookie@example.com"
 
 
-def test_refresh_does_not_rotate_the_token(sclient):
-    """R7.5 — no rotation, deliberately. The cookie is unchanged by a refresh."""
+def test_refresh_rotates_the_token(sclient):
+    """R7.5 (revised) — every refresh replaces the cookie; the full rotation and
+    reuse-detection suite lives in test_refresh_token_rotation.py."""
     _signup(sclient)
     before = sclient.cookies.get(COOKIE, path=settings.REFRESH_COOKIE_PATH)
     r = sclient.post("/auth/refresh", headers=CSRF)
     assert r.status_code == 200
-    assert sclient.cookies.get(COOKIE, path=settings.REFRESH_COOKIE_PATH) == before
-    # ...and it still works a second time.
+    assert sclient.cookies.get(COOKIE, path=settings.REFRESH_COOKIE_PATH) != before
+    # ...and the browser, holding the successor, can keep refreshing.
     assert sclient.post("/auth/refresh", headers=CSRF).status_code == 200
 
 
@@ -228,6 +229,103 @@ def test_logout_only_revokes_the_presented_session(sclient):
     assert sclient.post("/auth/refresh", headers=CSRF).status_code == 401
     # The second device's session survives.
     assert other.post("/auth/refresh", headers=CSRF).status_code == 200
+
+
+# --------------------------------------------------------------------------
+# Duplicate same-named cookies (the "logged out on every reload" bug)
+# --------------------------------------------------------------------------
+#
+# The frontend's MSW mock once set `jtracks_refresh=mock-refresh-value; Path=/`
+# on localhost. Cookies ignore ports, so the browser sent it to the real API
+# next to the genuine `Path=/auth` cookie; Starlette's `request.cookies` keeps
+# the last duplicate, and every refresh 401'd. Reproduced in headless Chrome
+# before the fix. These send the raw header a browser sends in that state.
+
+STRAY = "mock-refresh-value"
+
+
+def _bare_client() -> TestClient:
+    """A client with an empty jar, so only the explicit Cookie header is sent."""
+    return TestClient(fastapi_app, base_url="https://testserver")
+
+
+def _real_token(sclient) -> str:
+    _signup(sclient)
+    return sclient.cookies.get(COOKIE, path=settings.REFRESH_COOKIE_PATH)
+
+
+@pytest.mark.parametrize("order", ["real_first", "stray_first"])
+def test_a_stray_same_named_cookie_does_not_shadow_the_real_one(sclient, order):
+    real = _real_token(sclient)
+    pair = [real, STRAY] if order == "real_first" else [STRAY, real]
+    header = "; ".join(f"{COOKIE}={v}" for v in pair)
+
+    r = _bare_client().post("/auth/refresh", headers={**CSRF, "Cookie": header})
+
+    assert r.status_code == 200, r.text
+    assert f"{COOKIE}=" in r.headers.get("set-cookie", "")
+
+
+def test_only_stray_cookies_is_still_401():
+    header = f"{COOKIE}={STRAY}; {COOKIE}=another-stray"
+    r = _bare_client().post("/auth/refresh", headers={**CSRF, "Cookie": header})
+    assert r.status_code == 401
+
+
+def test_logout_revokes_the_real_session_behind_a_stray_cookie(sclient):
+    real = _real_token(sclient)
+    header = f"{COOKIE}={real}; {COOKIE}={STRAY}"
+
+    assert _bare_client().post("/auth/logout", headers={**CSRF, "Cookie": header}).status_code == 204
+
+    r = _bare_client().post("/auth/refresh", headers={**CSRF, "Cookie": f"{COOKIE}={real}"})
+    assert r.status_code == 401
+
+
+def test_stray_cookies_cannot_be_used_to_dodge_reuse_detection(sclient):
+    """Padding a replayed token with junk must not change the outcome."""
+    import datetime as dt
+
+    from app.core.clock import utc_now
+    from app.core.security import hash_refresh_token
+
+    stolen = _real_token(sclient)
+    assert sclient.post("/auth/refresh", headers=CSRF).status_code == 200
+    db = SessionLocal()
+    try:
+        row = db.query(RefreshToken).filter(
+            RefreshToken.token_hash == hash_refresh_token(stolen)
+        ).one()
+        row.revoked_at = utc_now() - dt.timedelta(
+            seconds=settings.REFRESH_TOKEN_REUSE_GRACE_SECONDS + 5
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    header = f"{COOKIE}={STRAY}; {COOKIE}={stolen}; {COOKIE}=junk"
+    r = _bare_client().post("/auth/refresh", headers={**CSRF, "Cookie": header})
+
+    assert r.status_code == 401
+    # Detection fired: the legitimate holder's session is gone too.
+    assert sclient.post("/auth/refresh", headers=CSRF).status_code == 401
+
+
+def test_read_refresh_cookies_parses_and_bounds_the_header():
+    from starlette.requests import Request
+
+    from app.core.cookies import read_refresh_cookies
+
+    def req(cookie: str) -> Request:
+        return Request({"type": "http", "headers": [(b"cookie", cookie.encode())]})
+
+    assert read_refresh_cookies(req("")) == []
+    assert read_refresh_cookies(req(f"other=1; {COOKIE}=a; x={COOKIE}")) == ["a"]
+    assert read_refresh_cookies(req(f'{COOKIE}="b"; {COOKIE}=a; {COOKIE}=b')) == ["b", "a"]
+    # A name that merely starts with the cookie name is a different cookie.
+    assert read_refresh_cookies(req(f"{COOKIE}_mock=m; {COOKIE}=a")) == ["a"]
+    many = "; ".join(f"{COOKIE}=v{i}" for i in range(20))
+    assert len(read_refresh_cookies(req(many))) == 4
 
 
 # --------------------------------------------------------------------------

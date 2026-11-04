@@ -92,7 +92,7 @@ function Panel({
  * **F35 standing rule -- no animation inside the exported subtree.** This
  * component sits inside what `recap-dialog.tsx` hands to `toBlob`, so no
  * Motion or MagicUI component may be placed anywhere in here (no
- * `BlurFade`, no `BorderBeam`, no `NumberTicker`). An in-flight animation
+ * `BlurFade`, no `NumberTicker`). An in-flight animation
  * serializes at whatever frame it happens to be on, and Motion's inline
  * transforms are not guaranteed to survive serialization -- either way
  * the exported PNG silently differs from what the user saw. Decorative

@@ -163,4 +163,4 @@ def decode_access_token(token: str) -> str | None:
     if payload.get("typ") != ACCESS_TOKEN_TYPE:
         return None
     sub = payload.get("sub")
-    return str(sub) if isinstance(sub, str) and sub else None
+    return sub if isinstance(sub, str) and sub else None

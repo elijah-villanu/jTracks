@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { sankey, sankeyLinkHorizontal } from "d3-sankey"
 import type { SankeyGraph, SankeyNode as D3SankeyNode } from "d3-sankey"
 import { ChartDataTable } from "@/components/dashboard/chart-data-table"
+import { sankeyStageTotals } from "@/components/dashboard/chart-summaries"
 import { STATUS_BREAKDOWN_COLORS } from "@/components/dashboard/status-breakdown-chart"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import type { ApplicationStatus, Sankey, SankeyLink } from "@/types/api"
@@ -28,6 +29,9 @@ const UNWEIGHTED_STROKE_WIDTH = 5
  * own `nodes`/`links`.
  */
 const NON_TERMINAL_STATUSES: ReadonlySet<ApplicationStatus> = new Set(["applied", "interviewing_oa"])
+
+/** WCAG 2.5.8's minimum pointer target, in CSS px, for the F38 per-node triggers -- see `hitBox` in the component body. */
+const TARGET_MIN_SIZE = 24
 
 /** Extra top margin reserved, beyond `marginY`, for a pass-through node's F38 above-node label -- see `topInset` in the component body. */
 const ABOVE_LABEL_HEADROOM = 6
@@ -99,6 +103,15 @@ interface SankeyEmptyPlaceholderProps {
   /** The `applied` node's `value` from the payload -- see the two-case split below. */
   appliedValue: number
   className?: string
+  /**
+   * `true` for in-app instances, which take the themed `--muted-foreground`
+   * text color. `false` for `RecapCard`'s fixed-palette export, where the
+   * text inherits the skin's own ink instead: a theme token there measured
+   * 3.02:1 (light theme's grey on the Strava skin's dark scrim), failed AA,
+   * and broke the recap's theme-independence contract (F28) by changing
+   * with the app theme.
+   */
+  themed?: boolean
 }
 
 /**
@@ -118,7 +131,13 @@ interface SankeyEmptyPlaceholderProps {
  *   funnel is most interesting to them, so this case gets its own
  *   progress-framed copy instead.
  */
-function SankeyEmptyPlaceholder({ width, height, appliedValue, className }: SankeyEmptyPlaceholderProps) {
+function SankeyEmptyPlaceholder({
+  width,
+  height,
+  appliedValue,
+  className,
+  themed = true,
+}: SankeyEmptyPlaceholderProps) {
   const allStillApplied = appliedValue > 0
   const message = allStillApplied
     ? `All ${appliedValue} application${appliedValue === 1 ? "" : "s"} ${appliedValue === 1 ? "is" : "are"} still in flight — outcomes will appear here as they land.`
@@ -132,7 +151,7 @@ function SankeyEmptyPlaceholder({ width, height, appliedValue, className }: Sank
   // command. It's plain prose; let it be plain prose.
   return (
     <p
-      className={`m-0 flex items-center justify-center text-center text-sm text-muted-foreground ${className ?? ""}`}
+      className={`m-0 flex items-center justify-center text-center text-sm ${themed ? "text-muted-foreground" : ""} ${className ?? ""}`}
       style={{ width, height }}
     >
       {message}
@@ -343,6 +362,58 @@ export function SankeyChart({
     return shortfalls
   }, [data.nodes, data.links])
 
+  /*
+    Dev-only payload invariant check. This component renders whatever
+    `data` says and must never re-derive the topology (R5.5), which also
+    means it has no way to *repair* a payload that contradicts itself --
+    so the least it can do is say so out loud instead of drawing a broken
+    picture in silence.
+
+    The invariant that matters: a node's `value` is its **inflow**, so it
+    can never be smaller than the sum of its own outgoing links. When it
+    is, d3-sankey still lays the graph out -- `fixedValue` sets the rect's
+    height from `value` while ribbon widths come from the links -- and the
+    result is a node rect visibly shorter than the ribbons attached to it,
+    plus an F37 shortfall of 0 where there should be one. That is exactly
+    the shape the MSW handlers and the landing page's demo data shipped
+    until they were corrected to match `dashboard_service.build_sankey`,
+    and it is invisible unless you measure it, which is why it survived
+    several visual passes.
+
+    A `console.error` rather than a throw: a contradictory payload is a
+    bug in whoever produced it, not a reason to take the dashboard down
+    for the user. Stripped from production builds by `import.meta.env.DEV`.
+  */
+  useEffect(() => {
+    if (!import.meta.env.DEV) {
+      return
+    }
+    const outgoing = new Map<ApplicationStatus, number>()
+    const incoming = new Map<ApplicationStatus, number>()
+    for (const link of data.links) {
+      outgoing.set(link.source, (outgoing.get(link.source) ?? 0) + link.value)
+      incoming.set(link.target, (incoming.get(link.target) ?? 0) + link.value)
+    }
+    for (const node of data.nodes) {
+      const out = outgoing.get(node.key) ?? 0
+      const inn = incoming.get(node.key) ?? 0
+      if (out > node.value) {
+        console.error(
+          `SankeyChart: node "${node.key}" is worth ${node.value} but emits ${out}. ` +
+            "Node values are inflows and must be >= their outgoing links; " +
+            "its rect will render shorter than the ribbons leaving it."
+        )
+      }
+      if (inn > node.value) {
+        console.error(
+          `SankeyChart: node "${node.key}" is worth ${node.value} but receives ${inn}. ` +
+            "A node's value must equal its inflow (see PRD_V2.md R5.5); " +
+            "its incoming ribbon will overshoot the rect and no shortfall will be reported."
+        )
+      }
+    }
+  }, [data])
+
   const graph = useMemo<SankeyGraph<NodeExtra, LinkExtra> | null>(() => {
     if (!hasLinks || effectiveWidth <= 0) {
       return null
@@ -421,7 +492,13 @@ export function SankeyChart({
       // Explicit-size, non-interactive callers (RecapCard) keep the
       // original, wrapper-free output exactly.
       return (
-        <SankeyEmptyPlaceholder width={effectiveWidth} height={height} appliedValue={appliedValue} className={className} />
+        <SankeyEmptyPlaceholder
+          width={effectiveWidth}
+          height={height}
+          appliedValue={appliedValue}
+          className={className}
+          themed={false}
+        />
       )
     }
     return (
@@ -551,9 +628,9 @@ export function SankeyChart({
           ...data.links.map((link) => [nodeLabel(link.source), nodeLabel(link.target), link.value]),
           ...shortfallRows,
         ]}
-        summary={`Sankey diagram of how applications moved between pipeline stages. Stage totals: ${data.nodes
-          .map((node) => `${node.label} ${node.value}`)
-          .join(", ")}. ${shortfallSummary ? `${shortfallSummary}. ` : ""}Stage-to-stage flows follow.`}
+        summary={`Sankey diagram of how applications moved between pipeline stages. Stage totals: ${sankeyStageTotals(
+          data
+        )}. ${shortfallSummary ? `${shortfallSummary}. ` : ""}Stage-to-stage flows follow.`}
       />
     )
   })()
@@ -563,12 +640,40 @@ export function SankeyChart({
   // `aria-hidden` SVG -- never ARIA on the SVG's own nodes. Dashboard-
   // only (`interactive`) and weighted-only (an unweighted node's
   // `fixedValue` has no real total to report).
+  //
+  // A11y (WCAG 2.5.8 Target Size): each trigger used to be exactly its
+  // node's rect -- 10px wide always, and as little as 1px tall for a small
+  // stage (measured 10x11 for "Offer" on the landing page). The hit box
+  // now grows to TARGET_MIN_SIZE around the rect's centre, horizontally
+  // freely (columns are far apart) and vertically only up to the midpoint
+  // of the gap to its column neighbours, so two triggers never overlap and
+  // the one under the pointer is always the node it looks like.
+  const focusableNodes = positionedNodes.filter(({ y1, y0 }) => y1 - y0 > 0)
+  const hitBox = ({ node, x0, x1, y0, y1 }: (typeof positionedNodes)[number]) => {
+    const columnPeers = focusableNodes.filter((peer) => peer.x0 === x0 && peer.node.key !== node.key)
+    const peerAbove = Math.max(-Infinity, ...columnPeers.filter((peer) => peer.y1 <= y0).map((peer) => peer.y1))
+    const peerBelow = Math.min(Infinity, ...columnPeers.filter((peer) => peer.y0 >= y1).map((peer) => peer.y0))
+    const centerX = (x0 + x1) / 2
+    const centerY = (y0 + y1) / 2
+    const width = Math.max(TARGET_MIN_SIZE, x1 - x0)
+    const left = Math.min(Math.max(0, centerX - width / 2), Math.max(0, effectiveWidth - width))
+    const top = Math.max(
+      Number.isFinite(peerAbove) ? (peerAbove + y0) / 2 : 0,
+      Math.min(y0, centerY - TARGET_MIN_SIZE / 2)
+    )
+    const bottom = Math.min(
+      Number.isFinite(peerBelow) ? (y1 + peerBelow) / 2 : height,
+      Math.max(y1, centerY + TARGET_MIN_SIZE / 2)
+    )
+    return { left, top, width, height: Math.max(1, bottom - top) }
+  }
+
   const overlay =
     interactive && weighted ? (
       <div className="pointer-events-none absolute inset-0">
-        {positionedNodes
-          .filter(({ y1, y0 }) => y1 - y0 > 0)
-          .map(({ node, x0, x1, y0, y1, shortfall, outgoingLinks }) => {
+        {focusableNodes
+          .map((positioned) => {
+            const { node, shortfall, outgoingLinks } = positioned
             const detailParts = [`${node.label}: ${node.value} total`]
             for (const link of outgoingLinks) {
               detailParts.push(`→ ${nodeLabel(link.target)}: ${link.value}`)
@@ -589,12 +694,7 @@ export function SankeyChart({
                       type="button"
                       aria-label={accessibleName}
                       className="pointer-events-auto absolute rounded-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
-                      style={{
-                        left: x0,
-                        top: y0,
-                        width: Math.max(1, x1 - x0),
-                        height: Math.max(1, y1 - y0),
-                      }}
+                      style={hitBox(positioned)}
                     />
                   }
                 />

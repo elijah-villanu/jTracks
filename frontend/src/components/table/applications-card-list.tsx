@@ -1,16 +1,9 @@
 import { Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { STATUS_CELL_CLASSES } from "@/components/StatusBadge"
-import { COLUMN_LABEL, type SortDirection, type SortKey } from "@/components/table/applications-table"
+import { COLUMN_LABEL, type SortDirection, type SortKey } from "@/components/table/columns"
+import { SortSelect } from "@/components/table/sort-select"
 import { StatusControl } from "@/components/table/status-control"
 import { useApplicationsContext } from "@/hooks/useApplicationsContext"
 import { cn } from "@/lib/utils"
@@ -66,7 +59,12 @@ export function ApplicationsCardList({
           : `Showing ${applications.length} of ${totalCount} tracked applications.`}
       </p>
 
-      <CardSortControl sortKey={sortKey} sortDirection={sortDirection} onSortChange={onSortChange} />
+      <SortSelect
+        sortKey={sortKey}
+        sortDirection={sortDirection}
+        onSortChange={onSortChange}
+        className="mt-3"
+      />
 
       {applications.length === 0 ? (
         <p className="mt-3 rounded-md border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
@@ -123,75 +121,6 @@ export function ApplicationsCardList({
           ))}
         </ul>
       )}
-    </div>
-  )
-}
-
-/** Every field/direction combination, in the same order as `COLUMNS`. */
-const SORT_OPTIONS: { value: string; key: SortKey; direction: SortDirection }[] = (
-  Object.keys(COLUMN_LABEL) as SortKey[]
-).flatMap((key) => [
-  { value: `${key}-asc`, key, direction: "asc" as const },
-  { value: `${key}-desc`, key, direction: "desc" as const },
-])
-
-function sortOptionLabel(key: SortKey, direction: SortDirection): string {
-  return `${COLUMN_LABEL[key]}, ${direction === "asc" ? "ascending" : "descending"}`
-}
-
-/**
- * R13.5's hard part: `applications-table.tsx`'s `SortButton` pattern
- * works because sort state lives on the parent `<th aria-sort>` and the
- * button's accessible name stays just the column name -- there's no
- * `<th>` here for state to live on. Instead this control's own current
- * *value* carries the state: each option spells out both the field and
- * the direction ("Company, ascending"), so the combobox's accessible
- * value announces the complete sort state by itself, with no separate
- * live region needed for the control itself (ApplicationsPage's
- * `tableStatus` live region still separately announces the *result* of
- * a sort/filter change, same as it does for the table).
- */
-function CardSortControl({
-  sortKey,
-  sortDirection,
-  onSortChange,
-}: {
-  sortKey: SortKey | null
-  sortDirection: SortDirection
-  onSortChange: (key: SortKey, direction: SortDirection) => void
-}) {
-  const currentValue = sortKey ? `${sortKey}-${sortDirection}` : null
-
-  return (
-    <div className="mt-3 flex items-center gap-2">
-      <Label htmlFor="card-sort-select" className="font-normal text-muted-foreground">
-        Sort applications by
-      </Label>
-      <Select
-        value={currentValue}
-        onValueChange={(value) => {
-          const option = SORT_OPTIONS.find((candidate) => candidate.value === value)
-          if (option) {
-            onSortChange(option.key, option.direction)
-          }
-        }}
-      >
-        <SelectTrigger id="card-sort-select" size="sm">
-          <SelectValue placeholder="Unsorted">
-            {(value: string | null) => {
-              const option = SORT_OPTIONS.find((candidate) => candidate.value === value)
-              return option ? sortOptionLabel(option.key, option.direction) : "Unsorted"
-            }}
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          {SORT_OPTIONS.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              {sortOptionLabel(option.key, option.direction)}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
     </div>
   )
 }

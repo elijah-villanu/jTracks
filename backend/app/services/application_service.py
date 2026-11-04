@@ -70,22 +70,24 @@ def update_application(
     for a disallowed change."""
     changes = payload.model_dump(exclude_unset=True)
 
-    if "status" in changes and changes["status"] is not None:
-        new_status = changes["status"]
-        # Will the row have a date_applied after this patch?
-        incoming_date_applied = changes.get("date_applied", app.date_applied)
+    if "status" in changes or "date_applied" in changes:
+        # The row's status and date_applied once this patch is applied.
+        new_status = changes.get("status", app.status)
+        date_applied = changes.get("date_applied", app.date_applied)
         # PRD: Saved -> Applied defaults date_applied to today if not supplied.
         if (
-            new_status == ApplicationStatus.APPLIED
-            and incoming_date_applied is None
+            "status" in changes
+            and new_status == ApplicationStatus.APPLIED
+            and date_applied is None
         ):
-            incoming_date_applied = utc_today()
-            changes["date_applied"] = incoming_date_applied
+            date_applied = changes["date_applied"] = utc_today()
 
+        # Also runs for a date-only patch, so clearing date_applied on an
+        # Applied row is a 400 instead of silently stopping its ghosting clock.
         validate_transition(
             app.status,
             new_status,
-            date_applied_present=incoming_date_applied is not None,
+            date_applied_present=date_applied is not None,
         )
 
     for field, value in changes.items():
