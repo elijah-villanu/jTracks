@@ -10,4 +10,4 @@ backend/__pycache__/
 
 # Claude worktrees
 .claude/worktrees/
-.claude\quick_recap.md
+.claude/quick_recap.md
