@@ -21,21 +21,18 @@ the bug this module exists to prevent.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 from fastapi import Request, Response
 
-from app.core.clock import utc_now
+from app.core.clock import as_utc, utc_now
 from app.core.config import settings
 
 
 def _max_age_seconds(expires_at: datetime | None) -> int:
     if expires_at is None:
         return settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
-    # SQLite hands back naive UTC; Postgres hands back aware values.
-    if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
-    return max(0, int((expires_at - utc_now()).total_seconds()))
+    return max(0, int((as_utc(expires_at) - utc_now()).total_seconds()))
 
 
 def set_refresh_cookie(

@@ -9,8 +9,6 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-import httpx
-
 from app.schemas.autofill import ParsedFields
 
 
@@ -31,8 +29,4 @@ def parse_iso_date(value: str | None) -> date | None:
         return None
 
 
-def make_parsed(url: str, **fields) -> ParsedFields:
-    return ParsedFields(job_url=url, **fields)
-
-
-__all__ = ["ParsedFields", "parse_iso_date", "make_parsed", "httpx"]
+__all__ = ["ParsedFields", "parse_iso_date"]

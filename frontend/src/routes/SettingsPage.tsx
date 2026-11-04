@@ -6,14 +6,7 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/c
 import { Input } from "@/components/ui/input"
 import { useAuth } from "@/hooks/useAuth"
 import { useDocumentTitle } from "@/hooks/useDocumentMetadata"
-import { ApiError } from "@/lib/api-client"
-
-function extractErrorMessage(err: unknown, fallback: string): string {
-  if (err instanceof ApiError) {
-    return (err.body as { message?: string } | undefined)?.message ?? fallback
-  }
-  return fallback
-}
+import { apiErrorMessage } from "@/lib/api-client"
 
 /**
  * F6's settings page: the one global, user-editable field from the
@@ -73,7 +66,7 @@ export function SettingsPage() {
       await updateSettings(parsed)
       setSavedAt(Date.now())
     } catch (err) {
-      setSubmitError(extractErrorMessage(err, "Failed to save settings. Please try again."))
+      setSubmitError(apiErrorMessage(err, "Failed to save settings. Please try again."))
     } finally {
       setIsSaving(false)
     }

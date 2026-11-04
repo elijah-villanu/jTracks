@@ -36,14 +36,13 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
+from app.core.clock import as_utc, utc_now
 from app.core.config import settings
-
-from app.core.clock import utc_now
 from app.core.security import (
     generate_refresh_token,
     hash_refresh_token,
@@ -60,20 +59,6 @@ logger = logging.getLogger("jtracks.refresh")
 # credentials behind (16 logins -> 16 live sessions, confirmed by PoC). Ten is
 # far more devices than one person uses; the oldest is revoked past that.
 MAX_LIVE_SESSIONS_PER_USER = 10
-
-
-def _as_utc(ts: datetime) -> datetime:
-    """Make a stored timestamp comparable to `utc_now()`.
-
-    SQLite has no timezone type and hands back naive values that `func.now()`
-    wrote in UTC; Postgres hands back aware values in the session timezone.
-    Both end up as aware UTC here so the expiry comparison can never silently
-    compare a naive value against an aware one (a TypeError) or, worse, compare
-    two different calendars.
-    """
-    if ts.tzinfo is None:
-        return ts.replace(tzinfo=timezone.utc)
-    return ts.astimezone(timezone.utc)
 
 
 def issue(db: Session, user: User) -> str:
@@ -145,7 +130,7 @@ def validate(db: Session, raw: str) -> RefreshToken | None:
         return None
     if row.revoked_at is not None:
         return None
-    if _as_utc(row.expires_at) <= utc_now():
+    if as_utc(row.expires_at) <= utc_now():
         return None
     return row
 
@@ -180,7 +165,7 @@ def rotate(db: Session, raw: str) -> RotationResult | None:
         return None
 
     if row.revoked_at is None:
-        if _as_utc(row.expires_at) <= utc_now():
+        if as_utc(row.expires_at) <= utc_now():
             return None
         result = _claim_and_issue_successor(db, row)
         if result is not None:
@@ -241,7 +226,7 @@ def _handle_rotated_token(db: Session, row: RefreshToken) -> RotationResult | No
     """A token that was already rotated has been presented again."""
     now = utc_now()
     grace = timedelta(seconds=settings.REFRESH_TOKEN_REUSE_GRACE_SECONDS)
-    if now - _as_utc(row.revoked_at) <= grace:
+    if now - as_utc(row.revoked_at) <= grace:
         # Only while the family is still alive: a session logged out (or
         # already killed for reuse) seconds after rotating stays dead.
         live = db.scalar(
@@ -304,22 +289,16 @@ def revoke_all_for_user(db: Session, user_id: uuid.UUID) -> int:
 
     Not wired to an endpoint: R7.8 rules out "log out all devices" for V2. It
     exists because account-level remediation (a password change, say) has no
-    other way to invalidate outstanding sessions, and it is three lines.
+    other way to invalidate outstanding sessions.
     """
-    now = utc_now()
-    rows = list(
-        db.scalars(
-            select(RefreshToken).where(
-                RefreshToken.user_id == user_id,
-                RefreshToken.revoked_at.is_(None),
-            )
-        ).all()
+    result = db.execute(
+        update(RefreshToken)
+        .where(RefreshToken.user_id == user_id, RefreshToken.revoked_at.is_(None))
+        .values(revoked_at=utc_now())
+        .execution_options(synchronize_session=False)
     )
-    for row in rows:
-        row.revoked_at = now
-    if rows:
-        db.commit()
-    return len(rows)
+    db.commit()
+    return result.rowcount or 0
 
 
 def purge_expired(db: Session) -> int:

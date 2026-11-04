@@ -58,13 +58,10 @@ class Settings(BaseSettings):
     # --- App ---
     APP_NAME: str = "jTracks API"
     ENVIRONMENT: str = "development"
-    DEBUG: bool = True
 
     # --- Database ---
-    # Production per PRD is PostgreSQL, e.g.
-    #   postgresql+psycopg://user:pass@host:5432/jtracks
-    # Dev/test default to SQLite so the app is runnable with no external service.
-    DATABASE_URL: str = "sqlite:///./jtracks_dev.db"
+    # DATABASE_URL is deliberately not a setting: app/db/session.py reads it
+    # straight from the OS environment and fails fast if it is missing.
     # Dev convenience: create tables from model metadata on startup.
     # SECURITY (audit M6): defaults to False so the *safe* state is the one you
     # get by omission. Alembic (DATABASE_TASKS D1) owns the schema; an operator
@@ -163,7 +160,6 @@ class Settings(BaseSettings):
     RUN_SCHEDULER: bool = True
     GHOSTING_JOB_HOUR: int = 3          # local hour of the daily sweep
     GHOSTING_JOB_MINUTE: int = 0
-    DEFAULT_GHOST_DAYS: int = 14        # fallback if a user row somehow lacks one
 
     # --- Request limits (audit M2) ---
     # Largest request body the API will accept. Every endpoint takes a small
@@ -335,10 +331,6 @@ class Settings(BaseSettings):
         useful to a developer, and just as useful to someone probing the API.
         """
         return self.is_development
-
-    @property
-    def is_sqlite(self) -> bool:
-        return self.DATABASE_URL.startswith("sqlite")
 
 
 @lru_cache

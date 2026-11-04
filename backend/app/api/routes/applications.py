@@ -39,6 +39,13 @@ router = APIRouter(prefix="/applications", tags=["applications"])
 _NOT_FOUND = HTTPException(status.HTTP_404_NOT_FOUND, "Application not found")
 
 
+def _get_owned_or_404(db: Session, user: User, app_id: uuid.UUID):
+    app = application_service.get_application(db, user.id, app_id)
+    if app is None:
+        raise _NOT_FOUND
+    return app
+
+
 @router.get("", response_model=list[ApplicationResponse])
 def list_applications(
     status: ApplicationStatus | None = Query(default=None),
@@ -84,10 +91,7 @@ def get_application(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    app = application_service.get_application(db, current_user.id, app_id)
-    if app is None:
-        raise _NOT_FOUND
-    return app
+    return _get_owned_or_404(db, current_user, app_id)
 
 
 @router.patch("/{app_id}", response_model=ApplicationResponse)
@@ -97,9 +101,7 @@ def update_application(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    app = application_service.get_application(db, current_user.id, app_id)
-    if app is None:
-        raise _NOT_FOUND
+    app = _get_owned_or_404(db, current_user, app_id)
     try:
         return application_service.update_application(db, app, payload)
     except TransitionError as exc:
@@ -112,8 +114,6 @@ def delete_application(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    app = application_service.get_application(db, current_user.id, app_id)
-    if app is None:
-        raise _NOT_FOUND
+    app = _get_owned_or_404(db, current_user, app_id)
     application_service.delete_application(db, app)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

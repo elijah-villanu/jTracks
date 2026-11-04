@@ -34,7 +34,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { ALL_STATUSES, STATUS_LABEL } from "@/components/StatusBadge"
 import { useApplicationsContext } from "@/hooks/useApplicationsContext"
 import { useAuth } from "@/hooks/useAuth"
-import { ApiError } from "@/lib/api-client"
+import { apiErrorMessage } from "@/lib/api-client"
 import type { ApplicationInput } from "@/lib/applications-context"
 import { canReceiveFocus, cn, todayIsoDate } from "@/lib/utils"
 import type { Application, ApplicationStatus } from "@/types/api"
@@ -87,13 +87,6 @@ const FIELD_CONTROL_ID: Record<keyof FieldErrors, string> = {
   status: "application-status",
   date_applied: "application-date-applied",
   ghost_days_override: "application-ghost-days-override",
-}
-
-function extractErrorMessage(err: unknown, fallback: string): string {
-  if (err instanceof ApiError) {
-    return (err.body as { message?: string } | undefined)?.message ?? fallback
-  }
-  return fallback
 }
 
 interface ApplicationFormDialogProps {
@@ -260,7 +253,7 @@ export function ApplicationFormDialog({ returnFocusRef }: ApplicationFormDialogP
       }
       closeForm()
     } catch (err) {
-      setSubmitError(extractErrorMessage(err, "Failed to save application. Please try again."))
+      setSubmitError(apiErrorMessage(err, "Failed to save application. Please try again."))
     } finally {
       setIsSubmitting(false)
     }
@@ -279,7 +272,7 @@ export function ApplicationFormDialog({ returnFocusRef }: ApplicationFormDialogP
       setAnnouncement(`Deleted ${application.company} — ${application.title}.`)
       closeForm()
     } catch (err) {
-      setDeleteError(extractErrorMessage(err, "Failed to delete application. Please try again."))
+      setDeleteError(apiErrorMessage(err, "Failed to delete application. Please try again."))
     } finally {
       setIsDeleting(false)
     }

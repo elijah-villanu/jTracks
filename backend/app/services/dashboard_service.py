@@ -104,7 +104,6 @@ class SubmittedAggregate:
     month_counts: Counter = field(default_factory=Counter)
     response_times: list[int] = field(default_factory=list)
     earliest_applied: date | None = None
-    latest_applied: date | None = None
 
     def count(self, s: S) -> int:
         return self.counts.get(s, 0)
@@ -154,8 +153,6 @@ def collect(db: Session, user_id: uuid.UUID, rr: ResolvedRange) -> SubmittedAggr
 
         if agg.earliest_applied is None or applied_on < agg.earliest_applied:
             agg.earliest_applied = applied_on
-        if agg.latest_applied is None or applied_on > agg.latest_applied:
-            agg.latest_applied = applied_on
 
         if a.status in _RESPONDED and a.updated_at is not None:
             # `to_utc_date`, not `.date()`: `updated_at` is a timestamptz that

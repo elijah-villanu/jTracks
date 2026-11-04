@@ -23,7 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { useMediaQuery } from "@/hooks/useMediaQuery"
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion"
 import { useRecap } from "@/hooks/useRecap"
 import { useRecapSkin } from "@/hooks/useRecapSkin"
 import { validateCustomRange } from "@/lib/date-range"
@@ -138,7 +138,7 @@ export function RecapDialog({ open, onOpenChange }: RecapDialogProps) {
    * selected slide instead of animating -- the selection still works
    * identically, it just doesn't move.
    */
-  const prefersReducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)")
+  const prefersReducedMotion = usePrefersReducedMotion()
 
   /**
    * True once Embla has actually landed on the remembered skin. Until it

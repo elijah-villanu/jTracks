@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react"
 import { Link, useLocation, useNavigate, type Location } from "react-router"
 import { cn } from "@/lib/utils"
-import { ApiError } from "@/lib/api-client"
+import { ApiError, apiErrorMessage } from "@/lib/api-client"
 import { useAuth } from "@/hooks/useAuth"
 import { BlurFade } from "@/components/ui/blur-fade"
 import { Button } from "@/components/ui/button"
@@ -52,7 +52,7 @@ export function LoginForm({
     } catch (err) {
       setError(
         err instanceof ApiError
-          ? ((err.body as { message?: string })?.message ?? "Invalid email or password.")
+          ? apiErrorMessage(err, "Invalid email or password.")
           : "Something went wrong. Please try again."
       )
     } finally {

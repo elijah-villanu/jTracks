@@ -74,7 +74,7 @@ export const authHandlers = [
 
     if (!body.email || !body.password) {
       return HttpResponse.json(
-        { message: "Email and password are required." },
+        { detail: "Email and password are required." },
         { status: 400 }
       )
     }
@@ -93,7 +93,7 @@ export const authHandlers = [
       })
     }
 
-    return HttpResponse.json({ message: "Invalid email or password." }, { status: 401 })
+    return HttpResponse.json({ detail: "Invalid email or password." }, { status: 401 })
   }),
 
   http.post(url("/auth/oauth/google"), async () => {
@@ -116,7 +116,7 @@ export const authHandlers = [
    */
   http.post(url("/auth/logout"), ({ request }) => {
     if (request.headers.get("X-Refresh-Request") !== "1") {
-      return HttpResponse.json({ message: "Missing X-Refresh-Request header." }, { status: 403 })
+      return HttpResponse.json({ detail: "Missing X-Refresh-Request header." }, { status: 403 })
     }
 
     return new HttpResponse(null, {
@@ -154,15 +154,15 @@ export const authHandlers = [
    */
   http.post(url("/auth/refresh"), ({ request }) => {
     if (request.headers.get("X-Refresh-Request") !== "1") {
-      return HttpResponse.json({ message: "Missing X-Refresh-Request header." }, { status: 403 })
+      return HttpResponse.json({ detail: "Missing X-Refresh-Request header." }, { status: 403 })
     }
 
     if (forceRefreshFailure) {
-      return HttpResponse.json({ message: "Refresh token invalid or expired." }, { status: 401 })
+      return HttpResponse.json({ detail: "Refresh token invalid or expired." }, { status: 401 })
     }
 
     if (!hasRefreshCookie(request)) {
-      return HttpResponse.json({ message: "No refresh token cookie present." }, { status: 401 })
+      return HttpResponse.json({ detail: "No refresh token cookie present." }, { status: 401 })
     }
 
     return HttpResponse.json<AuthResponse>({

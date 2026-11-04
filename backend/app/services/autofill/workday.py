@@ -17,7 +17,7 @@ from urllib.parse import urlsplit
 
 import httpx
 
-from app.services.autofill.base import ParsedFields, make_parsed, parse_iso_date
+from app.services.autofill.base import ParsedFields, parse_iso_date
 from app.services.autofill.fetch import fetch_json
 from app.services.autofill.net_guard import host_matches_domain
 
@@ -77,15 +77,8 @@ def _build_cxs_url(url: str) -> str | None:
 def _extract_location(info: dict) -> str | None:
     primary = info.get("location")
     extras = info.get("additionalLocations") or []
-    parts = [p for p in [primary, *extras] if p]
-    if not parts:
-        return None
-    # De-dupe while preserving order.
-    seen: list[str] = []
-    for p in parts:
-        if p not in seen:
-            seen.append(p)
-    return "; ".join(seen)
+    # dict.fromkeys de-dupes while preserving order.
+    return "; ".join(dict.fromkeys(p for p in [primary, *extras] if p)) or None
 
 
 async def parse(url: str, client: httpx.AsyncClient) -> ParsedFields | None:
@@ -108,8 +101,8 @@ async def parse(url: str, client: httpx.AsyncClient) -> ParsedFields | None:
         "-", " "
     ).title()
 
-    return make_parsed(
-        url,
+    return ParsedFields(
+        job_url=url,
         company=company,
         title=info.get("title"),
         location=_extract_location(info),

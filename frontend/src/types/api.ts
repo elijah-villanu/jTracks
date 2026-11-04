@@ -102,10 +102,6 @@ export function isAutofillUnsupported(response: AutofillResponse): response is A
   return response.status === "unsupported"
 }
 
-export function isAutofillFailed(response: AutofillResponse): response is AutofillFailed {
-  return response.status === "failed"
-}
-
 /**
  * Dashboard stats contract, mirroring the real backend's `DashboardStats`
  * (backend/API_SPEC_V1.md #6.17) field-for-field. `GET /dashboard/stats?range=...`

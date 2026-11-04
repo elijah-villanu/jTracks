@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react"
 import { Link, useNavigate } from "react-router"
-import { ApiError } from "@/lib/api-client"
+import { ApiError, apiErrorMessage } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/hooks/useAuth"
 import { BlurFade } from "@/components/ui/blur-fade"
@@ -63,7 +63,7 @@ export function SignupForm({ className, ...props }: React.ComponentProps<typeof 
     } catch (err) {
       setError(
         err instanceof ApiError
-          ? ((err.body as { message?: string })?.message ?? "Could not create your account.")
+          ? apiErrorMessage(err, "Could not create your account.")
           : "Something went wrong. Please try again."
       )
     } finally {

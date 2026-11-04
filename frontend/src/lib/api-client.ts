@@ -34,6 +34,16 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * The server's message from an `ApiError` -- FastAPI's `{"detail": "..."}` --
+ * or `fallback` for anything else. A 422's `detail` is a list of field
+ * errors, not text, so it also falls back.
+ */
+export function apiErrorMessage(err: unknown, fallback: string): string {
+  const detail = err instanceof ApiError ? (err.body as { detail?: unknown } | undefined)?.detail : undefined
+  return typeof detail === "string" ? detail : fallback
+}
+
 /** Path (relative to `API_BASE_URL`) of the refresh endpoint -- a `401` from this exact endpoint must never itself trigger another refresh attempt (F20/R7.6), or it would loop forever. */
 const REFRESH_PATH = "/auth/refresh"
 
@@ -81,6 +91,18 @@ export function setSessionExpiredHandler(handler: (() => void) | null): void {
  */
 let refreshPromise: Promise<string> | null = null
 
+/** `POST` to one of the two refresh-cookie endpoints (B25): CSRF header + cookie, no `Authorization`. */
+function postToCookieEndpoint(path: string): Promise<Response> {
+  return fetch(buildUrl(path), {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Refresh-Request": "1",
+    },
+  })
+}
+
 /**
  * Performs the actual `POST /auth/refresh` call: sends the required
  * `X-Refresh-Request: 1` CSRF-defense header (B25) and `credentials:
@@ -92,14 +114,7 @@ let refreshPromise: Promise<string> | null = null
  */
 async function performRefresh(): Promise<string> {
   try {
-    const response = await fetch(buildUrl(REFRESH_PATH), {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Refresh-Request": "1",
-      },
-    })
+    const response = await postToCookieEndpoint(REFRESH_PATH)
 
     if (!response.ok) {
       throw new ApiError(response.status, response.statusText)
@@ -125,16 +140,9 @@ async function performRefresh(): Promise<string> {
  * points at) un-revoked while the UI still looks logged out.
  */
 export async function performLogout(): Promise<void> {
-  const response = await fetch(buildUrl(LOGOUT_PATH), {
-    method: "POST",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Refresh-Request": "1",
-    },
-  })
+  const response = await postToCookieEndpoint(LOGOUT_PATH)
 
-  if (!response.ok && response.status !== 204) {
+  if (!response.ok) {
     throw new ApiError(response.status, response.statusText)
   }
 }

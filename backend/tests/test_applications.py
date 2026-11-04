@@ -58,6 +58,16 @@ def test_saved_to_applied_requires_date_applied(client, auth_headers):
     assert r.json()["date_applied"] == utc_today().isoformat()
 
 
+def test_clearing_date_applied_on_applied_row_returns_400(client, auth_headers):
+    app_id = _create(client, auth_headers, status="applied").json()["id"]
+    r = client.patch(f"/applications/{app_id}", json={"date_applied": None}, headers=auth_headers)
+    assert r.status_code == 400
+    # A saved row has no ghosting clock, so clearing its date stays allowed.
+    saved_id = _create(client, auth_headers).json()["id"]
+    r = client.patch(f"/applications/{saved_id}", json={"date_applied": None}, headers=auth_headers)
+    assert r.status_code == 200
+
+
 def test_disallowed_transition_returns_400(client, auth_headers):
     app_id = _create(client, auth_headers, status="saved").json()["id"]
     r = client.patch(f"/applications/{app_id}", json={"status": "offer"}, headers=auth_headers)

@@ -16,7 +16,7 @@ import { useApplicationsContext } from "@/hooks/useApplicationsContext"
 import { useDocumentTitle } from "@/hooks/useDocumentMetadata"
 import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { useViewMode } from "@/hooks/useViewMode"
-import { ApiError } from "@/lib/api-client"
+import { ApiError, apiErrorMessage } from "@/lib/api-client"
 import type { Application, ApplicationStatus } from "@/types/api"
 
 /**
@@ -170,7 +170,7 @@ export function ApplicationsPage() {
       setActionStatus("")
       setActionError(
         err instanceof ApiError
-          ? ((err.body as { message?: string })?.message ?? "Failed to update status.")
+          ? apiErrorMessage(err, "Failed to update status.")
           : "Failed to update status. Please try again."
       )
     } finally {
@@ -228,7 +228,7 @@ export function ApplicationsPage() {
     } catch (err) {
       setConfirmAppliedError(
         err instanceof ApiError
-          ? ((err.body as { message?: string })?.message ?? "Failed to update status.")
+          ? apiErrorMessage(err, "Failed to update status.")
           : "Failed to update status. Please try again."
       )
     } finally {

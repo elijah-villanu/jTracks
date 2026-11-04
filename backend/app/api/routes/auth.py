@@ -55,6 +55,11 @@ _INVALID_SESSION = HTTPException(
     detail="Invalid or expired session.",
 )
 
+_INVALID_GOOGLE_CREDENTIAL = HTTPException(
+    status_code=status.HTTP_401_UNAUTHORIZED,
+    detail="Invalid Google credential.",
+)
+
 
 def _start_session(db: Session, response: Response, user: User) -> TokenResponse:
     """Issue both tokens: access in the body, refresh in the cookie."""
@@ -109,10 +114,7 @@ def oauth_google(
     try:
         identity = verify_google_id_token(payload.id_token)
     except GoogleVerificationError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid Google credential.",
-        )
+        raise _INVALID_GOOGLE_CREDENTIAL
     try:
         user = auth_service.upsert_google_user(
             db, identity.google_id, identity.email, identity.email_verified
@@ -120,10 +122,7 @@ def oauth_google(
     except auth_service.UnverifiedEmail:
         # Same 401 as a bad credential: don't tell the caller whether the
         # address matched an existing account.
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid Google credential.",
-        )
+        raise _INVALID_GOOGLE_CREDENTIAL
     return _start_session(db, response, user)
 
 
