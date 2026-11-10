@@ -1,8 +1,0 @@
-{
-  "worktree": {
-    "bgIsolation": "none"
-  },
-  "enabledPlugins": {
-    "impeccable@impeccable": true
-  }
-}
