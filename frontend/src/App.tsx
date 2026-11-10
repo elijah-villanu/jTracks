@@ -17,8 +17,8 @@ import { SignupPage } from "@/routes/SignupPage"
  * is what keeps the two apart -- a visitor who signs in and lands on
  * `/app` never downloads the landing chunk, and a visitor on `/` never
  * pays for the app's route modules beyond what the two genuinely share
- * (`SankeyChart`, `RecapCard`, the `ui/` primitives). Verified against a
- * real `vite build` chunk listing, not assumed.
+ * (the logo and the theme hook). Verified
+ * against a real `vite build` chunk listing, not assumed.
  *
  * A default export is required by `React.lazy`, which is why
  * `LandingPage.tsx` exports default while every other route in this file

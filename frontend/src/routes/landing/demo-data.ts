@@ -1,209 +1,83 @@
-import { buildSankey, type FunnelCounts } from "@/lib/sankey-data"
-import type {
-  ApplicationStatus,
-  DashboardRecap,
-  RecapHighlight,
-  Sankey,
-  StatusBreakdownEntry,
-} from "@/types/api"
+import type { FunnelCounts } from "@/lib/sankey-data"
 
 /**
- * F42 (R10.2 + R10.4): the landing page's demo payloads.
+ * The landing page's sample numbers. Literals compiled into the landing
+ * chunk: the route is public, so nothing here is ever fetched (PRODUCT.md:
+ * hard-coded demo data, no authenticated requests).
  *
- * Three rules govern this file, and all three are acceptance criteria:
- *
- * 1. **Never a fetch.** The landing route is public and does no
- *    authenticated work (F41), so the numbers below are literals compiled
- *    into the landing chunk -- there is no request behind them.
- * 2. **Never `src/mocks/`.** MSW is dev-only and does not run in a
- *    production build, so importing a handler or fixture would render an
- *    empty chart for every real visitor. The Sankey comes from
- *    `lib/sankey-data.ts`'s `buildSankey` -- the same function the mocks
- *    use, which lives in `lib/` precisely so this file can share it.
- * 3. **Same invariants as the real payload.** The V2 shared contract
- *    (FRONTEND_TASKS.md) fixes three things about `sankey`, and a violation
- *    would make the landing page render a chart the product never could:
- *      - all six non-`saved` nodes are present, including zero-value ones;
- *      - links with `value: 0` are omitted entirely;
- *      - node values are *inflows*, so `applied -> interviewing_oa` equals
- *        the `interviewing_oa` node's own value, and no node emits more
- *        than it took in.
- *    `buildSankey` enforces all three *by construction* -- the
- *    hand-authored numbers are per-status counts, and every node value and
- *    link value is derived from them. Editing a count changes the chart;
- *    it cannot desynchronise the contract. `assertDemoContract` re-checks
- *    them at module load in dev builds anyway, because a future edit could
- *    still get the derivation itself wrong.
+ * Each range is written as per-status counts, and every figure the page
+ * shows (cards, funnel, range buttons) is derived from them with the same
+ * definitions the product's metrics use. So the sums always add up, and
+ * the hero cards, the funnel and the "This month" range can never disagree.
  */
 
-/**
- * The hand-authored half: how many applications sit in each status (see
- * `FunnelCounts` for why `total` is not the sum of the other five).
- */
+export type RangeKey = "week" | "month" | "year" | "all"
 
-/** All-time funnel behind the landing page's product visual. */
-const ALL_TIME_COUNTS: FunnelCounts = {
-  total: 128,
-  interviewingOa: 9,
-  offer: 3,
-  rejected: 41,
-  ghosted: 27,
-  failed: 6,
+export interface DemoRecap {
+  title: string
+  dates: string
+  applications: number
+  /** Everything that reached an interview: still interviewing, offers and failed interviews/OAs (R4.5). */
+  interviews: number
+  offers: number
+  rejected: number
+  ghosted: number
+  /** Still Applied, with no outcome yet. */
+  waiting: number
+  stillInterviewing: number
+  failed: number
+  responseRate: string
+  ghostRate: string
+  rejectionFailRate: string
 }
 
-/**
- * A single month's funnel, behind the recap card. Deliberately a smaller,
- * separate cohort rather than a reuse of the all-time numbers -- the card
- * is labelled "This month", so showing all-time totals under that heading
- * would be the landing page telling a story the product wouldn't.
- */
-const MONTH_COUNTS: FunnelCounts = {
-  total: 34,
-  interviewingOa: 4,
-  offer: 1,
-  rejected: 11,
-  ghosted: 6,
-  failed: 2,
-}
+const percent = (part: number, total: number) =>
+  total === 0 ? "0%" : `${Math.round((part / total) * 100)}%`
 
-/** Rows still sitting in `applied` with no outcome yet -- the `applied` node's shortfall. */
-function stillApplied(counts: FunnelCounts): number {
-  return (
-    counts.total -
-    counts.interviewingOa -
-    counts.offer -
-    counts.rejected -
-    counts.ghosted -
-    counts.failed
-  )
-}
-
-/** A `count` for every one of the six non-`saved` statuses, zero counts included, with 1-decimal percentages. */
-function buildDemoStatusBreakdown(counts: FunnelCounts): StatusBreakdownEntry[] {
-  const byStatus: [ApplicationStatus, number][] = [
-    ["applied", stillApplied(counts)],
-    ["interviewing_oa", counts.interviewingOa],
-    ["offer", counts.offer],
-    ["rejected", counts.rejected],
-    ["failed", counts.failed],
-    ["ghosted", counts.ghosted],
-  ]
-
-  return byStatus.map(([status, count]) => ({
-    status,
-    count,
-    percentage: counts.total === 0 ? 0 : Number(((count / counts.total) * 100).toFixed(1)),
-  }))
-}
-
-/** Whole-percent string, matching how the recap payload formats its rate highlights. */
-function ratePercent(part: number, total: number): string {
-  return total === 0 ? "0%" : `${Math.round((part / total) * 100)}%`
-}
-
-/**
- * The recap `highlights` list, in the contract's order and with the exact
- * `label` strings `recap-skins/shared.tsx`'s `featuredStats` matches on --
- * "Applications", "Interviews" and "Rejection/fail rate". Rename one and
- * the card silently renders an em dash instead of a number.
- *
- * `Interviews` counts offers and failed interviews/OAs too (R4.5: both
- * necessarily passed through the interview stage), and `Response rate`
- * counts a rejection as a response -- the same definitions the shipped
- * metrics use, so the demo card can't advertise a number the product
- * computes differently.
- */
-function buildDemoHighlights(counts: FunnelCounts): RecapHighlight[] {
-  const interviews = counts.interviewingOa + counts.offer + counts.failed
-  const responded = counts.interviewingOa + counts.offer + counts.rejected + counts.failed
-
-  return [
-    { label: "Applications", value: String(counts.total) },
-    { label: "Interviews", value: String(interviews) },
-    { label: "Offers", value: String(counts.offer) },
-    { label: "Response rate", value: ratePercent(responded, counts.total) },
-    { label: "Ghost rate", value: ratePercent(counts.ghosted, counts.total) },
-    {
-      label: "Rejection/fail rate",
-      value: ratePercent(counts.rejected + counts.failed, counts.total),
-    },
-  ]
-}
-
-/** The product visual's funnel: a whole search, all time. */
-export const DEMO_SANKEY: Sankey = buildSankey(ALL_TIME_COUNTS)
-
-/**
- * The recap card's payload. Dates are fixed literals rather than derived
- * from `new Date()` so the landing page renders identically on every visit
- * and in every timezone -- a demo that quietly changes at midnight is a
- * worse demo, not a better one. `range: "month"` and
- * `period_label: "This month"` are the pair the real payload produces
- * together, so the card's own eyebrow and footer stay self-consistent.
- */
-export const DEMO_RECAP: DashboardRecap = {
-  range: "month",
-  period_label: "This month",
-  period_start: "2026-08-01",
-  period_end: "2026-08-31",
-  total_applications: MONTH_COUNTS.total,
-  headline: `${MONTH_COUNTS.total} applications, ${MONTH_COUNTS.offer} offer${
-    MONTH_COUNTS.offer === 1 ? "" : "s"
-  }!`,
-  highlights: buildDemoHighlights(MONTH_COUNTS),
-  status_breakdown: buildDemoStatusBreakdown(MONTH_COUNTS),
-  sankey: buildSankey(MONTH_COUNTS),
-}
-
-/**
- * Dev-only contract check. `buildSankey` already makes a violation
- * impossible from the *data* side; this guards the remaining risk, which is
- * a future edit to the derivation itself. Throws loudly in `npm run dev`
- * and is stripped from production builds by `import.meta.env.DEV`.
- */
-function assertDemoContract(label: string, sankey: Sankey): void {
-  const nodeValue = (key: ApplicationStatus) =>
-    sankey.nodes.find((node) => node.key === key)?.value ?? 0
-  const linkValue = (source: ApplicationStatus, target: ApplicationStatus) =>
-    sankey.links.find((link) => link.source === source && link.target === target)?.value ?? 0
-
-  if (sankey.nodes.length !== 6) {
-    throw new Error(
-      `${label}: all six non-saved nodes must be present, got ${sankey.nodes.length}.`
-    )
-  }
-  if (sankey.links.some((link) => link.value === 0)) {
-    throw new Error(`${label}: links with value 0 must be omitted.`)
-  }
-  // Node values are inflows, so the `applied -> interviewing_oa` link and the
-  // `interviewing_oa` node it feeds must carry the same number. (This
-  // previously asserted `link === node + offer + failed`, which only held
-  // while the node wrongly carried the *current* interviewing_oa count --
-  // i.e. the assertion was locking in the bug rather than catching it.)
-  if (linkValue("applied", "interviewing_oa") !== nodeValue("interviewing_oa")) {
-    throw new Error(
-      `${label}: the applied->interviewing_oa link (${linkValue(
-        "applied",
-        "interviewing_oa"
-      )}) must equal the interviewing_oa node's value (${nodeValue("interviewing_oa")}).`
-    )
-  }
-  // No node may emit more than it took in -- a node whose outgoing links
-  // outweigh its own value renders as a rect shorter than the ribbons
-  // leaving it, and makes F37's shortfall go negative.
-  for (const node of sankey.nodes) {
-    const outgoing = sankey.links
-      .filter((link) => link.source === node.key)
-      .reduce((sum, link) => sum + link.value, 0)
-    if (outgoing > node.value) {
-      throw new Error(
-        `${label}: ${node.key} emits ${outgoing} but is only worth ${node.value}.`
-      )
-    }
+function recap(title: string, dates: string, c: FunnelCounts): DemoRecap {
+  return {
+    title,
+    dates,
+    applications: c.total,
+    interviews: c.interviewingOa + c.offer + c.failed,
+    offers: c.offer,
+    rejected: c.rejected,
+    ghosted: c.ghosted,
+    waiting: c.total - c.interviewingOa - c.offer - c.rejected - c.ghosted - c.failed,
+    stillInterviewing: c.interviewingOa,
+    failed: c.failed,
+    // A rejection counts as a response, the same as the shipped metric.
+    responseRate: percent(c.interviewingOa + c.offer + c.rejected + c.failed, c.total),
+    ghostRate: percent(c.ghosted, c.total),
+    rejectionFailRate: percent(c.rejected + c.failed, c.total),
   }
 }
 
+export const DEMO_RANGES: Record<RangeKey, DemoRecap> = {
+  week: recap("This week", "Aug 25 – 31", { total: 9, interviewingOa: 2, offer: 0, rejected: 3, ghosted: 1, failed: 0 }),
+  month: recap("This month", "Aug 2026", { total: 34, interviewingOa: 4, offer: 1, rejected: 11, ghosted: 6, failed: 2 }),
+  year: recap("This year", "2026", { total: 96, interviewingOa: 8, offer: 2, rejected: 31, ghosted: 21, failed: 4 }),
+  all: recap("All time", "Since Oct 2025", { total: 128, interviewingOa: 9, offer: 3, rejected: 41, ghosted: 27, failed: 6 }),
+}
+
+/** The month the hero cards and the funnel show. */
+export const DEMO_MONTH = DEMO_RANGES.month
+
+/** The ghosting table: applications still waiting, and how long each has been quiet. */
+export const DEMO_GHOST_ROWS = [
+  { company: "Northwind", role: "Software Engineer, New Grad", days: 31 },
+  { company: "Halcyon Labs", role: "Frontend Engineer", days: 22 },
+  { company: "Brightline", role: "Platform Engineer I", days: 17 },
+  { company: "Kestrel", role: "Data Engineer, New Grad", days: 15 },
+  { company: "Fieldnote", role: "Software Engineer", days: 12 },
+  { company: "Copperleaf", role: "Mobile Engineer", days: 9 },
+  { company: "Juniper Health", role: "Backend Engineer", days: 5 },
+  { company: "Tidewater", role: "Full-Stack Engineer", days: 2 },
+] as const
+
+// Dev-only: an edit whose outcomes outnumber the applications would draw a negative bar.
 if (import.meta.env.DEV) {
-  assertDemoContract("DEMO_SANKEY", DEMO_SANKEY)
-  assertDemoContract("DEMO_RECAP.sankey", DEMO_RECAP.sankey)
+  for (const [key, r] of Object.entries(DEMO_RANGES)) {
+    if (r.waiting < 0) throw new Error(`demo-data ${key}: outcomes add up to more than ${r.applications} applications`)
+  }
 }

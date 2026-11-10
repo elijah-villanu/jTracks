@@ -9,6 +9,17 @@ MagicUI usage specifically (its palette section exists because MagicUI component
 props *directly*, e.g. `BorderBeam`'s `colorFrom`/`colorTo` — a real coupling). No MagicUI
 component takes a font, so typography would be an unrelated tenant there.
 
+## Update (2026-11-09): the landing page sets its own type
+
+The landing page (`/`) was rebuilt from `docs/wireframes/landing-v5.html` and now uses that
+wireframe's typeface, **Switzer** (Indian Type Foundry, ITF Free Font License 2.0) at 400/500/600,
+declared in `frontend/src/routes/landing/landing.css` and scoped to the page. It is the one exception
+to the self-hosting rule below: Switzer is served from Fontshare's CDN (`cdn.fontshare.com`), because
+the FFL allows self-hosting but forbids putting the font files in a public repository, and this repo
+is public. Only text set in Switzer triggers the download, so `/login`, `/signup` and `/app` still make
+no third-party font request. The landing rows of the role table and the bundle-cost note below
+describe the page before this rebuild; Hedvig Letters Sans and Roboto remain the app's typefaces.
+
 ## Correction (2026-09-10): `.font-display` never actually worked until this fix
 
 F56–F59 were originally checked off on `npm run build` success plus `grep` evidence alone. A

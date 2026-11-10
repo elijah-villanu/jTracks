@@ -1,518 +1,813 @@
-import { Ghost, Share2, Workflow } from "lucide-react"
-import { Link } from "react-router"
-import { recapTextSummary } from "@/components/dashboard/chart-summaries"
-import { RecapCard } from "@/components/dashboard/recap-card"
-import { SankeyChart } from "@/components/dashboard/sankey-chart"
+import { ChevronLeft, ChevronRight, CircleAlert, Moon, Sun } from "lucide-react"
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react"
+import { Link, useNavigate } from "react-router"
+import logoOnDark from "@/assets/JourneyJobLogoDark.png"
+import logoOnLight from "@/assets/JourneyJobLogoLight.png"
 import { Logo } from "@/components/layout/logo"
-import { ThemeToggle } from "@/components/layout/theme-toggle"
-import { BlurFade } from "@/components/ui/blur-fade"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { useDocumentMetadata } from "@/hooks/useDocumentMetadata"
-import { useMediaQuery } from "@/hooks/useMediaQuery"
-import { DEMO_RECAP, DEMO_SANKEY } from "@/routes/landing/demo-data"
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion"
+import { useTheme } from "@/hooks/useTheme"
+import {
+  DEMO_GHOST_ROWS,
+  DEMO_MONTH,
+  DEMO_RANGES,
+  type DemoRecap,
+  type RangeKey,
+} from "@/routes/landing/demo-data"
+import "@/routes/landing/landing.css"
 
-const PAGE_TITLE = "JourneyJob — see where your job search stalls"
+// Keep in sync with index.html, which carries the same pair for crawlers.
+const PAGE_TITLE = "JourneyJob — track the search, share the month"
 const PAGE_DESCRIPTION =
-  "JourneyJob is a job application tracker that keeps every application in one place, marks the ones that go quiet, and turns your search into a funnel you can read at a glance."
+  "JourneyJob keeps every job application on one private board, marks the quiet ones as Ghosted, and turns any range into a Stories recap card."
+
+/** Marks an element to rise once as it scrolls in, `i` steps of 70ms after the first of its group (landing.css). */
+const rise = (i = 0) => ({ "data-rise": "", style: { "--i": i } as CSSProperties })
+
+const offerWord = (n: number) => (n === 1 ? "Offer" : "Offers")
+const spoken = (rate: string) => rate.replace("%", " percent")
+const SAMPLE = "Sample recap, August 2026"
 
 /**
- * F45: the entrance stagger between this page's four content groups (hero,
- * product visual, feature trio, footer). Same value and same named-constant
- * treatment as `AnalyticsPage.tsx`'s three groups -- the step is fixed
- * project-wide in docs/decisions/magicui-conventions.md, not chosen per
- * page, so group *N* gets `delay = 0.08 * N` here exactly as it does there.
- * The last group therefore starts at 0.24s and the whole cascade has
- * settled by ~0.68s.
- */
-const ENTRANCE_STAGGER_SECONDS = 0.08
-
-/**
- * F43's feature trio. Every entry here is a claim about shipped V2
- * behaviour and has to stay one -- the acceptance criterion is "every
- * feature claim maps to a shipped behavior", so each carries the code
- * that backs it:
- *
- * 1. Auto-ghosting after a configurable threshold -- `SettingsPage.tsx`'s
- *    "Default ghost days" field ("Applications with no status update for
- *    this many days are automatically marked Ghosted. Individual
- *    applications can override this in their own edit form.").
- * 2. Pre- vs post-interview failure -- `Rejected` and `Failed
- *    Interview/OA` are separate statuses (`components/StatusBadge.tsx`)
- *    and separate sinks in the pipeline flow (`sankey-chart.tsx`).
- * 3. The Stories-format recap -- `recap-dialog.tsx` exports a 270x480
- *    card at `pixelRatio: 4` (1080x1920) over the full
- *    week/month/year/all/custom range set, with Download always available
- *    and Share gated on `navigator.share`, across the three designs in
- *    `recap-skins/`.
- *
- * **"Failed Interview/OA" is never shortened to "Failed"** here, per
- * R10.3 and the V2 shared contract -- the whole point of feature 2 is
- * that the two outcomes are distinct, so softening the label in the copy
- * that sells it would be self-defeating.
- */
-const FEATURES = [
-  {
-    icon: Ghost,
-    title: "Ghosting handled for you",
-    body: "Pick how long silence counts as ghosted. Anything that goes quiet past your threshold is marked Ghosted automatically, so a dead lead stops sitting in your list looking alive. Individual applications can override the default.",
-  },
-  {
-    icon: Workflow,
-    title: "A funnel that separates the two ways you lose",
-    body: "Rejected and Failed Interview/OA are different outcomes, and the pipeline flow keeps them apart. You can see whether applications are dying before you get an interview or after one — which are two completely different problems to fix.",
-  },
-  {
-    icon: Share2,
-    title: "A recap worth posting",
-    body: "Turn any week, month, year or custom range into a 9:16 card in one of three designs, then download it or share it straight from your phone. It exports at 1080×1920, the size Stories want.",
-  },
-] as const
-
-/**
- * The product lockup, reused by the header and the footer. Thin wrapper
- * around the shared `Logo` (light/dark PNG pair) so both call sites pick up
- * a size/className without duplicating the theme-swap markup.
- */
-function Wordmark({ className }: { className?: string }) {
-  return <Logo className={`h-9 ${className ?? ""}`} />
-}
-
-/**
- * F41 + F42 + F43 + F44: the public landing page at `/`.
- *
- * **The rule that shapes this file: it does no authenticated work.**
- * (F41 / R10.2, and a stated V2.1 success metric.) It is declared in
- * `App.tsx` outside both `ProtectedRoute` and `GuestRoute`, so it renders
- * identically signed in or out -- that stable-URL property is the entire
- * reason V2.1 moved the app to `/app` (routing option B). Concretely,
- * nothing in this module or anything it imports may:
- *   - mount `ApplicationsProvider` (it fires `GET /applications` on mount);
- *   - call any authenticated endpoint;
- *   - read `useAuth().isLoading` as a render gate. `AuthProvider`'s
- *     boot-time `POST /auth/refresh` still fires -- that's its job -- but
- *     this page must paint before it settles, so it never touches the auth
- *     context at all. That is also why the header links to `/login` and
- *     `/signup` unconditionally rather than swapping in a "Go to app"
- *     link for a signed-in visitor: knowing which to show would mean
- *     reading `user`, and waiting on `isLoading` to know it.
- *
- * **Motion is F45's, and it uses the project's existing numbers rather
- * than page-specific ones** -- see docs/decisions/magicui-conventions.md,
- * which is the tiebreaker here, not taste. Four `BlurFade` entrance groups
- * (hero, product visual, feature trio, footer) at the component defaults
- * that doc fixes (`duration 0.4s`, `easeOut`, `offset 6px`, `blur 6px`,
- * `direction down` -- only `delay` is customized), staggered by
- * `ENTRANCE_STAGGER_SECONDS` *between* groups and never within one. No
- * continuous accent: the pipeline-flow card's `BorderBeam` (R14.3) was
- * removed app-wide on 2026-09-15 -- an endless loop with no pause control
- * fails WCAG 2.2.2. No `NumberTicker` anywhere -- this page has no KPI
- * tile, only sample figures inside captions and inside `RecapCard`, and
- * the doc scopes the ticker to numbers that *are* the content.
- *
- * **Reduced motion** (R14.4). Every animated thing on this page is a Motion
- * component under `main.tsx`'s `<MotionConfig reducedMotion="user">`; the
- * route is lazy-loaded inside `BrowserRouter`, which is itself inside that
- * provider, so `/` inherits it like every other route, and nothing portals
- * out of that tree. For `BlurFade` that is enough: Motion skips its offset
- * and keeps only the short opacity/blur fade.
- *
- * **F35's no-Motion-inside-the-recap rule still applies here.** The
- * `BlurFade` around the product visual wraps `RecapCard` from the outside,
- * which is permitted; nothing may be added *inside* the card or its skins,
- * even on this page, where the instance is never exported.
- *
- * **Colors are tokens.** `frontend/src/index.css`'s variables, per
- * `.claude/rules/shadcn-ui.md`. The one fixed-literal palette on this page
- * belongs to `RecapCard`, which is theme-independent by contract (F28) --
- * that is a documented, scoped exception owned by the card, not a licence
- * for landing chrome to hardcode anything.
+ * The landing page at `/`, built from docs/wireframes/landing-v5.html.
+ * It does no authenticated work: it never reads the auth context or mounts
+ * ApplicationsProvider, which is why App.tsx can declare it outside both route guards.
  */
 export default function LandingPage() {
   useDocumentMetadata(PAGE_TITLE, PAGE_DESCRIPTION)
+  const rootRef = useRef<HTMLDivElement>(null)
 
-  /*
-    The product visual's two cards share a grid row, and the recap column
-    sets that row's height: `RecapCard` is a fixed 480px card plus its
-    framing, which comes to ~614px. A fixed-height Sankey beside it left
-    318px of measured dead space inside the pipeline card -- over half of
-    it empty -- because the grid stretches both columns to the taller one
-    while the chart stayed at its narrow-width size.
-
-    So the chart's height tracks the layout rather than being a constant:
-    the taller value applies only from `lg` up, which is exactly where
-    `lg:grid-cols-12` turns this into two columns and creates the
-    stretching in the first place. Below `lg` the grid is a single column,
-    each card is content-sized, and 220px is the right size for the chart
-    at those widths (F15/F36's legibility work is calibrated there).
-    A media query rather than CSS because `SankeyChart` takes a numeric
-    `height` prop -- it draws an SVG, it does not lay one out.
-  */
-  const isTwoColumnVisual = useMediaQuery("(min-width: 1024px)")
+  // Entrances: each part rises once as its section arrives (only when motion is welcome; see landing.css).
+  useEffect(() => {
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue
+          const el = e.target as HTMLElement
+          el.dataset.in = ""
+          io.unobserve(el)
+        }
+      },
+      { rootMargin: "0px 0px -8% 0px" }
+    )
+    rootRef.current?.querySelectorAll("[data-rise]").forEach((el) => io.observe(el))
+    return () => io.disconnect()
+  }, [])
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      {/*
-        A11y (WCAG 2.4.1): the app's skip link lives in `AppLayout`, which
-        this route deliberately does not render, so `/` needs its own --
-        F44 asks for that call to be made rather than inherited. It earns
-        one: the header puts five focusable controls (three theme buttons,
-        two CTAs) ahead of the content, and the hero's primary CTA is not
-        the first tab stop. Same markup and same visually-hidden-until-
-        focused treatment as AppLayout's, so the behaviour is identical
-        across the two shells.
-      */}
-      <a
-        href="#landing-main"
-        className="sr-only rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50"
-      >
-        Skip to main content
+    <div className="landing" ref={rootRef}>
+      <a className="btn btn-solid btn-sm skip" href="#main">
+        Skip to content
       </a>
 
-      <header className="border-b border-border">
-        {/*
-          `flex-wrap` is a deliberate safety net rather than a layout
-          choice: the widths below are measured, not observed in a real
-          375px browser, so if a future label change pushes the row past
-          the viewport it wraps to a second line instead of putting the
-          whole page into a horizontal scroll (R13.1 / F44).
-        */}
-        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
-          {/*
-            Not a link: this lockup is already on the page it would point
-            at. F40 flagged the equivalent decision in `AppLayout` -- the
-            footer's lockup below *is* a link, and it points at `/app`,
-            deliberately.
-          */}
-          <Wordmark />
-
-          <div className="flex items-center gap-2 sm:gap-3">
-            {/*
-              R11.1's second half: F26's exported `ThemeToggle`, unchanged,
-              in the landing header. `ThemeProvider` sits above
-              `BrowserRouter` in `main.tsx`, so the choice made here is the
-              same provider state (and the same `jtracks_theme` localStorage
-              key) the authenticated app reads -- it carries into `/app`
-              with no extra wiring.
-            */}
-            <ThemeToggle />
-            {/*
-              Hidden below `sm`. **Correction, re-measured 2026-09-11 after
-              the logo size increase:** this used to be justified by a
-              combined-width budget (wordmark + this whole row summing past
-              375px). That framing no longer holds and arguably never quite
-              did -- the outer container's `flex-wrap` wraps the wordmark
-              and this action row onto separate lines as two independent
-              flex items, so the wordmark's own width was never actually
-              part of this row's budget. Verified live at 375px with "Log
-              in" forced visible: theme group + "Log in" + "Get started"
-              right-edges at 275px, well inside the 357px content width, no
-              horizontal scroll (`document.documentElement.scrollWidth ===
-              clientWidth`). Left hidden anyway -- this is a content-density
-              call for a phone-width header, not a scroll-safety one, and
-              nothing is lost: the hero's secondary CTA and the footer both
-              link to `/login`, both above the fold on a phone.
-            */}
-            <Button variant="ghost" className="hidden sm:inline-flex" render={<Link to="/login" />}>
+      <header className="site-header">
+        <div className="frame">
+          <Logo className="logo" />
+          <nav className="nav" aria-label="Main">
+            <ThemeButton />
+            <a className="nav-link" href="#how">
+              How it works
+            </a>
+            <a className="nav-link" href="#recaps">
+              Recaps
+            </a>
+            <Link className="nav-login" to="/login">
               Log in
-            </Button>
-            <Button render={<Link to="/signup" />}>Get started</Button>
-          </div>
+            </Link>
+            <Link className="btn btn-solid btn-sm" to="/signup">
+              Start your journey
+            </Link>
+          </nav>
         </div>
       </header>
 
-      <main
-        id="landing-main"
-        tabIndex={-1}
-        className="mx-auto w-full max-w-6xl flex-1 px-4 outline-none"
-      >
-        {/*
-          Hero, following the Linear reference's restraint: one confident
-          headline, one supporting line, and the product visual immediately
-          underneath rather than a wall of copy before it.
-
-          Entrance group 1 of 4. Wrapped as a single group, not per
-          element: the eyebrow, headline, subhead and both CTAs arrive
-          together, because the conventions doc stages *groups* and
-          explicitly forbids staggering the items inside one.
-        */}
-        <BlurFade delay={0}>
-          <section aria-labelledby="hero-heading" className="py-16 sm:py-24">
-            {/*
-              `text-muted-foreground`, not `text-primary`, even though the
-              incident.io reference colours its equivalent line in the accent.
-              docs/decisions/magicui-conventions.md's F27/F29 record measures
-              `--primary` as body text at 3.44:1 in light mode -- under the
-              4.5:1 floor -- and explicitly says to flag it "before either
-              gets used." An accent-coloured eyebrow here would have been the
-              app's first live instance of exactly that. The accent still
-              carries the page via the primary CTAs (measured 5.75:1) and the
-              `aria-hidden` icons, which take the 3:1 non-text floor.
-            */}
-            <p className="text-sm font-medium tracking-wide text-muted-foreground uppercase">
-              Job application tracker
-            </p>
-            {/* F57/R17.1: Display role, weight 400 only -- no heavier file exists, so hierarchy against the rest of the page comes from size/tracking, never a weight utility. */}
-            <h1
-              id="hero-heading"
-              className="mt-4 max-w-3xl font-display text-4xl leading-[1.05] font-normal tracking-tight text-balance sm:text-5xl lg:text-6xl"
-            >
-              Know exactly where your job search stalls.
-            </h1>
-            <p className="mt-5 max-w-2xl text-base text-pretty text-muted-foreground sm:text-lg">
-              JourneyJob keeps every application in one place, marks the ones that go quiet, and turns
-              the whole search into a funnel you can read at a glance.
-            </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <Button className="h-11 px-6 text-base" render={<Link to="/signup" />}>
-                Create your account
-              </Button>
-              <Button
-                variant="outline"
-                className="h-11 px-6 text-base"
-                render={<Link to="/login" />}
-              >
-                Log in
-              </Button>
+      <main id="main" tabIndex={-1}>
+        {/* Hero: the shared artifact, one card at a time */}
+        <section className="hero" aria-labelledby="hero-title">
+          <div className="frame hero-grid">
+            <div className="hero-copy">
+              <h1 id="hero-title" {...rise()}>
+                <span>Track the search.</span> <span>Share the month.</span>
+              </h1>
+              <p className="lede" {...rise(1)}>
+                Every application on one private board. Any month becomes a card you can post.
+              </p>
+              <div className="actions" {...rise(2)}>
+                <Link className="btn btn-solid" to="/signup">
+                  Start your journey
+                </Link>
+                <Link className="btn btn-soft" to="/login">
+                  Log in
+                </Link>
+              </div>
             </div>
-          </section>
-        </BlurFade>
+            <HeroCarousel />
+          </div>
+        </section>
 
-        {/*
-          F42's product visual. Both panels are *live renders of the real
-          components* (`SankeyChart`, `RecapCard`) against
-          `landing/demo-data.ts`, never screenshots -- R10.4's point being
-          that the landing page then cannot drift from the product, because
-          a change to either component changes this page too.
-
-          Both are rendered rather than one because they answer different
-          questions and the section has room for both side by side: the
-          flow is the analytical story (the Amplitude/Mixpanel references),
-          the card is the shareable artefact (Spotify Wrapped/Polarsteps).
-          The framing follows the Mixpanel dashboard-embed pattern -- each
-          visual sits in a titled card with a subtitle naming the data
-          behind it, so nobody reads the sample numbers as a real user's.
-
-          Entrance group 2 of 4. `BlurFade` translates and blurs but never
-          scales, so the Sankey's ResizeObserver (F36) measures the same
-          content width during the entrance as after it -- the chart does
-          not re-lay-out as the animation settles.
-        */}
-        <BlurFade delay={ENTRANCE_STAGGER_SECONDS}>
-          <section aria-labelledby="visual-heading" className="border-t border-border py-16 sm:py-20">
-            {/* F57/R17.1: Display role, weight 400 only. */}
-            <h2
-              id="visual-heading"
-              className="max-w-2xl font-display text-2xl font-normal tracking-tight text-balance sm:text-3xl"
-            >
-              One search, two views
+        {/* How it works: what you give, what comes back */}
+        <section id="how" className="section" aria-labelledby="how-title">
+          <div className="frame">
+            <h2 id="how-title" className="how-head" {...rise()}>
+              How the card gets made
             </h2>
-            <p className="mt-3 max-w-2xl text-pretty text-muted-foreground">
-              The pipeline flow shows where applications actually end up. The recap turns any stretch
-              of that search into something you can post.
-            </p>
-
-            <div className="mt-8 grid gap-6 lg:grid-cols-12">
-              {/*
-                This card carried the page's one continuous accent, a looping
-                `BorderBeam`, until 2026-09-15. Removed app-wide by user
-                decision: an animation that never ends and can't be paused
-                fails WCAG 2.2.2, however decorative it is.
-              */}
-              <Card className="lg:col-span-7">
-                <CardHeader>
-                  <h3 className="font-medium">Pipeline flow</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Sample search · 128 applications, all time
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  {/*
-                    Omitting `width` makes the chart measure this card's own
-                    width via ResizeObserver (F36), which is what keeps it
-                    legible from 375px up without a scaled viewBox.
-                    `interactive` (F38) is on so the visual behaves like the
-                    real dashboard rather than a picture of it; it also
-                    renders the `ChartDataTable` fallback, so the funnel is
-                    readable to a screen reader here exactly as it is in-app.
-                  */}
-                  <SankeyChart
-                    data={DEMO_SANKEY}
-                    height={isTwoColumnVisual ? 500 : 220}
-                    fontSize={10}
-                    className="w-full"
-                    interactive
-                  />
-                </CardContent>
-              </Card>
-
-              <Card className="lg:col-span-5">
-                <CardHeader>
-                  <h3 className="font-medium">Shareable recap</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Sample month · exported at 1080×1920
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  {/*
-                    Skin choice is deliberate. `RecapCard` is theme-
-                    independent by contract (F28) and must stay that way --
-                    making it follow `.dark` is explicitly not allowed -- so
-                    the risk here is the opposite one: a fixed-palette card
-                    looking stranded on a themed landing section.
-
-                    "beli" is the honest pick of the three. It is opaque, so
-                    it composites onto nothing: the Strava skin is
-                    *transparent* by design (F48 scoped transparency to it
-                    alone) and would take on whatever surface sits behind it,
-                    which on a light landing section means a card with no
-                    card. Duolingo is opaque too, but it's painted in the
-                    app's own teal accent (F27) and would read as more page
-                    chrome rather than as an artefact the product made. The
-                    Beli card's warm paper palette belongs to neither theme,
-                    which is exactly what an exported image is.
-
-                    The inset panel below is the framing treatment F42
-                    permits, taken from the Polarsteps reference (a portrait
-                    card sitting on a plain sheet, actions outside it): a
-                    bordered `bg-muted` surface gives the card a defined edge
-                    in light mode, where cream-on-white would otherwise float,
-                    and a dark backdrop in dark mode.
-                  */}
-                  {/*
-                    `px-2` at the narrow end is not cosmetic: the card is a
-                    fixed 270px (the export contract's width, not a
-                    suggestion), and at a 375px viewport the surrounding
-                    chrome -- `main`'s `px-4`, the card content's `px-4` and
-                    this panel's own padding -- is what decides whether it
-                    fits. At `px-2` the card has ~291px to sit in; at `px-4`
-                    it would have ~279px and no margin for error.
-                  */}
-                  {/*
-                    A11y (WCAG 1.1.1): the card is shown as the image it
-                    exports to, so it gets that image's text alternative --
-                    the same `recapTextSummary` the recap dialog uses.
-                    `role="img"` sits on this wrapper, outside the card
-                    itself, so nothing is added to the export subtree (F35).
-                  */}
-                  <div
-                    role="img"
-                    aria-label={`Sample recap image. ${recapTextSummary(DEMO_RECAP)}`}
-                    className="flex justify-center rounded-lg border border-border bg-muted px-2 py-4 sm:px-3 sm:py-5"
-                  >
-                    <RecapCard recap={DEMO_RECAP} skin="beli" />
-                  </div>
-                </CardContent>
-              </Card>
+            <div className="rows">
+              <PasteStep />
+              <GhostStep />
+              <div className="row row-wide">
+                <div className="row-text">
+                  <h3 className="order" {...rise()}>
+                    Visualize your progress
+                  </h3>
+                </div>
+                <Funnel />
+              </div>
             </div>
-          </section>
-        </BlurFade>
+          </div>
+        </section>
 
-        {/*
-          Feature trio, following the incident.io reference: a bordered
-          icon tile, a short bold heading, a few lines of muted body, and a
-          single accent colour used sparingly. Three columns at `md`,
-          stacked below it.
+        <RangeShowcase />
 
-          Entrance group 3 of 4 -- the trio enters as one group. Fading the
-          three cards in one after another is the per-item staggering the
-          conventions doc rules out.
-        */}
-        <BlurFade delay={ENTRANCE_STAGGER_SECONDS * 2}>
-          <section aria-labelledby="features-heading" className="border-t border-border py-16 sm:py-20">
-            {/* F57/R17.1: Display role, weight 400 only. */}
-            <h2
-              id="features-heading"
-              className="max-w-2xl font-display text-2xl font-normal tracking-tight text-balance sm:text-3xl"
-            >
-              Three things JourneyJob does for you
-            </h2>
-
-            <div className="mt-10 grid gap-8 md:grid-cols-3 md:gap-6">
-              {FEATURES.map((feature) => {
-                const Icon = feature.icon
-                return (
-                  <div key={feature.title}>
-                    <span className="flex size-10 items-center justify-center rounded-lg border border-border bg-card">
-                      <Icon className="size-5 text-primary" aria-hidden="true" />
-                    </span>
-                    <h3 className="mt-4 font-medium text-balance">{feature.title}</h3>
-                    <p className="mt-2 text-sm text-pretty text-muted-foreground">{feature.body}</p>
-                  </div>
-                )
-              })}
+        {/* Close: the first step, already open */}
+        <section className="close" aria-labelledby="close-title">
+          <div className="frame close-grid">
+            <div className="close-copy">
+              <h2 id="close-title" {...rise()}>
+                Start with one link
+              </h2>
+              <p {...rise(1)}>As easy as pasting a link. Start tracking now</p>
             </div>
-          </section>
-        </BlurFade>
+            <StartForm />
+          </div>
+        </section>
       </main>
 
-      {/*
-        Footer, following the Visitors reference: a short blurb column on
-        the left, one narrow link column, and plain small legal text --
-        no link farm.
-
-        Entrance group 4 of 4. The `<footer>` landmark stays intact inside
-        the wrapper -- `BlurFade` renders a plain `motion.div`, so this
-        adds an unstyled div to the tree, not a competing role. The root
-        is a `min-h-screen` flex column with `flex-1` on `<main>`, so the
-        extra auto-height flex item leaves the sticky-footer layout as it
-        was.
-      */}
-      <BlurFade delay={ENTRANCE_STAGGER_SECONDS * 3}>
-        <footer className="border-t border-border">
-          <div className="mx-auto grid w-full max-w-6xl gap-8 px-4 py-10 sm:grid-cols-2">
-            <div>
-              {/*
-                F40 noted the logo-lockup-as-link decision was F43's to make.
-                This one is a link and it points at `/app`, not `/` -- from
-                the bottom of the landing page the useful destination is the
-                product, and `/app` is the one URL that does the right thing
-                either way: straight in for a signed-in visitor,
-                `ProtectedRoute` -> `/login` -> back to `/app` for everyone
-                else. The header lockup stays unlinked because it would only
-                point at the page you're already on.
-              */}
-              <Link
-                to="/app"
-                // A11y (WCAG 1.4.11): solid ring -- `ring-ring/50` measured 2.26:1.
-                className="inline-flex rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <Wordmark />
-              </Link>
-              <p className="mt-3 max-w-xs text-sm text-muted-foreground">
-                A job application tracker that keeps score of your search, so you can tell what's
-                working from what isn't.
-              </p>
-            </div>
-
-            <nav aria-label="Footer" className="sm:justify-self-end">
-              <h2 className="text-sm font-medium">Product</h2>
-              <ul className="mt-3 space-y-2 text-sm">
-                <li>
-                  <Link to="/app" className="text-muted-foreground hover:text-foreground">
-                    Open the app
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/login" className="text-muted-foreground hover:text-foreground">
-                    Log in
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/signup" className="text-muted-foreground hover:text-foreground">
-                    Create an account
-                  </Link>
-                </li>
-              </ul>
-            </nav>
-
-            <p className="text-xs text-muted-foreground sm:col-span-2">
-              © 2026 JourneyJob. A personal project — not affiliated with any employer or job board.
-              Built with React, Tailwind CSS and shadcn/ui.
-            </p>
-          </div>
-        </footer>
-      </BlurFade>
+      <footer className="foot">
+        <div className="frame">
+          <span>JourneyJob</span>
+          <nav aria-label="Footer">
+            <Link to="/app">Open the app</Link>
+            <Link to="/login">Log in</Link>
+            <Link to="/signup">Sign up</Link>
+          </nav>
+          <span className="end">© 2026</span>
+        </div>
+      </footer>
     </div>
+  )
+}
+
+/** One button: it shows the mode you're in (sun or moon), and a press switches to the other. */
+function ThemeButton() {
+  const { resolvedTheme, setTheme } = useTheme()
+  const dark = resolvedTheme === "dark"
+  return (
+    <button className="icon-btn" type="button" aria-label="Dark mode" aria-pressed={dark} onClick={() => setTheme(dark ? "light" : "dark")}>
+      {dark ? <Moon size={18} aria-hidden="true" /> : <Sun size={18} aria-hidden="true" />}
+    </button>
+  )
+}
+
+/* ---------- recap cards: pictures of the exported image, fixed palette in both themes ---------- */
+
+function Ticks({ on }: { on: number }) {
+  return (
+    <div className="ticks">
+      {[0, 1, 2].map((i) => (
+        <i key={i} className={i === on ? "on" : undefined} />
+      ))}
+    </div>
+  )
+}
+
+function CardFoot({ dates, logo }: { dates: string; logo: string }) {
+  return (
+    <div className="card-foot">
+      <span className="soft">{dates}</span>
+      <img src={logo} alt="" width="78" height="15" />
+    </div>
+  )
+}
+
+/** The dark card: three figures, then the outcome bar sitting on the footer. Also the Recaps section's live card. */
+function InkCard({ r, label, tick }: { r: DemoRecap; label: string; tick?: number }) {
+  return (
+    <div className="card card-ink" role="img" aria-label={label}>
+      {tick !== undefined && <Ticks on={tick} />}
+      <div className="card-head">{r.title}</div>
+      <div className="stats">
+        <div>
+          <div className="n-l">{r.applications}</div>
+          <span className="soft">Applications</span>
+        </div>
+        <div>
+          <div className="n-l">{r.interviews}</div>
+          <span className="soft">Interviews</span>
+        </div>
+        <div>
+          <div className="n-l">{r.offers}</div>
+          <span className="soft">{offerWord(r.offers)}</span>
+        </div>
+      </div>
+      <div className="bar">
+        <span className="seg-int" style={{ flex: r.interviews }} />
+        <span className="seg-rej" style={{ flex: r.rejected }} />
+        <span className="seg-gho" style={{ flex: r.ghosted }} />
+        <span className="seg-wait" style={{ flex: r.waiting }} />
+      </div>
+      <div className="bar-key soft">
+        <span>{r.interviews} interviewed</span>
+        <span>{r.rejected} rejected</span>
+        <span>{r.ghosted} ghosted</span>
+        <span>{r.waiting} waiting</span>
+      </div>
+      <CardFoot dates={r.dates} logo={logoOnDark} />
+    </div>
+  )
+}
+
+const m = DEMO_MONTH
+const HERO_CARDS: ReactNode[] = [
+  <InkCard
+    key="ink"
+    r={m}
+    tick={0}
+    label={`Card 1 of 3. ${SAMPLE}: ${m.applications} applications, ${m.interviews} interviews, ${m.offers} ${offerWord(m.offers).toLowerCase()}.`}
+  />,
+  <div
+    key="field"
+    className="card card-field"
+    role="img"
+    aria-label={`Card 2 of 3. ${SAMPLE}: ${m.applications} applications sent, ${m.interviews} interviews, ${m.offers} ${offerWord(m.offers).toLowerCase()}, ${spoken(m.responseRate)} response rate, ${spoken(m.ghostRate)} ghost rate.`}
+  >
+    <Ticks on={1} />
+    <div className="card-head">{m.title}</div>
+    <div>
+      <div className="n-xl">{m.applications}</div>
+      <span>applications sent</span>
+    </div>
+    <div className="tiles">
+      <div>
+        <span className="n-m">{m.interviews}</span>
+        <span className="soft">Interviews</span>
+      </div>
+      <div>
+        <span className="n-m">{m.offers}</span>
+        <span className="soft">{offerWord(m.offers)}</span>
+      </div>
+      <div>
+        <span className="n-m">{m.responseRate}</span>
+        <span className="soft">Response</span>
+      </div>
+      <div>
+        <span className="n-m">{m.ghostRate}</span>
+        <span className="soft">Ghosted</span>
+      </div>
+    </div>
+    <CardFoot dates={m.dates} logo={logoOnLight} />
+  </div>,
+  <div
+    key="paper"
+    className="card card-paper"
+    role="img"
+    aria-label={`Card 3 of 3. ${SAMPLE}, ranked: ${m.applications} applications, ${m.interviews} interviews, ${spoken(m.responseRate)} response rate, ${spoken(m.ghostRate)} ghost rate, ${spoken(m.rejectionFailRate)} rejection or fail rate, ${m.offers} ${offerWord(m.offers).toLowerCase()}.`}
+  >
+    <Ticks on={2} />
+    <div className="card-head">{m.title}</div>
+    <ol className="rank">
+      {(
+        [
+          ["Applications", m.applications],
+          ["Interviews", m.interviews],
+          ["Response rate", m.responseRate],
+          ["Ghost rate", m.ghostRate],
+          ["Rejection/fail rate", m.rejectionFailRate],
+          ["Offers", m.offers],
+        ] as const
+      ).map(([name, value], i) => (
+        <li key={name}>
+          <span className="soft">{i + 1}</span>
+          <span>{name}</span>
+          <b>{value}</b>
+        </li>
+      ))}
+    </ol>
+    <CardFoot dates={m.dates} logo={logoOnLight} />
+  </div>,
+]
+
+/** One card at a time. Native scroll-snap does the swiping; the arrows scroll to a card. */
+function HeroCarousel() {
+  const reduce = usePrefersReducedMotion()
+  const viewRef = useRef<HTMLUListElement>(null)
+  const prevRef = useRef<HTMLButtonElement>(null)
+  const nextRef = useRef<HTMLButtonElement>(null)
+  const [current, setCurrent] = useState(0)
+  const [status, setStatus] = useState("")
+  const currentRef = useRef(0)
+  const byArrow = useRef(false)
+  const arrowTimer = useRef(0)
+  const last = HERO_CARDS.length - 1
+
+  const show = useCallback(
+    (i: number) => {
+      const focused = document.activeElement
+      currentRef.current = i
+      setCurrent(i)
+      setStatus(`Card ${i + 1} of ${last + 1}`)
+      // A hidden arrow cannot keep keyboard focus, so hand it to the other one.
+      if (focused === nextRef.current && i === last) prevRef.current?.focus()
+      if (focused === prevRef.current && i === 0) nextRef.current?.focus()
+    },
+    [last]
+  )
+
+  const go = (i: number) => {
+    const view = viewRef.current
+    if (!view || i < 0 || i > last) return
+    show(i) // the bars and arrows answer on press, not when the scroll lands
+    byArrow.current = true
+    window.clearTimeout(arrowTimer.current)
+    arrowTimer.current = window.setTimeout(() => {
+      byArrow.current = false
+    }, 700)
+    const s = view.children[i] as HTMLElement
+    view.scrollTo({ left: s.offsetLeft - (view.clientWidth - s.offsetWidth) / 2, behavior: reduce ? "auto" : "smooth" })
+  }
+
+  // Swiping and trackpads move the strip natively; whichever card sits nearest the middle becomes current.
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    let frame = 0
+    const onScroll = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        if (byArrow.current) return
+        const middle = view.scrollLeft + view.clientWidth / 2
+        const away = (s: Element) => Math.abs((s as HTMLElement).offsetLeft + (s as HTMLElement).offsetWidth / 2 - middle)
+        const slides = Array.from(view.children)
+        const nearest = slides.reduce((best, s, n) => (away(s) < away(slides[best]) ? n : best), 0)
+        if (nearest !== currentRef.current) show(nearest)
+      })
+    }
+    const onScrollEnd = () => {
+      byArrow.current = false
+      window.clearTimeout(arrowTimer.current)
+    }
+    view.addEventListener("scroll", onScroll, { passive: true })
+    view.addEventListener("scrollend", onScrollEnd)
+    return () => {
+      cancelAnimationFrame(frame)
+      window.clearTimeout(arrowTimer.current)
+      view.removeEventListener("scroll", onScroll)
+      view.removeEventListener("scrollend", onScrollEnd)
+    }
+  }, [show])
+
+  return (
+    <div
+      className="carousel"
+      data-ui
+      {...rise(3)}
+      role="group"
+      aria-roledescription="carousel"
+      aria-label="One sample month as a recap card, in three designs"
+    >
+      <button
+        ref={prevRef}
+        className={`car-arrow car-prev${current === 0 ? " is-off" : ""}`}
+        type="button"
+        aria-label="Previous card"
+        aria-controls="car-view"
+        onClick={() => go(currentRef.current - 1)}
+      >
+        <ChevronLeft size={20} aria-hidden="true" />
+      </button>
+      <ul className="car-view" id="car-view" ref={viewRef} tabIndex={0} aria-label="Recap cards">
+        {HERO_CARDS.map((card, n) => (
+          // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- pointer shortcut onto a peeking card; keyboard users have the arrows and the scrollable list
+          <li
+            key={n}
+            className={`slide ${n === current ? "is-current" : n < current ? "is-before" : "is-after"}`}
+            onClick={() => n !== currentRef.current && go(n)}
+          >
+            {card}
+          </li>
+        ))}
+      </ul>
+      <button
+        ref={nextRef}
+        className={`car-arrow car-next${current === last ? " is-off" : ""}`}
+        type="button"
+        aria-label="Next card"
+        aria-controls="car-view"
+        onClick={() => go(currentRef.current + 1)}
+      >
+        <ChevronRight size={20} aria-hidden="true" />
+      </button>
+      <p className="sr-only" aria-live="polite">
+        {status}
+      </p>
+    </div>
+  )
+}
+
+/* ---------- how it works ---------- */
+
+function PasteStep() {
+  return (
+    <div className="row">
+      <div className="row-text">
+        <h3 className="order" {...rise()}>
+          Paste the posting
+        </h3>
+        <p {...rise(1)}>Greenhouse and Workday links fill in the form.</p>
+        <div className="call" {...rise(2)}>
+          <label htmlFor="posting-1">Job posting link</label>
+          {/* A picture of the step, so it shows a link rather than taking one. */}
+          <input id="posting-1" type="url" defaultValue="https://boards.greenhouse.io/northwind/jobs/4182093" spellCheck={false} readOnly />
+        </div>
+      </div>
+      <div className="ui" data-ui {...rise(3)}>
+        <p className="ui-title">
+          New application <small>Autofilled from Greenhouse</small>
+        </p>
+        <div className="ui-form">
+          <div className="ui-2">
+            <div className="ui-field">
+              <span>Company</span>
+              <div className="filled">Northwind</div>
+            </div>
+            <div className="ui-field">
+              <span>Location</span>
+              <div className="filled">Remote (US)</div>
+            </div>
+          </div>
+          <div className="ui-field">
+            <span>Job title</span>
+            <div className="filled">Software Engineer, New Grad</div>
+          </div>
+          <div className="ui-2">
+            <div className="ui-field">
+              <span>Status</span>
+              <div>Applied</div>
+            </div>
+            <div className="ui-field">
+              <span>Date applied</span>
+              <div>Nov 4, 2026</div>
+            </div>
+          </div>
+          <div className="ui-actions">
+            <span className="ui-btn ui-btn-ghost">Cancel</span>
+            <span className="ui-btn ui-btn-blue">Save application</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** The ghost threshold re-sorts the rows on screen, and the count is taken from those same rows. */
+function GhostStep() {
+  const [limit, setLimit] = useState(14)
+  const ghosted = DEMO_GHOST_ROWS.filter((r) => r.days >= limit).length
+  return (
+    <div className="row row-flip">
+      <div className="row-text">
+        <h3 className="order" {...rise()}>
+          Then choose when silence counts
+        </h3>
+        <p {...rise(1)}>Quiet past your limit turns Ghosted. Interviews never do.</p>
+        <div className="call" {...rise(2)}>
+          <label htmlFor="ghost-days">
+            Ghost after <output htmlFor="ghost-days">{limit}</output> days
+          </label>
+          <input
+            id="ghost-days"
+            type="range"
+            min={7}
+            max={30}
+            value={limit}
+            onChange={(e) => setLimit(Number(e.target.value))}
+            aria-describedby="ghost-sum"
+          />
+        </div>
+      </div>
+      <div className="ui" data-ui {...rise(3)}>
+        <table className="ui-table">
+          <caption>Waiting to hear back</caption>
+          <thead>
+            <tr>
+              <th scope="col">Company</th>
+              <th scope="col" className="role">
+                Role
+              </th>
+              <th scope="col">Quiet for</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {DEMO_GHOST_ROWS.map((r) => {
+              const isGhosted = r.days >= limit
+              return (
+                <tr key={r.company}>
+                  <td className="co">{r.company}</td>
+                  <td className="role">{r.role}</td>
+                  <td className="quiet">{r.days} days</td>
+                  <td>
+                    <span className={isGhosted ? "pill pill-ghosted" : "pill pill-applied"}>
+                      {isGhosted ? "Ghosted" : "Applied"}
+                    </span>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+        <p className="ui-sum" id="ghost-sum" aria-live="polite">
+          <b>{ghosted}</b> of {DEMO_GHOST_ROWS.length} ghosted
+        </p>
+      </div>
+    </div>
+  )
+}
+
+type Band = readonly [number, number]
+
+/** A ribbon from the band a0-a1 at x0 into the band b0-b1 at x1. */
+function ribbon(x0: number, x1: number, [a0, a1]: Band, [b0, b1]: Band) {
+  const c = (x0 + x1) / 2
+  return `M${x0} ${a0} C${c} ${a0} ${c} ${b0} ${x1} ${b0} L${x1} ${b1} C${c} ${b1} ${c} ${a1} ${x0} ${a1} Z`
+}
+
+/**
+ * The month's pipeline, drawn from the same numbers as its labels.
+ * shortcut: 8px per application fills the 860x320 box at 37 applications; scale it down if the sample month grows past that.
+ */
+function Funnel() {
+  const top = 24
+  const band = (from: number, n: number): Band => [from, from + n * 8]
+  const labelTop = ([a, b]: Band) => (a + b) / 2 - 8
+  const rect = (x: number, [y0, y1]: Band) => ({ x, y: y0, width: 14, height: y1 - y0 })
+  // Applied, stacked: the outcomes so far, then the ones still waiting.
+  const toInt = band(top, m.interviews)
+  const toRej = band(toInt[1], m.rejected)
+  const toGho = band(toRej[1], m.ghosted)
+  const waiting = band(toGho[1], m.waiting)
+  // The middle column spaces its outcomes apart.
+  const rej = band(toInt[1] + 20, m.rejected)
+  const gho = band(rej[1] + 20, m.ghosted)
+  // Interviewing splits into Offer and Failed; the rest are still interviewing.
+  const toOffer = band(top, m.offers)
+  const toFail = band(toOffer[1], m.failed)
+  const still = band(toFail[1], m.stillInterviewing)
+  const fail = band(toOffer[1] + 24, m.failed)
+
+  return (
+    <figure className="ui ui-flow" data-ui {...rise(1)}>
+      <p className="ui-title">
+        Pipeline · {m.dates} <small>{m.applications} applications</small>
+      </p>
+      <div className="flow">
+        <div className="flow-plot">
+          <svg viewBox="0 0 860 320" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <pattern id="landing-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                <rect width="6" height="6" className="hatch-bg" />
+                <line x1="0" y1="0" x2="0" y2="6" strokeWidth="2" className="hatch-line" />
+              </pattern>
+            </defs>
+            <path className="f-int" d={ribbon(14, 423, toInt, toInt)} />
+            <path className="f-rej" d={ribbon(14, 423, toRej, rej)} />
+            <path className="f-gho" d={ribbon(14, 423, toGho, gho)} />
+            <path className="f-offer" d={ribbon(437, 846, toOffer, toOffer)} />
+            <path className="f-fail" d={ribbon(437, 846, toFail, fail)} />
+            <rect className="f-node" {...rect(0, [top, toGho[1]])} />
+            <rect fill="url(#landing-hatch)" {...rect(0, waiting)} />
+            <rect className="f-node" {...rect(423, [top, toFail[1]])} />
+            <rect fill="url(#landing-hatch)" {...rect(423, still)} />
+            <rect className="f-mid" {...rect(423, rej)} />
+            <rect className="f-mid" {...rect(423, gho)} />
+            <rect className="f-offer" {...rect(846, toOffer)} />
+            <rect className="f-node" {...rect(846, fail)} />
+          </svg>
+          <span className="lab" style={{ left: 0, top: 2 }}>
+            <b>Applied</b> {m.applications}
+          </span>
+          <span className="lab" style={{ left: 22, top: labelTop(waiting) }}>
+            {m.waiting} waiting
+          </span>
+          <span className="lab" style={{ left: "calc(50% - 7px)", top: 2 }}>
+            <b>Interviewing / OA</b> {m.interviews}
+          </span>
+          <span className="lab" style={{ left: "calc(50% + 14px)", top: still[1] + 2 }}>
+            {m.stillInterviewing} still interviewing
+          </span>
+          <span className="lab" style={{ left: "calc(50% + 16px)", top: labelTop(rej) }}>
+            <b>Rejected</b> {m.rejected}
+          </span>
+          <span className="lab" style={{ left: "calc(50% + 16px)", top: labelTop(gho) }}>
+            <b>Ghosted</b> {m.ghosted}
+          </span>
+        </div>
+        <div className="flow-out">
+          <span className="lab" style={{ left: 0, top: labelTop(toOffer) }}>
+            <b>Offer</b> {m.offers}
+          </span>
+          <span className="lab" style={{ left: 0, top: labelTop(fail) }}>
+            <b>Failed Interview/OA</b> {m.failed}
+          </span>
+        </div>
+      </div>
+      <dl className="flow-legend">
+        <dt>Applied</dt>
+        <dd>{m.applications}</dd>
+        <dt className="sub">Interviewing / OA</dt>
+        <dd>{m.interviews}</dd>
+        <dt className="sub">Rejected</dt>
+        <dd>{m.rejected}</dd>
+        <dt className="sub">Ghosted</dt>
+        <dd>{m.ghosted}</dd>
+        <dt className="sub">Still waiting</dt>
+        <dd>{m.waiting}</dd>
+        <dt>From Interviewing / OA</dt>
+        <dd>{m.interviews}</dd>
+        <dt className="sub">Offer</dt>
+        <dd>{m.offers}</dd>
+        <dt className="sub">Failed Interview/OA</dt>
+        <dd>{m.failed}</dd>
+        <dt className="sub">Still interviewing</dt>
+        <dd>{m.stillInterviewing}</dd>
+      </dl>
+      <figcaption className="flow-note">Striped: still open</figcaption>
+    </figure>
+  )
+}
+
+/* ---------- showcase: any range becomes a card ---------- */
+
+const RANGE_KEYS: RangeKey[] = ["week", "month", "year", "all"]
+
+function RangeShowcase() {
+  const reduce = usePrefersReducedMotion()
+  const [range, setRange] = useState<RangeKey>("month")
+  const [shown, setShown] = useState<RangeKey>("month")
+  const [swapping, setSwapping] = useState(false)
+  const rangeRef = useRef<RangeKey>("month")
+  const timer = useRef(0)
+  const listRef = useRef<HTMLUListElement>(null)
+
+  const select = useCallback(
+    (k: RangeKey) => {
+      if (k === rangeRef.current) return
+      rangeRef.current = k
+      setRange(k)
+      window.clearTimeout(timer.current)
+      if (reduce) {
+        setShown(k)
+        setSwapping(false)
+        return
+      }
+      setSwapping(true)
+      timer.current = window.setTimeout(() => {
+        setShown(k)
+        setSwapping(false)
+      }, 120)
+    },
+    [reduce]
+  )
+
+  // Pinned story on wide screens: the step crossing the middle of the screen drives the card.
+  useEffect(() => {
+    const wide = matchMedia("(min-width: 1120px)")
+    const steps = new IntersectionObserver(
+      (entries) => {
+        if (!wide.matches) return
+        for (const e of entries) if (e.isIntersecting) select((e.target as HTMLElement).dataset.step as RangeKey)
+      },
+      { rootMargin: "-45% 0px -45% 0px" }
+    )
+    listRef.current?.querySelectorAll("[data-step]").forEach((el) => steps.observe(el))
+    return () => steps.disconnect()
+  }, [select])
+  useEffect(() => () => window.clearTimeout(timer.current), [])
+
+  const r = DEMO_RANGES[shown]
+  return (
+    <section id="recaps" className="section" aria-labelledby="recaps-title">
+      <div className="frame show-grid">
+        <div className="show-index">
+          <h2 id="recaps-title" {...rise()}>
+            Any range becomes a card
+          </h2>
+          <ul className="ranges" ref={listRef} {...rise(1)}>
+            {RANGE_KEYS.map((k) => (
+              <li key={k} data-step={k}>
+                <button className="range-btn" type="button" aria-pressed={range === k} aria-controls="sheet" onClick={() => select(k)}>
+                  {DEMO_RANGES[k].title}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="stage-col">
+          <div className="stage-pin">
+            <div className="stage">
+              <div className={swapping ? "sheet is-swapping" : "sheet"} id="sheet" data-ui aria-live="polite">
+                <InkCard
+                  r={r}
+                  label={`Recap for ${r.title.toLowerCase()}: ${r.applications} applications, ${r.interviews} interviews, ${r.offers} ${offerWord(r.offers).toLowerCase()}.`}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/* ---------- close: the first step ---------- */
+
+const LINK_ERROR = "That is not a full link. It should start with https://"
+const isLink = (value: string) => {
+  try {
+    return /^https?:$/.test(new URL(value.trim()).protocol)
+  } catch {
+    return false
+  }
+}
+// The link is optional, so an empty field is fine.
+const isOk = (value: string) => !value.trim() || isLink(value)
+
+/** The link is checked when the visitor leaves the field or submits; a good one rides along to /signup. */
+function StartForm() {
+  const navigate = useNavigate()
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [posting, setPosting] = useState("")
+  const [error, setError] = useState(false)
+
+  const submit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    if (!isOk(posting)) {
+      setError(true)
+      inputRef.current?.focus()
+      return
+    }
+    const params = new URLSearchParams()
+    if (posting.trim()) params.set("posting", posting.trim())
+    params.set("status", String(new FormData(e.currentTarget).get("status")))
+    navigate(`/signup?${params}`)
+  }
+
+  return (
+    <form className="start-form" data-ui noValidate onSubmit={submit} {...rise(2)}>
+      <div>
+        <label className="field-label" htmlFor="posting">
+          Job posting link
+        </label>
+        <input
+          ref={inputRef}
+          className="start-input"
+          id="posting"
+          name="posting"
+          type="url"
+          inputMode="url"
+          placeholder="https://boards.greenhouse.io/…"
+          spellCheck={false}
+          aria-describedby="posting-note"
+          aria-invalid={error || undefined}
+          value={posting}
+          onChange={(e) => {
+            setPosting(e.target.value)
+            if (error && isOk(e.target.value)) setError(false)
+          }}
+          onBlur={() => setError(!isOk(posting))}
+        />
+        <p className={error ? "field-note is-error" : "field-note"} id="posting-note" aria-live="polite">
+          <CircleAlert aria-hidden="true" />
+          <span>{error ? LINK_ERROR : ""}</span>
+        </p>
+      </div>
+      <div className="start-row">
+        <fieldset>
+          <legend>Status</legend>
+          <div className="seg">
+            <label>
+              <input type="radio" name="status" value="applied" defaultChecked />
+              Applied
+            </label>
+            <label>
+              <input type="radio" name="status" value="saved" />
+              Saved
+            </label>
+          </div>
+        </fieldset>
+        <button className="btn" type="submit">
+          Start your journey
+        </button>
+      </div>
+    </form>
   )
 }

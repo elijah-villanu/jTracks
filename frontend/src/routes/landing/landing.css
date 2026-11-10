@@ -1,0 +1,434 @@
+/*
+  The landing page at `/`, built from docs/wireframes/landing-v5.html (phone
+  frames: landing-v5-mobile.html). The wireframe's CSS carries over nearly
+  rule for rule, so later wireframe edits port across by selector. Every rule
+  is scoped to .landing, so nothing here reaches the app.
+*/
+
+/*
+  Switzer, the wireframe's typeface, is served by Fontshare instead of this
+  repo: its licence (ITF FFL 2.0) allows self-hosting but forbids putting the
+  files in a public repository, and jTracks is public. Only text set in
+  Switzer triggers a download, so the app's own routes never fetch these.
+*/
+@font-face {
+  font-family: "Switzer";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("https://cdn.fontshare.com/wf/BLNB4FAQFNK56DWWNF7PMGTCOTZHOEII/ST3WKSSDMBK2MIQQO3MAVYWLF4FTOLFV/6IN5WOLRCYP4G4MOCOHOMXNON6Q7MDAR.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Switzer";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("https://cdn.fontshare.com/wf/OYB4CXKJQXKTNSLJMTDQOIVUL2V5EL7S/WYO2P7DQVV5RNXGMCUO2HL4RJP4VFUAS/6XPIMU23OJVRY676OG5YVJMWEHWICATX.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Switzer";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("https://cdn.fontshare.com/wf/5SZVFDB7V52TI6ULVC6J3WQZQCIZVDV5/ODYPSTCUDMKSTYIPTV4CLQ7URIK7XYBJ/YS3VPNVO4B3TOJMEXDGFZQ4TLZGGSRZC.woff2") format("woff2");
+}
+
+.landing {
+  /* Palette: near-white neutral ground + the binding brand blue. */
+  --bg: #fafafa;
+  --surface: #f1f1f2;
+  --field: #e6e6e9;
+  --field-press: #d4d4d8;
+  --paper: #ffffff;
+  --raised: #ffffff;
+  --raised-hover: #f1f1f2;
+  --ink: #18181b;
+  --muted: #52525b;
+  --rule-strong: #8b8b93;
+  --accent: #0F57FE;
+  --accent-press: #0a45cc;
+  --accent-ink: #ffffff;
+  --danger: #c31b1f;
+  --focus: #0F57FE;
+
+  --font: "Switzer", ui-sans-serif, system-ui, sans-serif;
+  --step-small: 0.875rem;
+  --step-body: clamp(1.0625rem, 1rem + 0.25vw, 1.1875rem);
+  --step-lead: clamp(1.25rem, 1.1rem + 0.7vw, 1.625rem);
+  --step-head: clamp(2rem, 10.2vw, 3.5rem);    /* phones: two lines hold down to 280px */
+  --step-hero: var(--step-head);
+  --step-display: clamp(2.75rem, 1.6rem + 4.6vw, 5.5rem);
+
+  --m: clamp(16px, 2.5vw, 32px);
+  --gap: clamp(16px, 2vw, 32px);
+  --section: clamp(112px, 12vw, 200px);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 var(--step-body)/1.5 var(--font);
+  letter-spacing: -0.005em;
+  font-variant-numeric: tabular-nums;
+}
+/* With one card in the hero, the headline has room to lead. */
+@media (min-width: 900px) { .landing { --step-hero: clamp(2.5rem, 6vw, 5.5rem); } }
+@media (min-width: 1120px) { .landing { --step-head: clamp(2.375rem, 3.6vw, 3.25rem); } }
+
+/* Dark: a softer black than v4's #0a0a0a, with every layer stepped up from it. */
+.dark .landing {
+  --bg: #171717;
+  --surface: #2a2a2a;
+  --field: #333333;
+  --field-press: #404040;
+  --paper: #202020;
+  --raised: #333333;
+  --raised-hover: #404040;
+  --ink: #ebebeb;
+  --muted: #b1b1b1;
+  --rule-strong: #737373;
+  --accent-press: #296aff;
+  --danger: #ec5d53;
+  --focus: #4f88ff;
+}
+/* Overscroll and rubber-banding show the body, so while this page is up it takes the page's ground. */
+body:has(.landing) { background: #fafafa; }
+.dark body:has(.landing) { background: #171717; }
+/* Recap cards are pictures of an exported image, so their palette never follows the theme (PRODUCT.md). */
+.landing .card { --ink: #18181b; --muted: #52525b; --field: #e6e6e9; --paper: #ffffff; }
+
+.landing ::selection { background: var(--field); color: var(--ink); }
+.landing h1, .landing h2 { font-size: var(--step-head); font-weight: 600; line-height: 0.98; letter-spacing: -0.04em; text-wrap: balance; }
+.landing h3 { font-size: var(--step-small); font-weight: 600; }
+.landing a { text-underline-offset: 3px; }
+.landing :focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.landing main:focus { outline: none; }
+.landing .frame { width: 100%; max-width: 1440px; margin: 0 auto; padding-left: var(--m); padding-right: var(--m); }
+.landing .section { padding-top: var(--section); }
+.landing .skip { position: absolute; left: var(--m); top: -100px; z-index: 2; }
+.landing .skip:focus { top: 8px; }
+
+/* ---------- controls ---------- */
+.landing .btn {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 24px;
+  border: 0; border-radius: 999px; font: 500 var(--step-body)/1 var(--font); text-decoration: none; cursor: pointer; white-space: nowrap;
+  transition: transform 160ms var(--ease-out), background-color 160ms ease;
+}
+.landing .btn:active { transform: scale(0.97); }
+.landing .btn-solid { background: var(--accent); color: var(--accent-ink); }
+.landing .btn-soft { background: var(--surface); color: var(--ink); }
+.landing .btn-sm { min-height: 40px; padding: 0 18px; font-size: var(--step-small); }
+@media (hover: hover) and (pointer: fine) {
+  .landing .btn-solid:hover { background: var(--accent-press); }
+  .landing .btn-soft:hover, .landing .icon-btn:hover { background: var(--field); }
+  .landing .nav a:not(.btn):hover, .landing .foot a:hover { text-decoration: underline; }
+  .landing .car-arrow:hover { background: var(--raised-hover); }
+  .landing .seg label:hover:not(:has(input:checked)) { background: var(--field-press); }
+}
+
+/* ---------- header ---------- */
+.landing .site-header .frame { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 76px; }
+.landing .logo { flex: none; height: 28px; }
+.landing .nav { display: flex; align-items: center; gap: 28px; font-size: var(--step-small); font-weight: 500; }
+.landing .nav a { text-decoration: none; }
+.landing .nav .nav-link { display: none; }
+@media (min-width: 900px) { .landing .nav .nav-link { display: inline-flex; align-items: center; min-height: 44px; } .landing .logo { height: 32px; } }
+/* Theme: one round button showing the mode you're in; a press switches to the other. */
+.landing .icon-btn {
+  display: inline-grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 999px;
+  background: var(--surface); color: var(--ink); cursor: pointer; transition: transform 160ms var(--ease-out), background-color 160ms ease;
+}
+.landing .icon-btn:active { transform: scale(0.95); }
+/* Below this the header holds only the logo and the main action; the page follows the system theme. */
+@media (max-width: 479px) { .landing .nav { gap: 14px; } .landing .nav .icon-btn { display: none; } }
+/* Narrow phones: the hero already shows Log in on the first screen, so the header keeps only the logo and the main action. */
+@media (max-width: 399px) { .landing .site-header .nav-login { display: none; } }
+@media (max-width: 374px) { .landing .logo { height: 24px; } }
+@media (max-width: 339px) { .landing .nav .btn-sm { padding: 0 12px; } }
+@media (max-width: 300px) { .landing .nav .btn { display: none; } }
+
+/* ---------- hero ---------- */
+.landing .hero { padding-top: clamp(32px, 5vw, 72px); }
+.landing .hero-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 48px; } /* minmax(0, ...): the card strip must scroll inside the column, not widen it */
+.landing .hero-copy { display: grid; gap: 32px; align-content: center; min-width: 0; }
+.landing .hero h1 { font-size: var(--step-hero); }
+.landing .hero h1 span { display: block; }
+.landing .lede { font-size: var(--step-body); max-width: 34rem; }
+.landing .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+@media (min-width: 900px) {
+  .landing .hero-grid { grid-template-columns: minmax(0, 1fr) auto; gap: 48px; align-items: center; }
+}
+
+/* ---------- hero carousel: one card at a time, neighbours peeking as a faint fade ---------- */
+.landing .carousel {
+  --peek-gap: 16px;
+  --edge: 72px;
+  --card-w: min(320px, calc(100vw - 2 * var(--m) - 2 * var(--edge)));
+  position: relative; justify-self: center; width: calc(var(--card-w) + 2 * var(--edge)); max-width: 100%;
+}
+@media (min-width: 900px) {
+  /* Tall enough to lead, never taller than the first screen. */
+  .landing .carousel { --card-w: clamp(240px, min(26vw, calc((100svh - 200px) * 0.5625)), 320px); justify-self: end; }
+}
+/*
+  Stacked under the copy: the strip starts at the screen edge, so the first card lines up with the headline.
+  The middle card centres and the last lines up on the right, so every arrow keeps a zone beside its card.
+*/
+@media (max-width: 899px) {
+  .landing .carousel { justify-self: start; width: min(calc(100% + 2 * var(--m)), calc(var(--card-w) + 2 * var(--edge))); max-width: none; margin-left: calc(var(--m) * -1); }
+}
+@media (max-width: 639px) {
+  .landing .carousel { --peek-gap: 12px; --card-w: max(200px, min(270px, calc(100vw - 104px))); }
+}
+.landing .car-view {
+  position: relative; display: flex; gap: var(--peek-gap); margin: 0; list-style: none;
+  padding: 0 calc((100% - var(--card-w)) / 2);
+  overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 calc((100% - var(--card-w)) / 2), #000 calc(100% - (100% - var(--card-w)) / 2), transparent); /* taste-skill-ignore: the requested faint preview of the next and previous card */
+  mask-image: linear-gradient(to right, transparent, #000 calc((100% - var(--card-w)) / 2), #000 calc(100% - (100% - var(--card-w)) / 2), transparent); /* taste-skill-ignore: the requested faint preview of the next and previous card */
+}
+.landing .car-view::-webkit-scrollbar { display: none; }
+.landing .car-view:focus-visible { outline: none; }
+.landing .car-view:focus-visible .is-current .card { outline: 2px solid var(--focus); outline-offset: -2px; }
+.landing .slide { flex: 0 0 var(--card-w); scroll-snap-align: center; opacity: 0.4; transition: opacity 200ms ease; }
+.landing .slide:not(.is-current) { cursor: pointer; }
+.landing .slide.is-current { opacity: 1; }
+.landing .car-arrow {
+  position: absolute; top: 50%; z-index: 1; display: grid; place-items: center; width: 44px; height: 44px; padding: 0;
+  border: 0; border-radius: 999px; background: var(--raised); color: var(--ink); cursor: pointer; transform: translateY(-50%);
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 120ms var(--ease-out), background-color 160ms ease, opacity 200ms ease, visibility 0s;
+}
+.landing .car-arrow { box-shadow: 0 1px 2px rgb(0 0 0 / 0.1), 0 4px 12px rgb(0 0 0 / 0.1); } /* taste-skill-ignore: the arrow floats over the card edge */
+.landing .car-arrow:active { transform: translateY(-50%) scale(0.95); }
+.landing .car-arrow.is-off { opacity: 0; visibility: hidden; transition: opacity 120ms ease, visibility 0s linear 120ms; }
+.landing .car-prev { left: 0; }
+.landing .car-next { right: 0; }
+/* Stacked (see .carousel above): the strip pads by the page margin, and the faint preview travels with each neighbouring card instead of sitting at fixed screen edges. */
+@media (max-width: 899px) {
+  .landing .car-view { padding: 0 var(--m); -webkit-mask-image: none; mask-image: none; }
+  .landing .slide.is-before { -webkit-mask-image: linear-gradient(to left, #000, transparent 40%); mask-image: linear-gradient(to left, #000, transparent 40%); } /* taste-skill-ignore: the requested faint preview of the previous card */
+  .landing .slide.is-after { -webkit-mask-image: linear-gradient(to right, #000, transparent 40%); mask-image: linear-gradient(to right, #000, transparent 40%); } /* taste-skill-ignore: the requested faint preview of the next card */
+}
+@media (max-width: 639px) { .landing .car-prev { left: 4px; } .landing .car-next { right: 4px; } }
+
+/* ---------- recap card (data-ui: the product's conventions apply inside) ---------- */
+.landing .card {
+  container-type: inline-size; aspect-ratio: 9 / 16; border-radius: 16px; overflow: hidden;
+  display: flex; flex-direction: column; gap: 14px; padding: 16px 16px 14px;
+  font-size: 13px; line-height: 1.3;
+}
+.landing .card-ink { background: var(--ink); color: #fafafa; }
+.landing .card-ink .soft { color: #c4c4c8; }
+.landing .card-field { background: var(--field); color: var(--ink); }
+.landing .card-paper { background: var(--paper); color: var(--ink); }
+.landing .card-paper { box-shadow: inset 0 0 0 1px #e4e4e7; } /* taste-skill-ignore: keeps the white card's edge visible, in its faint preview too */
+.dark .landing .card-ink { box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12); } /* taste-skill-ignore: the dark card keeps an edge on the near-black page */
+.landing .soft { color: var(--muted); }
+/* The three bars say which card this is. The active one fills as the card arrives. */
+.landing .ticks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.landing .ticks i { height: 3px; border-radius: 2px; background: color-mix(in oklab, currentColor 25%, transparent); overflow: hidden; }
+.landing .ticks i.on::after { content: ""; display: block; height: 100%; background: currentColor; transform: scaleX(0); transform-origin: left; }
+.landing .is-current .ticks i.on::after { transform: scaleX(1); }
+.landing .card-head { font-weight: 500; }
+.landing .n-xl { font-size: 34cqw; font-weight: 600; line-height: 0.9; letter-spacing: -0.05em; }
+.landing .n-l { font-size: 17cqw; font-weight: 600; line-height: 1.05; letter-spacing: -0.04em; }
+.landing .n-m { font-size: 9cqw; font-weight: 600; line-height: 1.05; letter-spacing: -0.03em; }
+.landing .stats { display: grid; gap: 5cqw; }
+.landing .bar { margin-top: auto; display: flex; height: 10px; border-radius: 3px; overflow: hidden; gap: 2px; }
+.landing .bar span { display: block; height: 100%; }
+.landing .seg-int { background: var(--field); } .landing .seg-rej { background: #a1a1aa; } .landing .seg-gho { background: #71717a; }
+.landing .seg-wait { background: repeating-linear-gradient(45deg, #a1a1aa 0 2px, transparent 2px 5px); } /* taste-skill-ignore: striped "still open" segment inside the data-ui recap card */
+.landing .bar-key { display: flex; flex-wrap: wrap; gap: 2px 10px; margin-top: -6px; }
+.landing .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: auto; }
+.landing .tiles div { background: color-mix(in oklab, var(--ink) 8%, transparent); border-radius: 8px; padding: 8px 10px; display: grid; gap: 2px; }
+.landing .rank { list-style: none; margin: 0; padding: 0; display: grid; }
+.landing .rank li { display: grid; grid-template-columns: 18px 1fr auto; gap: 6px; align-items: baseline; padding: 8px 0; border-top: 1px solid color-mix(in oklab, var(--ink) 12%, transparent); } /* taste-skill-ignore: list rule inside the data-ui recap card */
+.landing .rank li b { font-size: 15px; font-weight: 600; }
+/* Month bottom-left, logo bottom-right. */
+.landing .card-foot { margin-top: auto; display: flex; flex-wrap: wrap; gap: 4px 8px; justify-content: space-between; align-items: center; }
+.landing .card-ink .card-foot { margin-top: 0; } /* keeps the chart near the bottom of the card, sitting on the footer */
+.landing .card-foot img { height: 15px; width: auto; }
+.landing .card-paper .rank { margin-bottom: auto; }
+@media (max-width: 300px) { .landing .card { gap: 8px; padding: 12px; } .landing .rank li { padding: 4px 0; } }
+
+/* ---------- how it works: statement + call | response ---------- */
+.landing .how-head { margin-bottom: clamp(48px, 6vw, 88px); }
+.landing .rows { display: grid; gap: clamp(80px, 9vw, 136px); }
+.landing .row { display: grid; gap: 32px; align-items: start; }
+.landing .row-text { display: grid; gap: 16px; max-width: 34rem; }
+.landing .order { font-size: var(--step-lead); font-weight: 500; line-height: 1.2; letter-spacing: -0.02em; }
+.landing .call { background: var(--surface); border-radius: 12px; padding: 20px; display: grid; gap: 10px; margin-top: 8px; }
+.landing .call label { font-size: var(--step-small); font-weight: 500; }
+.landing .call input[type="url"] {
+  width: 100%; min-height: 48px; border: 0; border-radius: 8px; background: var(--paper);
+  font: 400 15px/1.2 var(--font); color: var(--ink); padding: 0 14px;
+}
+.landing .call input[type="range"] { width: 100%; accent-color: var(--accent); height: 28px; }
+.landing .call output { font-weight: 600; }
+@media (min-width: 960px) {
+  .landing .row { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: var(--gap); column-gap: clamp(32px, 4vw, 64px); }
+  .landing .row-wide .ui-flow { grid-column: 1 / -1; }
+  /* The ghosting step mirrors the first: table left, its controls right and right-aligned. */
+  .landing .row-flip { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
+  .landing .row-flip > .ui { grid-column: 1; grid-row: 1; }
+  .landing .row-flip > .row-text { grid-column: 2; grid-row: 1; justify-self: end; justify-items: end; width: 100%; text-align: right; }
+  .landing .row-flip .call { justify-self: stretch; }
+}
+
+/* fragments: the app's own panels, so they follow the theme */
+.landing .ui { background: var(--paper); border-radius: 14px; padding: 20px; font-size: 14px; line-height: 1.35; color: var(--ink); min-width: 0; }
+.landing .ui-title { font-size: 16px; font-weight: 600; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.landing .ui-title small { font-size: 13px; font-weight: 400; color: var(--muted); }
+.landing .ui-form { display: grid; gap: 12px; }
+.landing .ui-field { display: grid; gap: 4px; }
+.landing .ui-field span { font-size: 13px; color: var(--muted); }
+.landing .ui-field div { min-height: 40px; border: 1px solid color-mix(in srgb, var(--ink) 20%, var(--paper)); border-radius: 8px; padding: 9px 12px; } /* taste-skill-ignore: form field inside a data-ui fragment */
+.landing .ui-field .filled { background: color-mix(in srgb, var(--ink) 5%, var(--paper)); border-color: transparent; }
+.landing .ui-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.landing .ui-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+.landing .ui-btn { min-height: 38px; padding: 0 16px; border-radius: 8px; border: 0; font: 500 14px/1 var(--font); display: inline-flex; align-items: center; white-space: nowrap; }
+/* Folded-phone cover screens: one field per row, and Save moves above Cancel instead of breaking its label. */
+@media (max-width: 300px) { .landing .ui-2 { grid-template-columns: 1fr; } .landing .ui-actions { flex-wrap: wrap-reverse; } }
+.landing .ui-btn-ghost { background: transparent; color: var(--ink); }
+.landing .ui-btn-blue { background: var(--accent); color: #fff; }
+.landing .pill { display: inline-flex; align-items: center; min-height: 24px; padding: 0 10px; border-radius: 999px; font-size: 13px; font-weight: 500; white-space: nowrap; }
+.landing .pill-applied { background: color-mix(in srgb, var(--ink) 8%, var(--paper)); color: var(--ink); }
+.landing .pill-ghosted { background: var(--ink); color: var(--paper); }
+
+.landing .ui-table { width: 100%; border-collapse: collapse; }
+.landing .ui-table caption { text-align: left; font-size: 16px; font-weight: 600; padding-bottom: 12px; }
+.landing .ui-table th { text-align: left; font-size: 13px; font-weight: 500; color: var(--muted); padding: 0 8px 8px 0; }
+.landing .ui-table td { padding: 10px 8px 10px 0; border-top: 1px solid color-mix(in srgb, var(--ink) 12%, var(--paper)); vertical-align: middle; }
+.landing .ui-table td:last-child, .landing .ui-table th:last-child { text-align: right; padding-right: 0; }
+.landing .ui-table .co { font-weight: 500; }
+.landing .ui-table .quiet { color: var(--muted); white-space: nowrap; }
+.landing .ui-sum { margin-top: 14px; padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--ink) 12%, var(--paper)); } /* taste-skill-ignore: table footer rule inside a data-ui fragment */
+.landing .ui-sum b { font-weight: 600; }
+@media (max-width: 639px) { .landing .ui-table .role { display: none; } }
+
+/* funnel: greys mixed from ink into the panel, so the same emphasis holds in both themes */
+.landing .ui-flow { padding: 24px; }
+.landing .flow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; }
+.landing .flow-plot { position: relative; height: 320px; }
+.landing .flow-plot svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.landing .f-node { fill: var(--ink); }
+.landing .f-int, .landing .f-mid { fill: color-mix(in srgb, var(--ink) 60%, var(--paper)); }
+.landing .f-rej { fill: color-mix(in srgb, var(--ink) 20%, var(--paper)); }
+.landing .f-gho { fill: color-mix(in srgb, var(--ink) 40%, var(--paper)); }
+.landing .f-fail { fill: color-mix(in srgb, var(--ink) 80%, var(--paper)); }
+.landing .f-offer { fill: var(--accent); }
+.landing .hatch-bg { fill: color-mix(in srgb, var(--ink) 5%, var(--paper)); }
+.landing .hatch-line { stroke: color-mix(in srgb, var(--ink) 40%, var(--paper)); }
+.landing .lab { position: absolute; font-size: 13px; line-height: 1.2; white-space: nowrap; }
+.landing .lab b { font-weight: 600; }
+.landing .flow-out { position: relative; height: 320px; width: clamp(150px, 14vw, 190px); }
+.landing .flow-note { margin-top: 18px; color: var(--muted); font-size: 14px; max-width: 60ch; }
+.landing .flow-legend { display: none; }
+/* Phone: the plot is too narrow to label in place, so its labels move to a list under it. */
+@media (max-width: 639px) {
+  .landing .flow { grid-template-columns: 1fr; }
+  .landing .flow-out, .landing .flow-plot .lab { display: none; }
+  .landing .flow-plot { height: 220px; }
+  .landing .flow-legend { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; margin-top: 16px; font-size: 14px; }
+  .landing .flow-legend dt.sub { padding-left: 14px; color: var(--muted); }
+  .landing .flow-legend dd { font-weight: 600; text-align: right; }
+}
+
+/* ---------- showcase: output index + live sheet, pinned on desktop ---------- */
+.landing .show-grid { display: grid; gap: 32px; }
+.landing .show-index { display: grid; gap: 24px; align-content: start; }
+.landing .ranges { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 24px; }
+.landing .range-btn {
+  border: 0; background: none; padding: 4px 0; cursor: pointer; text-align: left;
+  font: 600 var(--step-lead)/1.1 var(--font); letter-spacing: -0.03em; color: var(--muted);
+  transition: color 160ms ease, transform 160ms var(--ease-out);
+}
+.landing .range-btn[aria-pressed="true"] { color: var(--ink); }
+.landing .range-btn:active { transform: scale(0.98); }
+/* Below desktop the ranges are tapped, not scrolled past: a 2x2 set of pills, the selected one filled. */
+@media (max-width: 1119px) {
+  .landing .ranges { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .landing .range-btn {
+    width: 100%; min-height: 48px; padding: 0 16px; border-radius: 999px; text-align: center;
+    background: var(--surface); color: var(--ink); font-size: var(--step-body); letter-spacing: -0.01em;
+    transition: background-color 160ms ease, color 160ms ease, transform 160ms var(--ease-out);
+  }
+  .landing .range-btn[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+}
+.landing .stage { background: var(--field); min-height: 70svh; display: grid; place-items: start center; padding: 56px 16px; overflow: hidden; }
+.landing .sheet { width: min(320px, 100%); transition: opacity 200ms ease, filter 200ms ease; }
+.landing .sheet.is-swapping { opacity: 0; filter: blur(2px); }
+@media (min-width: 1120px) {
+  .landing .show-grid { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); column-gap: clamp(32px, 4vw, 64px); align-items: stretch; }
+  .landing .ranges { display: block; margin-top: clamp(64px, 7vw, 112px); }
+  .landing .ranges li { min-height: 52svh; display: grid; align-content: start; gap: 12px; }
+  .landing .ranges li:last-child { min-height: 30svh; }
+  .landing .range-btn { font-size: var(--step-head); letter-spacing: -0.04em; }
+  .landing .stage-pin { position: sticky; top: 10svh; }
+  .landing .sheet { width: max(200px, min(320px, calc((80svh - 48px) * 0.5625))); } /* short laptop screens: the whole card stays inside the pinned stage */
+  .landing .stage { height: 80svh; min-height: 0; place-items: center; }
+}
+
+/* ---------- close: the first step, already open ---------- */
+.landing .close { margin-top: clamp(72px, 40px + 8vw, 160px); background: var(--accent); color: var(--accent-ink); }
+.landing .close-grid { display: grid; gap: 40px; align-items: center; padding-top: clamp(64px, 40px + 5vw, 112px); padding-bottom: clamp(64px, 40px + 5vw, 112px); }
+@media (min-width: 1024px) { .landing .close-grid { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); column-gap: clamp(32px, 4.5vw, 64px); } }
+.landing .close h2 { font-size: var(--step-display); line-height: 1.05; letter-spacing: -0.03em; }
+.landing .close-copy p { margin-top: 16px; font-size: 1.0625rem; }
+.landing .start-form { display: grid; gap: 12px; padding: 24px; border-radius: 16px; background: var(--paper); color: var(--ink); }
+.landing .start-row { display: grid; gap: 16px; }
+@media (min-width: 480px) { .landing .start-row { grid-template-columns: minmax(0, 1fr) auto; align-items: end; } }
+.landing .field-label, .landing legend { display: block; padding: 0; margin-bottom: 4px; font-size: 0.875rem; font-weight: 500; }
+.landing fieldset { border: 0; padding: 0; min-width: 0; }
+.landing .start-input { width: 100%; min-height: 48px; padding: 0 12px; border: 1px solid var(--rule-strong); border-radius: 8px; background: var(--paper); color: var(--ink); font: 400 1rem/1.2 var(--font); } /* taste-skill-ignore: form field inside a data-ui fragment */
+.landing .start-input::placeholder { color: var(--muted); }
+.landing .start-input[aria-invalid="true"] { border-color: var(--danger); }
+/* One reserved line under the field: empty until there is an error, so nothing below jumps when one appears. */
+.landing .field-note { display: flex; align-items: center; gap: 4px; min-height: 20px; margin-top: 4px; font-size: 0.8125rem; line-height: 20px; color: var(--muted); }
+.landing .field-note svg { display: none; flex: none; width: 16px; height: 16px; }
+.landing .field-note.is-error { color: var(--danger); }
+.landing .field-note.is-error svg { display: block; }
+.landing .seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 2px; padding: 2px; border-radius: 8px; background: var(--field); }
+.landing .seg label {
+  position: relative; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 12px;
+  border: 1px solid transparent; border-radius: 6px; color: var(--ink); font: 500 0.875rem/1 var(--font); white-space: nowrap; cursor: pointer; /* taste-skill-ignore: transparent until selected, so the label does not shift, inside a data-ui fragment */
+  -webkit-tap-highlight-color: transparent; transition: background-color 120ms ease;
+}
+.landing .seg label:has(input:checked) { background: var(--paper); border-color: var(--rule-strong); font-weight: 600; box-shadow: 0 1px 2px rgb(0 0 0 / 0.1), 0 4px 12px rgb(0 0 0 / 0.05); } /* taste-skill-ignore: selected segment inside a data-ui fragment */
+.landing .seg input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+.landing .seg label:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 1px; }
+.landing .start-form .btn { min-height: 48px; border-radius: 8px; background: var(--ink); color: var(--paper); font-size: 1.0625rem; }
+@media (hover: hover) and (pointer: fine) { .landing .start-form .btn:hover { background: color-mix(in srgb, var(--ink) 88%, var(--paper)); } }
+
+/* ---------- footer: one quiet line ---------- */
+.landing .foot { padding-top: 30svh; padding-bottom: 30px; font-size: var(--step-small); color: var(--muted); }
+.landing .foot .frame { display: grid; gap: 8px; }
+.landing .foot nav { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+.landing .foot a { color: var(--ink); text-decoration: none; }
+@media (min-width: 900px) { .landing .foot .frame { grid-template-columns: 1fr auto 1fr; align-items: baseline; } .landing .foot .end { text-align: right; } }
+
+/* ---------- touch and narrow screens ---------- */
+@media (pointer: coarse), (max-width: 639px) {
+  .landing .btn-sm { min-height: 44px; }
+  .landing .icon-btn { width: 44px; height: 44px; }
+  .landing .nav-login, .landing .foot a { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 44px; }
+  .landing .call input[type="range"] { height: 44px; }
+  .landing .call input[type="url"] { font-size: 16px; } /* under 16px, iOS zooms the page on focus */
+  .landing .btn, .landing .range-btn { -webkit-tap-highlight-color: transparent; }
+}
+@media (max-width: 359px) { .landing .ui, .landing .ui-flow { padding: 16px; } }
+/* Phones held sideways: keep the headline and both hero buttons inside the short first screen. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .landing { --step-head: clamp(2rem, 5vw, 2.5rem); --step-hero: clamp(2rem, 5vw, 2.5rem); }
+  .landing .site-header .frame { min-height: 60px; }
+  .landing .hero { padding-top: 16px; }
+  .landing .hero-copy { gap: 20px; }
+  .landing .carousel { --card-w: max(200px, min(320px, calc((100svh - 32px) * 0.5625))); } /* the whole card fits one short screen */
+}
+
+/* ---------- motion ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  .landing [data-rise] { opacity: 0; transform: translateY(24px); transition: opacity 700ms var(--ease-out), transform 700ms var(--ease-out); transition-delay: calc(var(--i, 0) * 70ms); }
+  .landing [data-rise][data-in] { opacity: 1; transform: none; }
+  .landing .ticks i.on::after { transition: transform 320ms var(--ease-out); }
+}
