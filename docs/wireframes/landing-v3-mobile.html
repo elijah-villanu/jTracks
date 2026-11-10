@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Landing v3 on phones</title>
+<link rel="preconnect" href="https://api.fontshare.com">
+<link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
+<link href="https://api.fontshare.com/v2/css?f[]=switzer@400,500,600&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #fafafa; --ink: #18181b; --muted: #52525b; --frame: #e4e4e7; --accent: #0F57FE; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 400 16px/1.5 "Switzer", system-ui, sans-serif; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  main { padding: 32px clamp(16px, 2.5vw, 32px) 64px; }
+  header { display: grid; gap: 4px; margin-bottom: 32px; }
+  h1 { margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.03em; }
+  header p { margin: 0; color: var(--muted); }
+  header a { color: var(--ink); }
+  .row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 40px 32px; }
+  .row + .row { margin-top: 56px; }
+  figure { margin: 0; display: grid; gap: 10px; }
+  figcaption { font-size: 14px; color: var(--muted); }
+  figcaption b { color: var(--ink); font-weight: 600; }
+  /* Device screen: exact CSS width; the frame's own scrollbar is pushed out of view (phones use overlay scrollbars). */
+  .screen { width: var(--w); height: var(--h); overflow: hidden; border-radius: 22px; background: #fff; outline: 8px solid var(--frame); outline-offset: 0; }
+  .screen iframe { display: block; border: 0; width: var(--w); height: var(--h); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Landing v3 on phones</h1>
+    <p>Each screen runs <a href="landing-v3.html">landing-v3.html</a> at that width. Scroll inside it; the slider, ranges and card strip all work.</p>
+  </header>
+
+  <div class="row">
+    <figure>
+      <figcaption><b>280</b> · narrowest folded phones</figcaption>
+      <div class="screen" style="--w:280px;--h:653px"><iframe src="landing-v3.html" title="Landing v3 at 280 pixels wide"></iframe></div>
+    </figure>
+    <figure>
+      <figcaption><b>320</b> · iPhone SE (1st gen)</figcaption>
+      <div class="screen" style="--w:320px;--h:568px"><iframe src="landing-v3.html" title="Landing v3 at 320 pixels wide"></iframe></div>
+    </figure>
+    <figure>
+      <figcaption><b>360</b> · typical Android</figcaption>
+      <div class="screen" style="--w:360px;--h:780px"><iframe src="landing-v3.html" title="Landing v3 at 360 pixels wide"></iframe></div>
+    </figure>
+    <figure>
+      <figcaption><b>375</b> · iPhone SE (2nd/3rd gen), the project's floor</figcaption>
+      <div class="screen" style="--w:375px;--h:667px"><iframe src="landing-v3.html" title="Landing v3 at 375 pixels wide"></iframe></div>
+    </figure>
+    <figure>
+      <figcaption><b>390</b> · iPhone 12–14</figcaption>
+      <div class="screen" style="--w:390px;--h:844px"><iframe src="landing-v3.html" title="Landing v3 at 390 pixels wide"></iframe></div>
+    </figure>
+    <figure>
+      <figcaption><b>430</b> · Plus and Pro Max iPhones</figcaption>
+      <div class="screen" style="--w:430px;--h:932px"><iframe src="landing-v3.html" title="Landing v3 at 430 pixels wide"></iframe></div>
+    </figure>
+  </div>
+
+  <div class="row">
+    <figure>
+      <figcaption><b>844 × 390</b> · iPhone 12–14 held sideways</figcaption>
+      <div class="screen" style="--w:844px;--h:390px"><iframe src="landing-v3.html" title="Landing v3 on a phone held sideways, 844 by 390 pixels"></iframe></div>
+    </figure>
+  </div>
+</main>
+<script>
+  // Desktop browsers may reserve room for a scrollbar inside each frame, which would narrow the page's layout width.
+  // Widen each iframe by that amount and let the screen clip it, so the page lays out at the exact device width.
+  const probe = Object.assign(document.createElement('div'), { style: 'position:absolute;top:-999px;width:100px;height:100px;overflow:scroll' });
+  document.body.append(probe);
+  const bar = probe.offsetWidth - probe.clientWidth;
+  probe.remove();
+  if (bar) for (const f of document.querySelectorAll('.screen iframe')) f.style.width = `calc(var(--w) + ${bar}px)`;
+</script>
+</body>
+</html>

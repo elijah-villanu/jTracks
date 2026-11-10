@@ -1,0 +1,834 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JourneyJob: track your job search and share how it's going (wireframe v4)</title>
+<meta name="description" content="JourneyJob keeps every job application on one private board, marks the quiet ones as Ghosted, and turns any range into a card you can post.">
+<script>try { const t = localStorage.getItem('jtracks_theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch {}</script>
+<link rel="preconnect" href="https://api.fontshare.com">
+<link rel="preconnect" href="https://cdn.fontshare.com" crossorigin="">
+<link href="https://api.fontshare.com/v2/css?f[]=switzer@400,500,600&amp;display=swap" rel="stylesheet">
+<style>
+/* Oxfords colour: Brand #0F57FE (built from your own colours)
+   lead #0F57FE, support #D9D0FF, pop #FF9B56
+   light on grey: native, nothing moved
+     no room for quieter text on lead: --on-lead-2 equals --on-lead, so set secondary text smaller instead.
+     too light for text on this page: support, pop. Text, links and icons use --support-ink, --pop-ink.
+     pop on the lead block is 2.6:1, under 3: a pop mark on --lead gets an --on-lead edge, or sits beside the block.
+   dark on near-black: native, nothing moved
+     no room for quieter text on lead: --on-lead-2 equals --on-lead, so set secondary text smaller instead.
+     too dark for text on this page: lead. Text, links and icons use --lead-ink.
+     pop on the lead block is 2.6:1, under 3: a pop mark on --lead gets an --on-lead edge, or sits beside the block.
+   notes:
+     support: analogous +30 #D9D0FF, the first rotation clear of the state hues, the mud zone and the other roles. Rejected: analogous -30 #A9E0FF (sits near info), complementary #FFD072 (sits near warning). Also: split +150 #FFCBAB, split -150 #D8E34A.
+     pop: split +150 #FF9B56, the first rotation clear of the state hues, the mud zone and the other roles. Rejected: complementary #E8AC00 (sits near warning), analogous -30 #4CC5FF (sits near info). Also: split -150 #B9C216.
+     lead sits near info: info states use --info, never --lead. Keep --lead off controls; pair every state with a word and an icon.
+   regenerate: node scripts/palette.mjs --brand "#0F57FE" --mode both --ground grey,near-black */
+
+:root {
+  color-scheme: light;
+  /* neutrals */
+  --page: #F5F5F5; --surface: #FFFFFF; --surface-2: #EDEDED; --selected: #E4E4E4;
+  --line: #DEDEDE; --line-strong: #8D8D8D; --focus: #0F57FE; --overlay: #00000066;
+  --text: #161616; --text-2: #484848; --text-3: #656565; --text-disabled: #999999;
+  --shadow-1: 0 1px 2px #0000001A, 0 4px 12px #0000000D;
+  --shadow-2: 0 2px 4px #0000001A, 0 12px 32px #0000001F;
+  /* neutral controls */
+  --action: #161616; --action-hover: #222222; --action-pressed: #070707; --on-action: #FFFFFF;
+  --action-disabled: #E4E4E4; --on-action-disabled: #8D8D8D;
+  --control: #E8E8E8; --control-hover: #DBDBDB; --control-pressed: #CECECE;
+  /* palette */
+  --lead: #0F57FE; --lead-hover: #296AFF; --lead-pressed: #0040D6;
+  --on-lead: #FFFFFF; --on-lead-2: #FFFFFF; --lead-line: #92A6CC;
+  --lead-ink: #0F57FE; --lead-tint: #E9F0FF;
+  --support: #D9D0FF; --support-hover: #CCC3F2; --support-pressed: #BFB6E4;
+  --on-support: #111111; --on-support-2: #4D495D; --support-line: #9E9AB0;
+  --support-ink: #6E668F; --support-tint: #F0EDFF;
+  --pop: #FF9B56; --pop-hover: #FFB484; --pop-pressed: #E7853E;
+  --on-pop: #111111; --on-pop-2: #4F2D17; --pop-line: #9E775F;
+  --pop-ink: #A95400; --pop-tint: #FFECE0;
+  /* semantic */
+  --danger: #C31B1F; --danger-hover: #D5322F; --danger-pressed: #A5000F;
+  --on-danger: #FFFFFF; --on-danger-2: #FFF5F3; --danger-line: #C3928C;
+  --danger-ink: #C31B1F; --danger-tint: #FFEBE8;
+  --warning: #F5A91F; --warning-hover: #FFBD58; --warning-pressed: #DB9400;
+  --on-warning: #111111; --on-warning-2: #4C3511; --warning-line: #9A7F5B;
+  --warning-ink: #926100; --warning-tint: #FEEDD7;
+  --success: #007433; --success-hover: #17843F; --success-pressed: #005E28;
+  --on-success: #FFFFFF; --on-success-2: #E8FFEB; --success-line: #80A586;
+  --success-ink: #007433; --success-tint: #E0F7E4;
+  --info: #0065B0; --info-hover: #0074C8; --info-pressed: #00518F;
+  --on-info: #FFFFFF; --on-info-2: #F1F8FF; --info-line: #7F9FC0;
+  --info-ink: #0065B0; --info-tint: #E5F2FF;
+  /* chart */
+  --series-1: #0F57FE; --series-2: #9188B3; --series-3: #D5742B; --series-4: #002A95;
+  --series-5: #574F74; --series-6: #3A3A3A; --series-muted: #808080;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    /* neutrals */
+    --page: #0A0A0A; --surface: #141414; --surface-2: #1E1E1E; --selected: #262626;
+    --line: #2E2E2E; --line-strong: #626262; --focus: #4F88FF; --overlay: #000000A3;
+    --text: #EBEBEB; --text-2: #B1B1B1; --text-3: #8D8D8D; --text-disabled: #545454;
+    --shadow-1: none;
+    --shadow-2: 0 2px 4px #00000066, 0 16px 40px #00000080;
+    /* neutral controls */
+    --action: #F2F2F2; --action-hover: #E4E4E4; --action-pressed: #D7D7D7; --on-action: #111111;
+    --action-disabled: #2E2E2E; --on-action-disabled: #6D6D6D;
+    --control: #292929; --control-hover: #353535; --control-pressed: #181818;
+    /* palette */
+    --lead: #1D5DF0; --lead-hover: #296AFE; --lead-pressed: #0241D4;
+    --on-lead: #FFFFFF; --on-lead-2: #FFFFFF; --lead-line: #92A6CC;
+    --lead-ink: #4F88FF; --lead-tint: #1D2638;
+    --support: #D9D1FB; --support-hover: #CCC4EE; --support-pressed: #BFB7E0;
+    --on-support: #111111; --on-support-2: #4D4A5B; --support-line: #9D9AAE;
+    --support-ink: #D9D1FB; --support-tint: #272432;
+    --pop: #F99F62; --pop-hover: #FFB484; --pop-pressed: #E1894C;
+    --on-pop: #111111; --on-pop-2: #4F2E18; --pop-line: #9E785F;
+    --pop-ink: #F99F62; --pop-tint: #342216;
+    /* semantic */
+    --danger: #BC2D2A; --danger-hover: #CE3F39; --danger-pressed: #A40B13;
+    --on-danger: #FFFFFF; --on-danger-2: #FFF7F5; --danger-line: #C4938D;
+    --danger-ink: #EC5D53; --danger-tint: #36201D;
+    --warning: #F0AC3F; --warning-hover: #FFBD58; --warning-pressed: #D8951F;
+    --on-warning: #111111; --on-warning-2: #4C3411; --warning-line: #997F5B;
+    --warning-ink: #F0AC3F; --warning-tint: #302412;
+    --success: #157337; --success-hover: #2A8245; --success-pressed: #005E28;
+    --on-success: #FFFFFF; --on-success-2: #E5FFE9; --success-line: #7FA486;
+    --success-ink: #499F5F; --success-tint: #1A2B1D;
+    --info: #0065B0; --info-hover: #0874C6; --info-pressed: #00518F;
+    --on-info: #FFFFFF; --on-info-2: #F1F8FF; --info-line: #7F9FC0;
+    --info-ink: #3591E5; --info-tint: #192837;
+    /* chart */
+    --series-1: #1D5DF0; --series-2: #D9D1FB; --series-3: #F99F62; --series-4: #6F9FFF;
+    --series-5: #8880A7; --series-6: #AEAEAE; --series-muted: #626262;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  /* neutrals */
+  --page: #0A0A0A; --surface: #141414; --surface-2: #1E1E1E; --selected: #262626;
+  --line: #2E2E2E; --line-strong: #626262; --focus: #4F88FF; --overlay: #000000A3;
+  --text: #EBEBEB; --text-2: #B1B1B1; --text-3: #8D8D8D; --text-disabled: #545454;
+  --shadow-1: none;
+  --shadow-2: 0 2px 4px #00000066, 0 16px 40px #00000080;
+  /* neutral controls */
+  --action: #F2F2F2; --action-hover: #E4E4E4; --action-pressed: #D7D7D7; --on-action: #111111;
+  --action-disabled: #2E2E2E; --on-action-disabled: #6D6D6D;
+  --control: #292929; --control-hover: #353535; --control-pressed: #181818;
+  /* palette */
+  --lead: #1D5DF0; --lead-hover: #296AFE; --lead-pressed: #0241D4;
+  --on-lead: #FFFFFF; --on-lead-2: #FFFFFF; --lead-line: #92A6CC;
+  --lead-ink: #4F88FF; --lead-tint: #1D2638;
+  --support: #D9D1FB; --support-hover: #CCC4EE; --support-pressed: #BFB7E0;
+  --on-support: #111111; --on-support-2: #4D4A5B; --support-line: #9D9AAE;
+  --support-ink: #D9D1FB; --support-tint: #272432;
+  --pop: #F99F62; --pop-hover: #FFB484; --pop-pressed: #E1894C;
+  --on-pop: #111111; --on-pop-2: #4F2E18; --pop-line: #9E785F;
+  --pop-ink: #F99F62; --pop-tint: #342216;
+  /* semantic */
+  --danger: #BC2D2A; --danger-hover: #CE3F39; --danger-pressed: #A40B13;
+  --on-danger: #FFFFFF; --on-danger-2: #FFF7F5; --danger-line: #C4938D;
+  --danger-ink: #EC5D53; --danger-tint: #36201D;
+  --warning: #F0AC3F; --warning-hover: #FFBD58; --warning-pressed: #D8951F;
+  --on-warning: #111111; --on-warning-2: #4C3411; --warning-line: #997F5B;
+  --warning-ink: #F0AC3F; --warning-tint: #302412;
+  --success: #157337; --success-hover: #2A8245; --success-pressed: #005E28;
+  --on-success: #FFFFFF; --on-success-2: #E5FFE9; --success-line: #7FA486;
+  --success-ink: #499F5F; --success-tint: #1A2B1D;
+  --info: #0065B0; --info-hover: #0874C6; --info-pressed: #00518F;
+  --on-info: #FFFFFF; --on-info-2: #F1F8FF; --info-line: #7F9FC0;
+  --info-ink: #3591E5; --info-tint: #192837;
+  /* chart */
+  --series-1: #1D5DF0; --series-2: #D9D1FB; --series-3: #F99F62; --series-4: #6F9FFF;
+  --series-5: #8880A7; --series-6: #AEAEAE; --series-muted: #626262;
+}
+
+  /* ---------- scale: type steps, one page margin, one column split, two radius tiers ---------- */
+  :root {
+    --font: "Switzer", ui-sans-serif, system-ui, sans-serif;
+    --t-meta: 0.8125rem;
+    --t-ui: 0.875rem;
+    --t-body: clamp(1rem, 0.96rem + 0.2vw, 1.0625rem);
+    --t-lead: clamp(1.0625rem, 1rem + 0.35vw, 1.25rem);
+    --t-h2: clamp(1.875rem, 1.4rem + 1.9vw, 2.75rem);
+    --t-h1: clamp(2rem, 1.2rem + 3.2vw, 3.5rem);
+    --t-display: clamp(2.75rem, 1.6rem + 4.6vw, 5.5rem);
+    --m: clamp(16px, 2.5vw, 32px);
+    --section: clamp(72px, 40px + 8vw, 160px);
+    --col-gap: clamp(32px, 4.5vw, 64px);
+    --r-control: 8px;
+    --r-card: 16px;
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scrollbar-color: var(--line-strong) transparent; accent-color: var(--action); caret-color: var(--lead-ink); }
+  body { margin: 0; background: var(--page); color: var(--text); font: 400 var(--t-body)/1.5 var(--font); }
+  ::selection { background: var(--lead-tint); color: var(--text); }
+  img, svg { display: block; max-width: 100%; }
+  h1, h2, h3, p, dl, dd, figure, fieldset { margin: 0; }
+  h1, h2 { font-weight: 600; letter-spacing: -0.03em; text-wrap: balance; }
+  h1 { font-size: var(--t-h1); line-height: 1.08; }
+  h2 { font-size: var(--t-h2); line-height: 1.1; }
+  h3 { font-size: var(--t-lead); font-weight: 600; line-height: 1.3; }
+  a { color: inherit; text-underline-offset: 3px; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .skip { position: absolute; left: var(--m); top: -100px; z-index: 1; }
+  .skip:focus { top: 12px; }
+
+  .frame { width: 100%; max-width: 1440px; margin: 0 auto; padding-left: var(--m); padding-right: var(--m); }
+  .section { padding-top: var(--section); }
+  /* The whole page shares this one split, so the right-hand content always starts on the same edge. */
+  .split { display: grid; gap: 40px; }
+  @media (min-width: 1024px) { .split { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); column-gap: var(--col-gap); } }
+
+  /* ---------- controls ---------- */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 24px;
+    border: 0; border-radius: var(--r-control); font: 500 var(--t-body)/1 var(--font); text-decoration: none;
+    white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent;
+    transition: background-color 120ms ease, transform 120ms var(--ease-out);
+  }
+  .btn-sm { min-height: 44px; padding: 0 16px; font-size: var(--t-ui); }
+  .btn-primary { background: var(--action); color: var(--on-action); }
+  .btn-secondary { background: var(--control); color: var(--text); }
+  @media (hover: hover) and (pointer: fine) {
+    .btn-primary:hover { background: var(--action-hover); }
+    .btn-secondary:hover { background: var(--control-hover); }
+    .seg button:hover:not([aria-pressed="true"]) { background: var(--control-hover); }
+    .nav a:not(.btn):hover, .foot a:hover { text-decoration: underline; }
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary:active { background: var(--action-pressed); }
+  .btn-secondary:active { background: var(--control-pressed); }
+  @media (prefers-reduced-motion: reduce) { .btn:active { transform: none; } }
+
+  /* One segmented control everywhere: ranges, application status, theme. */
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 2px; padding: 2px; border-radius: var(--r-control); background: var(--control); }
+  .seg button, .seg label {
+    position: relative; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 12px;
+    border: 1px solid transparent; border-radius: 6px; background: none; color: var(--text);
+    font: 500 var(--t-ui)/1 var(--font); white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent;
+    transition: background-color 120ms ease;
+  }
+  .seg [aria-pressed="true"], .seg label:has(input:checked) { background: var(--surface); border-color: var(--line-strong); font-weight: 600; box-shadow: var(--shadow-1); }
+  .seg button:active:not([aria-pressed="true"]) { background: var(--control-pressed); }
+  .seg input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+  .seg label:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 1px; }
+
+  .field-label, legend { display: block; padding: 0; margin-bottom: 4px; font-size: var(--t-ui); font-weight: 500; }
+  fieldset { border: 0; padding: 0; min-width: 0; }
+  .text-input {
+    width: 100%; min-height: 48px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--r-control);
+    background: var(--surface); color: var(--text); font: 400 1rem/1.2 var(--font);
+  }
+  .text-input::placeholder { color: var(--text-3); }
+  .text-input[aria-invalid="true"] { border-color: var(--danger); }
+  /* One reserved line under a field: the hint, or the error in its place, so nothing below ever jumps. */
+  .field-note { display: flex; align-items: center; gap: 4px; min-height: 20px; margin-top: 4px; font-size: var(--t-meta); line-height: 20px; color: var(--text-3); }
+  .field-note svg { display: none; flex: none; width: 16px; height: 16px; }
+  .field-note.is-error { color: var(--danger-ink); }
+  .field-note.is-error svg { display: block; }
+
+  /* ---------- header ---------- */
+  .site-header .frame { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 72px; }
+  .logo { flex: none; display: inline-flex; align-items: center; min-height: 44px; }
+  .logo img { height: 28px; width: auto; }
+  .logo-on-dark { display: none; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .logo-on-light { display: none; }
+    :root:not([data-theme="light"]) .logo-on-dark { display: block; }
+  }
+  :root[data-theme="dark"] .logo-on-light { display: none; }
+  :root[data-theme="dark"] .logo-on-dark { display: block; }
+  .nav { display: flex; align-items: center; gap: 24px; font-size: var(--t-ui); font-weight: 500; }
+  .nav a:not(.btn) { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 44px; text-decoration: none; }
+  .site-header .nav .nav-link { display: none; }
+  @media (min-width: 900px) { .site-header .nav .nav-link { display: inline-flex; } .logo img { height: 32px; } }
+  @media (max-width: 479px) { .nav { gap: 12px; } }
+  @media (max-width: 389px) { .logo img { height: 24px; } }
+  /* Too narrow for both: the hero shows Log in on the first screen, so the header keeps the main action. */
+  @media (max-width: 369px) { .site-header .nav a[href="/login"] { display: none; } }
+  @media (max-width: 300px) { .nav .btn { display: none; } }
+
+  /* ---------- hero ---------- */
+  .hero { padding-top: clamp(24px, 4vw, 64px); }
+  .hero-grid { display: grid; gap: 40px; }
+  .hero-copy { align-self: center; max-width: 36rem; }
+  .lede { margin-top: 16px; font-size: var(--t-lead); color: var(--text-2); }
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
+  .hero-media { display: grid; gap: 12px; min-width: 0; }
+  .caption { font-size: var(--t-meta); color: var(--text-3); }
+  @media (min-width: 1200px) {
+    .hero-grid { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); column-gap: var(--col-gap); }
+  }
+  .strip { list-style: none; margin: 0; padding: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 320px); gap: 16px; }
+  @media (min-width: 1200px) { .strip { grid-auto-columns: minmax(0, 1fr); } }
+  /* Phone: the three cards swipe inside their own strip, with the next card showing. */
+  @media (max-width: 639px) {
+    .strip {
+      grid-auto-columns: min(270px, 74vw); overflow-x: auto; overscroll-behavior-x: contain;
+      scroll-snap-type: x mandatory; scroll-padding-left: var(--m);
+      margin-left: calc(var(--m) * -1); margin-right: calc(var(--m) * -1);
+      padding-left: var(--m); padding-right: var(--m); scrollbar-width: none;
+    }
+    .strip::-webkit-scrollbar { display: none; }
+    .strip > li { scroll-snap-align: start; }
+  }
+
+  /* ---------- recap cards: exported art, so these colours never follow the page theme (PRODUCT.md).
+     Each value is frozen from the light or dark sheet above. ---------- */
+  .card {
+    --card-ink: #161616; --card-on-ink: #FFFFFF; --card-on-ink-2: #B1B1B1;
+    --card-blue: #0F57FE; --card-on-blue: #FFFFFF; --card-blue-line: #92A6CC;
+    --card-paper: #FFFFFF; --card-text: #161616; --card-text-2: #484848; --card-line: #DEDEDE;
+    --bar-interviewed: #4F88FF; --bar-rejected: #AEAEAE; --bar-ghosted: #8D8D8D; --bar-open: #626262;
+    container-type: inline-size; aspect-ratio: 9 / 16; overflow: hidden; border-radius: var(--r-card);
+    display: flex; flex-direction: column; gap: 16px; padding: 16px; font-size: var(--t-meta); line-height: 1.3;
+  }
+  .card-ink { background: var(--card-ink); color: var(--card-on-ink); }
+  .card-ink .soft { color: var(--card-on-ink-2); }
+  .card-blue { background: var(--card-blue); color: var(--card-on-blue); }
+  .card-paper { background: var(--card-paper); color: var(--card-text); }
+  .card-paper .soft { color: var(--card-text-2); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .card-ink { outline: 1px solid var(--line); } }
+  :root[data-theme="dark"] .card-ink { outline: 1px solid var(--line); }
+  .card-head { font-weight: 500; }
+  .n-xl, .n-l, .n-m { font-weight: 600; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+  .n-xl { font-size: 34cqw; line-height: 1; }
+  .n-l { font-size: 17cqw; line-height: 1.05; }
+  .n-m { display: block; font-size: 9cqw; line-height: 1.1; }
+  .stats { display: grid; gap: 5cqw; }
+  .bar { display: flex; gap: 2px; height: 8px; margin-top: auto; }
+  .bar span { display: block; border-radius: 2px; }
+  .bar .interviewed { background: var(--bar-interviewed); }
+  .bar .rejected { background: var(--bar-rejected); }
+  .bar .ghosted { background: var(--bar-ghosted); }
+  .bar .open { box-shadow: inset 0 0 0 1px var(--bar-open); }
+  .bar-key { display: flex; flex-wrap: wrap; gap: 4px 8px; margin-top: -8px; }
+  .figures { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 12px; margin-top: auto; }
+  .figures div { padding: 8px 0; border-top: 1px solid var(--card-blue-line); }
+  .rank { list-style: none; margin: 0; padding: 0; }
+  .rank li { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; padding: 8px 0; border-top: 1px solid var(--card-line); }
+  .rank b { font-size: var(--t-ui); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .card-foot { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; justify-content: space-between; }
+  .card-paper .card-foot { margin-top: auto; }
+  .card-foot img { height: 16px; width: auto; }
+  .logo-white { filter: brightness(0) invert(1); } /* the logo's blue "o" would vanish on the blue card */
+  @media (max-width: 300px) { .card { gap: 8px; padding: 12px; } }
+
+  /* ---------- how it works ---------- */
+  .how-head { margin-bottom: clamp(32px, 16px + 3vw, 64px); }
+  .step { display: flex; flex-direction: column; min-width: 0; }
+  .step > p { margin-top: 4px; color: var(--text-2); }
+  .step > .ui { flex: 1; margin-top: 16px; }
+  .step-wide { margin-top: clamp(48px, 24px + 4vw, 80px); }
+  .step-wide-head p { color: var(--text-2); }
+  @media (min-width: 1024px) { .step-wide-head p { align-self: end; } }
+  .step-wide-head { row-gap: 4px; }
+  .step-wide .ui { margin-top: 16px; }
+
+  /* The app's own panels */
+  .ui { min-width: 0; padding: 24px; border-radius: var(--r-card); background: var(--surface); font-size: var(--t-ui); line-height: 1.4; }
+  .ui-title { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; margin-bottom: 16px; font-size: 1rem; font-weight: 600; }
+  .ui-title small { font-size: var(--t-meta); font-weight: 400; color: var(--text-2); }
+  .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; margin-top: 16px; }
+  .fields .wide { grid-column: 1 / -1; }
+  .fields dt { margin-bottom: 4px; font-size: var(--t-meta); color: var(--text-2); }
+  .fields dd { min-height: 44px; padding: 12px; border-radius: var(--r-control); background: var(--surface-2); overflow-wrap: anywhere; }
+  .fields dd.is-empty { color: var(--text-3); }
+
+  .ghost-panel { padding: 24px 12px; }
+  .ghost-panel .ui-title, .slider, .ui-sum { margin-left: 12px; margin-right: 12px; }
+  .slider label { display: block; font-size: 1rem; font-weight: 500; }
+  .slider output { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .slider input { display: block; width: 100%; height: 44px; margin: 0; }
+  .ghost-table { width: 100%; margin-top: 8px; border-collapse: collapse; }
+  .ghost-table th { padding: 8px 12px; font-size: var(--t-meta); font-weight: 500; color: var(--text-2); text-align: left; }
+  .ghost-table td { padding: 8px 12px; border-top: 1px solid var(--line); }
+  .ghost-table .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .ghost-table .co { font-weight: 500; }
+  .ghost-table .role, .ghost-table .num, .ghost-table .st { color: var(--text-2); }
+  .ghost-table tr.is-ghosted { background: var(--surface-2); }
+  .ghost-table tr.is-ghosted .st { color: var(--text); font-weight: 600; }
+  @media (max-width: 639px) { .ghost-table .role { display: none; } }
+  .ui-sum { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; padding-top: 12px; border-top: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+  .ui-sum b { font-weight: 600; }
+  .ui-sum .faint { color: var(--text-3); }
+
+  /* Funnel: blue is the path still moving forward; grey is where applications ended; hollow is still open. */
+  .flow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; }
+  .flow-plot { position: relative; height: 236px; }
+  .flow-plot svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .flow-out { position: relative; height: 236px; width: clamp(150px, 14vw, 192px); }
+  .lab { position: absolute; font-size: var(--t-meta); line-height: 1.2; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .lab b { font-weight: 600; }
+  .rb-forward { fill: var(--lead-tint); }
+  .rb-offer { fill: var(--series-1); }
+  .rb-ended { fill: var(--selected); }
+  .rb-ended-2 { fill: var(--surface-2); }
+  .nd-applied { fill: var(--text); }
+  .nd-forward { fill: var(--series-1); }
+  .nd-ended { fill: var(--series-muted); }
+  .nd-ended-2 { fill: var(--series-6); }
+  .nd-open { fill: none; stroke: var(--line-strong); stroke-width: 1; vector-effect: non-scaling-stroke; }
+  .flow-legend { display: none; }
+  /* Phone: the plot is too narrow to label in place, so its labels move to a keyed list under it. */
+  @media (max-width: 639px) {
+    .flow { grid-template-columns: minmax(0, 1fr); }
+    .flow-out, .flow-plot .lab { display: none; }
+    .flow-plot { height: 180px; }
+    .flow-legend { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 16px; margin-top: 16px; }
+    .flow-legend dt { display: flex; align-items: center; gap: 8px; }
+    .flow-legend dt.sub { padding-left: 12px; color: var(--text-2); }
+    .flow-legend dd { font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+    .sw { flex: none; width: 12px; height: 12px; border-radius: 2px; }
+    .sw.applied { background: var(--text); }
+    .sw.forward { background: var(--series-1); }
+    .sw.ended { background: var(--series-muted); }
+    .sw.ended-2 { background: var(--series-6); }
+    .sw.open { box-shadow: inset 0 0 0 1px var(--line-strong); }
+  }
+
+  /* ---------- recaps: the card on the left, its control beside it ---------- */
+  .stage { display: grid; place-items: center; padding: 32px 16px; border-radius: var(--r-card); background: var(--surface-2); }
+  .sheet { width: min(320px, 100%); }
+  .recaps-copy { align-self: center; }
+  .recaps-copy p { margin-top: 12px; color: var(--text-2); }
+  .recaps-copy .seg { margin-top: 24px; max-width: 480px; }
+  @media (max-width: 479px) { .seg-ranges { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (min-width: 1024px) {
+    .stage { grid-column: 1; grid-row: 1; padding: 48px 32px; }
+    .recaps-copy { grid-column: 2; grid-row: 1; }
+  }
+
+  /* ---------- privacy ---------- */
+  .priv-copy p { margin-top: 12px; font-size: var(--t-lead); color: var(--text-2); }
+  .lists { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+  .lists h3 { font-size: var(--t-body); }
+  .lists ul { display: grid; gap: 8px; margin: 12px 0 0; padding: 0; list-style: none; color: var(--text-2); }
+
+  /* ---------- close ---------- */
+  .close { margin-top: var(--section); background: var(--lead); color: var(--on-lead); }
+  .close .split { align-items: center; padding-top: clamp(64px, 40px + 5vw, 112px); padding-bottom: clamp(64px, 40px + 5vw, 112px); }
+  .close h2 { font-size: var(--t-display); line-height: 1.05; }
+  .close-copy p { margin-top: 16px; }
+  .start-form { display: grid; gap: 12px; padding: 24px; border-radius: var(--r-card); background: var(--surface); color: var(--text); }
+  .start-row { display: grid; gap: 16px; }
+  @media (min-width: 480px) { .start-row { grid-template-columns: minmax(0, 1fr) auto; align-items: end; } }
+
+  /* ---------- footer ---------- */
+  .foot { padding-top: 24px; padding-bottom: 24px; font-size: var(--t-ui); color: var(--text-2); }
+  .foot .frame { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 32px; }
+  .foot nav { display: flex; flex-wrap: wrap; gap: 0 16px; }
+  .foot a { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 44px; color: var(--text); text-decoration: none; }
+  .seg-theme { grid-auto-columns: minmax(64px, 1fr); }
+
+  /* Phones held sideways: keep the headline and both hero buttons inside the short first screen. */
+  @media (orientation: landscape) and (max-height: 500px) {
+    :root { --t-h1: clamp(2rem, 5vw, 2.5rem); }
+    .site-header .frame { min-height: 56px; }
+    .hero { padding-top: 12px; }
+    .actions { margin-top: 20px; }
+  }
+
+  /* Theme switch: fade instead of a brightness jump. */
+  .theming, .theming * { transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease !important; }
+</style>
+<style type="text/css">*,*::before,*::after{animation-duration:0s!important;animation-delay:0s!important;
+animation-iteration-count:1!important;transition-duration:0s!important;transition-delay:0s!important;
+scroll-behavior:auto!important}</style></head>
+<body>
+<a class="btn btn-primary btn-sm skip" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="frame">
+    <a class="logo" href="/" aria-label="JourneyJob home">
+      <img class="logo-on-light" src="../../frontend/src/assets/JourneyJobLogoLight.png" alt="JourneyJob" width="166" height="32">
+      <img class="logo-on-dark" src="../../frontend/src/assets/JourneyJobLogoDark.png" alt="JourneyJob" width="166" height="32">
+    </a>
+    <nav class="nav" aria-label="Main">
+      <a class="nav-link" href="#how">How it works</a>
+      <a class="nav-link" href="#recaps">Recaps</a>
+      <a class="nav-link" href="#privacy">Privacy</a>
+      <a href="/login">Log in</a>
+      <a class="btn btn-primary btn-sm" href="/signup">Start your board</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="frame hero-grid">
+      <div class="hero-copy">
+        <h1 id="hero-title">Track your job search and share how it's going</h1>
+        <p class="lede">Every application on one private board, and any month as a card you can post.</p>
+        <div class="actions">
+          <a class="btn btn-primary" href="/signup">Start your board</a>
+          <a class="btn btn-secondary" href="/login">Log in</a>
+        </div>
+      </div>
+
+      <div class="hero-media">
+        <ul class="strip" aria-label="One sample month as a recap card, in three designs" tabindex="0">
+          <li>
+            <div class="card card-ink" role="img" aria-label="Sample recap card, dark design. August 2026: 34 applications, 7 interviews, 1 offer.">
+              <div class="card-head">This month</div>
+              <div class="stats">
+                <div><div class="n-l">34</div><span class="soft">Applications</span></div>
+                <div><div class="n-l">7</div><span class="soft">Interviews</span></div>
+                <div><div class="n-l">1</div><span class="soft">Offer</span></div>
+              </div>
+              <div class="bar"><span class="interviewed" style="flex:7"></span><span class="rejected" style="flex:11"></span><span class="ghosted" style="flex:6"></span><span class="open" style="flex:10"></span></div>
+              <div class="bar-key soft"><span>7 interviewed</span><span>11 rejected</span><span>6 ghosted</span><span>10 waiting</span></div>
+              <div class="card-foot"><img src="../../frontend/src/assets/JourneyJobLogoDark.png" alt="" width="83" height="16"><span class="soft">Aug 2026</span></div>
+            </div>
+          </li>
+          <li>
+            <div class="card card-blue" role="img" aria-label="Sample recap card, blue design. August 2026: 34 applications sent, 7 interviews, 1 offer, 53 percent response rate, 18 percent ghost rate.">
+              <div class="card-head">This month</div>
+              <div><div class="n-xl">34</div><span>applications sent</span></div>
+              <div class="figures">
+                <div><span class="n-m">7</span>Interviews</div>
+                <div><span class="n-m">1</span>Offer</div>
+                <div><span class="n-m">53%</span>Response rate</div>
+                <div><span class="n-m">18%</span>Ghost rate</div>
+              </div>
+              <div class="card-foot"><img class="logo-white" src="../../frontend/src/assets/JourneyJobLogoDark.png" alt="" width="83" height="16"><span>Aug 2026</span></div>
+            </div>
+          </li>
+          <li>
+            <div class="card card-paper" role="img" aria-label="Sample recap card, ranked design. August 2026: 34 applications, 7 interviews, 53 percent response rate, 18 percent ghost rate, 38 percent rejection or fail rate, 1 offer.">
+              <div class="card-head">This month</div>
+              <ol class="rank">
+                <li><span class="soft">1</span><span>Applications</span><b>34</b></li>
+                <li><span class="soft">2</span><span>Interviews</span><b>7</b></li>
+                <li><span class="soft">3</span><span>Response rate</span><b>53%</b></li>
+                <li><span class="soft">4</span><span>Ghost rate</span><b>18%</b></li>
+                <li><span class="soft">5</span><span>Rejection/fail rate</span><b>38%</b></li>
+                <li><span class="soft">6</span><span>Offers</span><b>1</b></li>
+              </ol>
+              <div class="card-foot"><img src="../../frontend/src/assets/JourneyJobLogoLight.png" alt="" width="83" height="16"><span class="soft">Aug 2026</span></div>
+            </div>
+          </li>
+        </ul>
+        <p class="caption">Sample data throughout the page.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="how" class="section" aria-labelledby="how-title">
+    <div class="frame">
+      <h2 id="how-title" class="how-head">How the card gets made</h2>
+      <div class="split">
+        <div class="step">
+          <h3>First, paste the posting</h3>
+          <p>Greenhouse and Workday links fill in the form.</p>
+          <div class="ui">
+            <p class="ui-title">New application</p>
+            <label class="field-label" for="posting-1">Job posting link</label>
+            <input class="text-input" id="posting-1" type="url" inputmode="url" value="https://boards.greenhouse.io/northwind/jobs/4182093" spellcheck="false" aria-describedby="fill-state" style="">
+            <p class="field-note" id="fill-state" role="status">Filled from Greenhouse. Check it, then save.</p>
+            <dl class="fields">
+              <div><dt>Company</dt><dd data-fill="company">Northwind</dd></div>
+              <div><dt>Location</dt><dd data-fill="location">Remote (US)</dd></div>
+              <div class="wide"><dt>Job title</dt><dd data-fill="title">Software Engineer, New Grad</dd></div>
+              <div><dt>Status</dt><dd>Applied</dd></div>
+              <div><dt>Date applied</dt><dd id="date-applied">Nov 5, 2026</dd></div>
+            </dl>
+          </div>
+        </div>
+
+        <div class="step">
+          <h3>Then choose when silence counts</h3>
+          <p>An application past your limit moves to Ghosted. Interviews never do.</p>
+          <div class="ui ghost-panel">
+            <p class="ui-title" id="ghost-title">Waiting to hear back, Aug 2026</p>
+            <div class="slider">
+              <label for="ghost-days">Ghost after <output id="ghost-out" for="ghost-days">14</output> days</label>
+              <input id="ghost-days" type="range" min="7" max="30" value="14" aria-valuetext="14 days" style="">
+            </div>
+            <table class="ghost-table" aria-labelledby="ghost-title">
+              <thead><tr><th scope="col">Company</th><th scope="col" class="role">Role</th><th scope="col" class="num">Quiet for</th><th scope="col">Status</th></tr></thead>
+              <tbody id="ghost-rows">
+                <tr class="is-ghosted" data-days="31"><td class="co">Northwind</td><td class="role">Software Engineer, New Grad</td><td class="num">31 days</td><td class="st">Ghosted</td></tr>
+                <tr class="is-ghosted" data-days="22"><td class="co">Halcyon Labs</td><td class="role">Frontend Engineer</td><td class="num">22 days</td><td class="st">Ghosted</td></tr>
+                <tr class="is-ghosted" data-days="15"><td class="co">Kestrel</td><td class="role">Data Engineer, New Grad</td><td class="num">15 days</td><td class="st">Ghosted</td></tr>
+                <tr data-days="12"><td class="co">Fieldnote</td><td class="role">Software Engineer</td><td class="num">12 days</td><td class="st">Applied</td></tr>
+                <tr data-days="5"><td class="co">Juniper Health</td><td class="role">Backend Engineer</td><td class="num">5 days</td><td class="st">Applied</td></tr>
+                <tr data-days="2"><td class="co">Tidewater</td><td class="role">Full-Stack Engineer</td><td class="num">2 days</td><td class="st">Applied</td></tr>
+              </tbody>
+            </table>
+            <p class="ui-sum"><span role="status"><b id="ghost-count">6</b> ghosted, <b id="wait-count">10</b> waiting</span><span class="faint">Showing 6 of 16</span></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-wide">
+        <div class="split step-wide-head">
+          <h3>Then read where it stalls</h3>
+          <p>Rejected and Failed Interview/OA stay apart.</p>
+        </div>
+        <figure class="ui">
+          <figcaption class="ui-title">Pipeline, Aug 2026 <small>34 applications</small></figcaption>
+          <div class="flow">
+            <div class="flow-plot">
+              <svg viewBox="0 0 860 236" preserveAspectRatio="none" aria-hidden="true">
+                <!-- Applied 34: Interviewing/OA 7, Rejected 11, Ghosted 6; 10 waiting stay open in the node -->
+                <path class="rb-forward" d="M14 24 C220 24 220 24 423 24 L423 66 C220 66 220 66 14 66 Z"></path>
+                <path class="rb-ended" d="M14 66 C220 66 220 86 423 86 L423 152 C220 152 220 132 14 132 Z"></path>
+                <path class="rb-ended-2" d="M14 132 C220 132 220 172 423 172 L423 208 C220 208 220 168 14 168 Z"></path>
+                <!-- Interviewing/OA 7: Offer 1, Failed Interview/OA 2; 4 still interviewing stay open in the node -->
+                <path class="rb-offer" d="M437 24 C640 24 640 24 846 24 L846 30 C640 30 640 30 437 30 Z"></path>
+                <path class="rb-ended" d="M437 30 C640 30 640 50 846 50 L846 62 C640 62 640 42 437 42 Z"></path>
+                <rect class="nd-applied" x="0" y="24" width="14" height="144"></rect>
+                <rect class="nd-open" x="0.5" y="168.5" width="13" height="59"></rect>
+                <rect class="nd-forward" x="423" y="24" width="14" height="18"></rect>
+                <rect class="nd-open" x="423.5" y="42.5" width="13" height="23"></rect>
+                <rect class="nd-ended" x="423" y="86" width="14" height="66"></rect>
+                <rect class="nd-ended-2" x="423" y="172" width="14" height="36"></rect>
+                <rect class="nd-forward" x="846" y="24" width="14" height="6"></rect>
+                <rect class="nd-ended" x="846" y="50" width="14" height="12"></rect>
+              </svg>
+              <span class="lab" style="left:0;top:2px"><b>Applied</b> 34</span>
+              <span class="lab" style="left:22px;top:190px">10 waiting</span>
+              <span class="lab" style="left:calc(50% - 7px);top:2px"><b>Interviewing / OA</b> 7</span>
+              <span class="lab" style="left:calc(50% + 16px);top:50px">4 still interviewing</span>
+              <span class="lab" style="left:calc(50% + 16px);top:111px"><b>Rejected</b> 11</span>
+              <span class="lab" style="left:calc(50% + 16px);top:182px"><b>Ghosted</b> 6</span>
+            </div>
+            <div class="flow-out">
+              <span class="lab" style="left:0;top:19px"><b>Offer</b> 1</span>
+              <span class="lab" style="left:0;top:48px"><b>Failed Interview/OA</b> 2</span>
+            </div>
+          </div>
+          <dl class="flow-legend">
+            <dt><i class="sw applied"></i>Applied</dt><dd>34</dd>
+            <dt class="sub"><i class="sw forward"></i>Interviewing / OA</dt><dd>7</dd>
+            <dt class="sub"><i class="sw ended"></i>Rejected</dt><dd>11</dd>
+            <dt class="sub"><i class="sw ended-2"></i>Ghosted</dt><dd>6</dd>
+            <dt class="sub"><i class="sw open"></i>Still waiting</dt><dd>10</dd>
+            <dt><i class="sw forward"></i>From Interviewing / OA</dt><dd>7</dd>
+            <dt class="sub"><i class="sw forward"></i>Offer</dt><dd>1</dd>
+            <dt class="sub"><i class="sw ended"></i>Failed Interview/OA</dt><dd>2</dd>
+            <dt class="sub"><i class="sw open"></i>Still interviewing</dt><dd>4</dd>
+          </dl>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <section id="recaps" class="section" aria-labelledby="recaps-title">
+    <div class="frame split">
+      <div class="recaps-copy">
+        <h2 id="recaps-title">Any range becomes a card</h2>
+        <p>Download it, or share it from your phone.</p>
+        <div class="seg seg-ranges" role="group" aria-label="Range">
+          <button type="button" data-range="week" aria-pressed="false" aria-controls="sheet">This week</button>
+          <button type="button" data-range="month" aria-pressed="false" aria-controls="sheet">This month</button>
+          <button type="button" data-range="year" aria-pressed="true" aria-controls="sheet">This year</button>
+          <button type="button" data-range="all" aria-pressed="false" aria-controls="sheet">All time</button>
+        </div>
+        <p class="sr-only" id="range-status" role="status"></p>
+      </div>
+      <div class="stage">
+        <div class="sheet" id="sheet">
+          <div class="card card-ink" role="img" id="sheet-card" aria-label="Sample recap card for this year: 96 applications, 14 interviews, 2 offers.">
+            <div class="card-head" data-k="title">This year</div>
+            <div class="stats">
+              <div><div class="n-l" data-k="apps">96</div><span class="soft">Applications</span></div>
+              <div><div class="n-l" data-k="interviews">14</div><span class="soft">Interviews</span></div>
+              <div><div class="n-l" data-k="offers">2</div><span class="soft" data-k="offerLabel">Offers</span></div>
+            </div>
+            <div class="bar" id="sheet-bar"><span class="interviewed" style="flex:14"></span><span class="rejected" style="flex:31"></span><span class="ghosted" style="flex:21"></span><span class="open" style="flex:30"></span></div>
+            <div class="bar-key soft" id="sheet-key"><span>14 interviewed</span><span>31 rejected</span><span>21 ghosted</span><span>30 waiting</span></div>
+            <div class="card-foot"><img src="../../frontend/src/assets/JourneyJobLogoDark.png" alt="" width="83" height="16"><span class="soft" data-k="dates">2026</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="privacy" class="section" aria-labelledby="privacy-title">
+    <div class="frame split">
+      <div class="priv-copy">
+        <h2 id="privacy-title">Your board stays yours</h2>
+        <p>Only you can see it, and nothing leaves unless you export a card.</p>
+      </div>
+      <div class="lists">
+        <div>
+          <h3>Stays on your board</h3>
+          <ul><li>Companies</li><li>Roles</li><li>Salaries</li><li>Notes</li><li>Links</li><li>Statuses</li></ul>
+        </div>
+        <div>
+          <h3>Can go on a card</h3>
+          <ul><li>Totals</li><li>Rates</li><li>Pipeline flow</li></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="close" aria-labelledby="close-title">
+    <div class="frame split">
+      <div class="close-copy">
+        <h2 id="close-title">Start with one link</h2>
+        <p>Make an account, check the filled-in fields, and save.</p>
+      </div>
+      <form class="start-form" id="start-form" action="/signup" method="get" novalidate="">
+        <div>
+          <label class="field-label" for="posting">Job posting link</label>
+          <input class="text-input" id="posting" name="posting" type="url" inputmode="url" placeholder="https://boards.greenhouse.io/…" spellcheck="false" aria-describedby="posting-note" style="">
+          <p class="field-note" id="posting-note" aria-live="polite">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="8" y2="12"></line><line x1="12" x2="12.01" y1="16" y2="16"></line></svg>
+            <span>Optional. Starts with https://</span>
+          </p>
+        </div>
+        <div class="start-row">
+          <fieldset>
+            <legend>Status</legend>
+            <div class="seg">
+              <label><input type="radio" name="status" value="applied" checked="" style="">Applied</label>
+              <label><input type="radio" name="status" value="saved" style="">Saved</label>
+            </div>
+          </fieldset>
+          <button class="btn btn-primary" type="submit">Start your board</button>
+        </div>
+      </form>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="frame">
+    <span>© 2026 JourneyJob</span>
+    <nav aria-label="Footer"><a href="/app">Open the app</a><a href="/login">Log in</a><a href="/signup">Start your board</a><a href="#privacy">Privacy</a></nav>
+    <div class="seg seg-theme" role="group" aria-label="Theme">
+      <button type="button" data-theme-choice="light" aria-pressed="false">Light</button>
+      <button type="button" data-theme-choice="dark" aria-pressed="false">Dark</button>
+      <button type="button" data-theme-choice="system" aria-pressed="true">System</button>
+    </div>
+  </div>
+</footer>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  // The one motion idea on the page: what just changed settles in. Opacity only, so it stays under reduced motion.
+  const settle = (el) => el.animate?.([{ opacity: 0.4 }, { opacity: 1 }], { duration: 180, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
+
+  // The card strip is a Tab stop only where it actually scrolls.
+  const strip = document.querySelector('.strip');
+  const stripFocus = () => strip.scrollWidth > strip.clientWidth + 1 ? strip.setAttribute('tabindex', '0') : strip.removeAttribute('tabindex');
+  addEventListener('resize', stripFocus);
+  stripFocus();
+
+  // Paste step: the same host rule as the backend's autofill (exact domain or true subdomain).
+  const SOURCES = [['greenhouse.io', 'Greenhouse'], ['myworkdayjobs.com', 'Workday']];
+  const SAMPLE = { company: 'Northwind', location: 'Remote (US)', title: 'Software Engineer, New Grad' };
+  const hostOf = (value) => {
+    try { const u = new URL(value.trim()); return /^https?:$/.test(u.protocol) ? u.hostname.toLowerCase() : null; } catch { return null; }
+  };
+  const sourceOf = (host) => SOURCES.find(([domain]) => host === domain || host.endsWith('.' + domain))?.[1];
+  const link = $('posting-1');
+  const cells = [...document.querySelectorAll('[data-fill]')];
+  const applyLink = () => {
+    const host = hostOf(link.value);
+    const source = host && sourceOf(host);
+    for (const c of cells) {
+      c.textContent = source ? SAMPLE[c.dataset.fill] : 'You fill this in';
+      c.classList.toggle('is-empty', !source);
+      settle(c);
+    }
+    $('fill-state').textContent = source ? `Filled from ${source}. Check it, then save.`
+      : host ? 'Not a Greenhouse or Workday link, so you fill these in.'
+      : 'Paste the full link, starting with https://';
+  };
+  link.addEventListener('input', applyLink);
+  $('date-applied').textContent = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date());
+
+  // Silence step: the threshold re-sorts the sample month. All 16 count; the table shows the 6 it has room for.
+  const QUIET = [31, 26, 22, 19, 17, 15, 12, 11, 10, 9, 8, 6, 5, 4, 3, 2];
+  const slider = $('ghost-days');
+  const rows = [...document.querySelectorAll('#ghost-rows tr')];
+  const applyThreshold = () => {
+    const limit = Number(slider.value);
+    const ghosted = QUIET.filter((days) => days >= limit).length;
+    $('ghost-out').textContent = limit;
+    slider.setAttribute('aria-valuetext', `${limit} days`);
+    $('ghost-count').textContent = ghosted;
+    $('wait-count').textContent = QUIET.length - ghosted;
+    for (const r of rows) {
+      const isGhosted = Number(r.dataset.days) >= limit;
+      r.classList.toggle('is-ghosted', isGhosted);
+      r.querySelector('.st').textContent = isGhosted ? 'Ghosted' : 'Applied';
+    }
+  };
+  slider.addEventListener('input', applyThreshold);
+  applyThreshold();
+
+  // Ranges: sample recaps; interviewed + rejected + ghosted + waiting = applications.
+  const RANGES = {
+    week:  { title: 'This week',  dates: 'Aug 25 – 31',    apps: 9,   int: 2,  off: 0, rej: 3,  gho: 1,  wait: 3 },
+    month: { title: 'This month', dates: 'Aug 2026',       apps: 34,  int: 7,  off: 1, rej: 11, gho: 6,  wait: 10 },
+    year:  { title: 'This year',  dates: '2026',           apps: 96,  int: 14, off: 2, rej: 31, gho: 21, wait: 30 },
+    all:   { title: 'All time',   dates: 'Since Oct 2025', apps: 128, int: 18, off: 3, rej: 41, gho: 27, wait: 42 },
+  };
+  const card = $('sheet-card');
+  const rangeButtons = [...document.querySelectorAll('[data-range]')];
+  const showRange = (key) => {
+    const r = RANGES[key];
+    const set = (k, value) => { card.querySelector(`[data-k="${k}"]`).textContent = value; };
+    const offers = `${r.off} ${r.off === 1 ? 'offer' : 'offers'}`;
+    rangeButtons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.range === key)));
+    set('title', r.title); set('dates', r.dates); set('apps', r.apps); set('interviews', r.int);
+    set('offers', r.off); set('offerLabel', r.off === 1 ? 'Offer' : 'Offers');
+    document.querySelectorAll('#sheet-bar span').forEach((s, i) => { s.style.flex = [r.int, r.rej, r.gho, r.wait][i]; });
+    $('sheet-key').replaceChildren(...[`${r.int} interviewed`, `${r.rej} rejected`, `${r.gho} ghosted`, `${r.wait} waiting`].map((text) => Object.assign(document.createElement('span'), { textContent: text })));
+    card.setAttribute('aria-label', `Sample recap card for ${r.title.toLowerCase()}: ${r.apps} applications, ${r.int} interviews, ${offers}.`);
+    $('range-status').textContent = `${r.title}: ${r.apps} applications, ${r.int} interviews, ${offers}.`;
+    settle(card);
+  };
+  rangeButtons.forEach((b) => b.addEventListener('click', () => showRange(b.dataset.range)));
+
+  // Closing form: the link is optional, but a wrong one is caught when the visitor leaves the field or submits.
+  const form = $('start-form');
+  const posting = form.elements.posting;
+  const note = $('posting-note');
+  const noteText = note.querySelector('span');
+  const HINT = noteText.textContent;
+  form.noValidate = true; // native URL validation stays as the fallback without this script
+  const isOk = () => !posting.value.trim() || hostOf(posting.value) !== null;
+  const showError = (bad) => {
+    posting.toggleAttribute('aria-invalid', bad);
+    if (bad) posting.setAttribute('aria-invalid', 'true');
+    note.classList.toggle('is-error', bad);
+    noteText.textContent = bad ? 'That is not a full link. It should start with https://' : HINT;
+  };
+  posting.addEventListener('blur', () => showError(!isOk()));
+  posting.addEventListener('input', () => { if (posting.hasAttribute('aria-invalid') && isOk()) showError(false); });
+  form.addEventListener('submit', (e) => {
+    if (!isOk()) { e.preventDefault(); showError(true); posting.focus(); }
+  });
+
+  // Theme: light, dark or system, remembered with the same key the app uses.
+  const root = document.documentElement;
+  const themeButtons = [...document.querySelectorAll('[data-theme-choice]')];
+  const markTheme = (theme) => themeButtons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.themeChoice === theme)));
+  markTheme(root.dataset.theme || 'system');
+  themeButtons.forEach((b) => b.addEventListener('click', () => {
+    const theme = b.dataset.themeChoice;
+    root.classList.add('theming');
+    if (theme === 'system') delete root.dataset.theme; else root.dataset.theme = theme;
+    try { localStorage.setItem('jtracks_theme', theme); } catch {}
+    markTheme(theme);
+    setTimeout(() => root.classList.remove('theming'), 200);
+  }));
+})();
+</script>
+
+
+</body></html>

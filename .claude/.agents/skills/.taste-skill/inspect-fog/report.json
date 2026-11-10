@@ -1,0 +1,2238 @@
+{
+ "url": "docs/wireframes/landing-v2-fog.html",
+ "at": "2026-11-04T20:03:05.520Z",
+ "allow": [],
+ "viewports": [
+  {
+   "width": 1440,
+   "height": 900,
+   "load": "load",
+   "screens": 8,
+   "filled": [
+    0.52,
+    0.56,
+    0.53,
+    0.57,
+    0.46,
+    0.34,
+    0.62,
+    0.63
+   ],
+   "motion": {
+    "elements": 37,
+    "css": 4,
+    "transitions": 33,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 1440,
+     "h": 900
+    },
+    "page": {
+     "height": 6589,
+     "screens": 7.3,
+     "words": 683,
+     "img": 5,
+     "video": 0,
+     "canvas": 0,
+     "svg": 2,
+     "sections": 5,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 6,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 6,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "34",
+     "words": 1,
+     "chars": 2,
+     "lines": 1,
+     "size": 80.9,
+     "vw": 5.6,
+     "font": "Switzer",
+     "weight": 600,
+     "tracking": -0.05,
+     "leading": 0.9,
+     "upper": false,
+     "italic": false,
+     "mono": false,
+     "align": "left",
+     "position": "right",
+     "widthRatio": 0.17,
+     "top": 253,
+     "tag": "div",
+     "kind": "heading"
+    },
+    "h1": {
+     "text": "Track the search. Share the month.",
+     "words": 6,
+     "lines": 2,
+     "size": 51.8,
+     "font": "Switzer"
+    },
+    "headings": [
+     {
+      "text": "34",
+      "words": 1,
+      "chars": 2,
+      "lines": 1,
+      "size": 80.9,
+      "vw": 5.6,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.05,
+      "leading": 0.9,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "right",
+      "widthRatio": 0.17,
+      "top": 253,
+      "tag": "div",
+      "kind": "heading"
+     },
+     {
+      "text": "34",
+      "words": 1,
+      "chars": 2,
+      "lines": 1,
+      "size": 35.7,
+      "vw": 2.5,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.17,
+      "top": 253,
+      "tag": "div",
+      "kind": "statement"
+     },
+     {
+      "text": "Track the search. Share the month.",
+      "words": 6,
+      "chars": 34,
+      "lines": 2,
+      "size": 51.8,
+      "vw": 3.6,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 0.98,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.33,
+      "top": 298,
+      "tag": "h1",
+      "kind": "heading"
+     },
+     {
+      "text": "7",
+      "words": 1,
+      "chars": 1,
+      "lines": 1,
+      "size": 35.7,
+      "vw": 2.5,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.17,
+      "top": 315,
+      "tag": "div",
+      "kind": "statement"
+     },
+     {
+      "text": "1",
+      "words": 1,
+      "chars": 1,
+      "lines": 1,
+      "size": 35.7,
+      "vw": 2.5,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.17,
+      "top": 378,
+      "tag": "div",
+      "kind": "statement"
+     },
+     {
+      "text": "How the card gets made",
+      "words": 5,
+      "chars": 22,
+      "lines": 1,
+      "size": 51.8,
+      "vw": 3.6,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 0.98,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.96,
+      "top": 879,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Any range becomes a card",
+      "words": 5,
+      "chars": 24,
+      "lines": 2,
+      "size": 51.8,
+      "vw": 3.6,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 0.98,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.38,
+      "top": 2972,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "34",
+      "words": 1,
+      "chars": 2,
+      "lines": 1,
+      "size": 43.2,
+      "vw": 3,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "right",
+      "widthRatio": 0.2,
+      "top": 3112,
+      "tag": "div",
+      "kind": "heading"
+     },
+     {
+      "text": "7",
+      "words": 1,
+      "chars": 1,
+      "lines": 1,
+      "size": 43.2,
+      "vw": 3,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "right",
+      "widthRatio": 0.2,
+      "top": 3182,
+      "tag": "div",
+      "kind": "heading"
+     },
+     {
+      "text": "This week",
+      "words": 2,
+      "chars": 9,
+      "lines": 1,
+      "size": 51.8,
+      "vw": 3.6,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1.1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.38,
+      "top": 3195,
+      "tag": "button",
+      "kind": "statement"
+     },
+     {
+      "text": "1",
+      "words": 1,
+      "chars": 1,
+      "lines": 1,
+      "size": 43.2,
+      "vw": 3,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "right",
+      "widthRatio": 0.2,
+      "top": 3252,
+      "tag": "div",
+      "kind": "heading"
+     },
+     {
+      "text": "This month",
+      "words": 2,
+      "chars": 10,
+      "lines": 1,
+      "size": 51.8,
+      "vw": 3.6,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1.1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.38,
+      "top": 3663,
+      "tag": "button",
+      "kind": "statement"
+     },
+     {
+      "text": "This year",
+      "words": 2,
+      "chars": 9,
+      "lines": 1,
+      "size": 51.8,
+      "vw": 3.6,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1.1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.38,
+      "top": 4131,
+      "tag": "button",
+      "kind": "statement"
+     },
+     {
+      "text": "All time",
+      "words": 2,
+      "chars": 8,
+      "lines": 1,
+      "size": 51.8,
+      "vw": 3.6,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1.1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.38,
+      "top": 4599,
+      "tag": "button",
+      "kind": "statement"
+     },
+     {
+      "text": "Your board stays yours",
+      "words": 4,
+      "chars": 22,
+      "lines": 1,
+      "size": 51.8,
+      "vw": 3.6,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 0.98,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "right",
+      "widthRatio": 0.63,
+      "top": 5042,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Start with one link.",
+      "words": 4,
+      "chars": 20,
+      "lines": 2,
+      "size": 100.8,
+      "vw": 7,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.045,
+      "leading": 0.92,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.42,
+      "top": 5891,
+      "tag": "h2",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 16,
+     "maxLines": 2,
+     "over2Lines": 0,
+     "statements": 7,
+     "centered": 0,
+     "medianWords": 2,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Switzer",
+       "share": 1,
+       "mono": false
+      }
+     ],
+     "familyCount": 1,
+     "sizes": [
+      14,
+      19,
+      26,
+      52,
+      101
+     ],
+     "sizeCount": 5,
+     "notLoaded": [],
+     "body": {
+      "font": "Switzer",
+      "size": 19,
+      "leading": 1.5,
+      "weight": 400,
+      "tracking": -0.005,
+      "contrast": 14.6
+     },
+     "measureChars": 57,
+     "max": {
+      "size": 100.8,
+      "vw": 7,
+      "font": "Switzer",
+      "text": "Start with"
+     },
+     "monoShare": 0,
+     "monoProseShare": 0,
+     "monoFamilies": [],
+     "monoSamples": [],
+     "microLabels": 0,
+     "microLabelShare": 0,
+     "microSamples": [],
+     "upperShare": 0,
+     "centerShare": 0.01,
+     "smallText": 0
+    },
+    "eyebrows": [],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#f0f2f5",
+     "bodyBgHsl": {
+      "h": 216,
+      "s": 0.2,
+      "l": 0.95
+     },
+     "dark": false,
+     "sectionBgs": [
+      {
+       "color": "#ffffff",
+       "top": 2340,
+       "hsl": {
+        "h": 0,
+        "s": 0,
+        "l": 1
+       }
+      },
+      {
+       "color": "#d6dde8",
+       "top": 2972,
+       "hsl": {
+        "h": 217,
+        "s": 0.28,
+        "l": 0.87
+       }
+      },
+      {
+       "color": "#0f57fe",
+       "top": 5728,
+       "hsl": {
+        "h": 222,
+        "s": 0.99,
+        "l": 0.53
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#1c2028",
+       "share": 0.68
+      },
+      {
+       "color": "#4b5260",
+       "share": 0.2
+      },
+      {
+       "color": "#ffffff",
+       "share": 0.06
+      },
+      {
+       "color": "#bcc3ce",
+       "share": 0.05
+      },
+      {
+       "color": "#f3f5f8",
+       "share": 0.01
+      }
+     ],
+     "button": {
+      "bg": "#0f57fe",
+      "hsl": {
+       "h": 222,
+       "s": 0.99,
+       "l": 0.53
+      },
+      "fg": "#ffffff"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 5,
+     "inHero": 4,
+     "radius": "pill",
+     "height": 48,
+     "withShadow": 0,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "Skip to content",
+      "Start your board",
+      "Start your board",
+      "Log in"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 0,
+     "shadowOverlay": 2,
+     "shadowSamples": [],
+     "gradients": 0,
+     "scrims": 0,
+     "gradientSamples": [],
+     "gradientText": 0,
+     "hairlines": 0,
+     "hairlineSamples": [],
+     "outlinedBoxes": 0,
+     "dashed": 0,
+     "blurred": 0,
+     "roundedBoxes": 10,
+     "boxRadius": 16,
+     "squareMedia": 0,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": []
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 6,
+     "fixed": false,
+     "height": 76,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "switzer"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 1440,
+     "h": 900
+    },
+    "pageH": 6589,
+    "margins": {
+     "left": 32,
+     "right": 48
+    },
+    "sections": [
+     {
+      "sel": "section.hero",
+      "tag": "section",
+      "top": 117,
+      "height": 589,
+      "words": 100,
+      "media": 0,
+      "middle": 76,
+      "heading": {
+       "text": "34",
+       "size": 81,
+       "tag": "div"
+      },
+      "left": 32,
+      "right": 48,
+      "textLeft": 32,
+      "textRight": 48,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#how.section",
+      "tag": "section",
+      "top": 706,
+      "height": 2093,
+      "words": 276,
+      "media": 1,
+      "middle": 0,
+      "heading": {
+       "text": "How the card gets made",
+       "size": 52,
+       "tag": "h2"
+      },
+      "left": 32,
+      "right": 52,
+      "textLeft": 32,
+      "textRight": 52,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#recaps.section",
+      "tag": "section",
+      "top": 2799,
+      "height": 2069,
+      "words": 98,
+      "media": 0,
+      "middle": 298,
+      "heading": {
+       "text": "Any range becomes a card",
+       "size": 52,
+       "tag": "h2"
+      },
+      "left": 32,
+      "right": 273,
+      "textLeft": 32,
+      "textRight": 273,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": true
+     },
+     {
+      "sel": "section#privacy.section",
+      "tag": "section",
+      "top": 4869,
+      "height": 715,
+      "words": 97,
+      "media": 0,
+      "middle": 334,
+      "heading": {
+       "text": "Your board stays yours",
+       "size": 52,
+       "tag": "h2"
+      },
+      "left": 32,
+      "right": 221,
+      "textLeft": 32,
+      "textRight": 221,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section.close",
+      "tag": "section",
+      "top": 5728,
+      "height": 541,
+      "words": 50,
+      "media": 0,
+      "middle": 498,
+      "heading": {
+       "text": "Start with",
+       "size": 101,
+       "tag": "h2"
+      },
+      "left": 32,
+      "right": 52,
+      "textLeft": 32,
+      "textRight": 103,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "footer.foot",
+      "tag": "footer",
+      "top": 6268,
+      "height": 321,
+      "words": 17,
+      "media": 0,
+      "middle": 475,
+      "heading": null,
+      "left": 32,
+      "right": 32,
+      "textLeft": 32,
+      "textRight": 32,
+      "fullBleed": false,
+      "footer": true,
+      "hero": false,
+      "continues": false,
+      "pinned": false
+     }
+    ],
+    "gaps": [
+     {
+      "top": 5584,
+      "height": 276
+     },
+     {
+      "top": 6152,
+      "height": 384
+     }
+    ],
+    "h1s": [
+     {
+      "text": "Track the search. Share the month.",
+      "size": 52,
+      "top": 298,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 32,
+      "n": 13
+     },
+     {
+      "x": 500,
+      "n": 3
+     },
+     {
+      "x": 824,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 17,
+    "bodySize": 19,
+    "stage": false,
+    "explains": true,
+    "slivers": [],
+    "voidShare": 0.13,
+    "voidBox": {
+     "x": 0,
+     "y": 720,
+     "w": 1440,
+     "h": 120
+    }
+   },
+   "app": null,
+   "consoleErrors": []
+  },
+  {
+   "width": 768,
+   "height": 1024,
+   "load": "load",
+   "screens": 7,
+   "filled": [
+    0.59,
+    0.59,
+    0.68,
+    0.7,
+    0.42,
+    0.65,
+    0.64
+   ],
+   "motion": {
+    "elements": 34,
+    "css": 4,
+    "transitions": 30,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "page": {
+     "height": 6603,
+     "screens": 6.4,
+     "words": 641,
+     "img": 5,
+     "video": 0,
+     "canvas": 0,
+     "svg": 2,
+     "sections": 5,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 6,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 6,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "34",
+     "words": 1,
+     "chars": 2,
+     "lines": 1,
+     "size": 68.2,
+     "vw": 8.9,
+     "font": "Switzer",
+     "weight": 600,
+     "tracking": -0.05,
+     "leading": 0.9,
+     "upper": false,
+     "italic": false,
+     "mono": false,
+     "align": "left",
+     "position": "center",
+     "widthRatio": 0.26,
+     "top": 550,
+     "tag": "div",
+     "kind": "heading"
+    },
+    "h1": {
+     "text": "Track the search. Share the month.",
+     "words": 6,
+     "lines": 2,
+     "size": 46.1,
+     "font": "Switzer"
+    },
+    "headings": [
+     {
+      "text": "Track the search. Share the month.",
+      "words": 6,
+      "chars": 34,
+      "lines": 2,
+      "size": 46.1,
+      "vw": 6,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 0.98,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.75,
+      "top": 155,
+      "tag": "h1",
+      "kind": "heading"
+     },
+     {
+      "text": "34",
+      "words": 1,
+      "chars": 2,
+      "lines": 1,
+      "size": 68.2,
+      "vw": 8.9,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.05,
+      "leading": 0.9,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.26,
+      "top": 550,
+      "tag": "div",
+      "kind": "heading"
+     },
+     {
+      "text": "34",
+      "words": 1,
+      "chars": 2,
+      "lines": 1,
+      "size": 30.1,
+      "vw": 3.9,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.26,
+      "top": 550,
+      "tag": "div",
+      "kind": "statement"
+     },
+     {
+      "text": "7",
+      "words": 1,
+      "chars": 1,
+      "lines": 1,
+      "size": 30.1,
+      "vw": 3.9,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.26,
+      "top": 607,
+      "tag": "div",
+      "kind": "statement"
+     },
+     {
+      "text": "1",
+      "words": 1,
+      "chars": 1,
+      "lines": 1,
+      "size": 30.1,
+      "vw": 3.9,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.26,
+      "top": 664,
+      "tag": "div",
+      "kind": "statement"
+     },
+     {
+      "text": "How the card gets made",
+      "words": 5,
+      "chars": 22,
+      "lines": 1,
+      "size": 46.1,
+      "vw": 6,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 0.98,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.95,
+      "top": 1049,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Any range becomes a card",
+      "words": 5,
+      "chars": 24,
+      "lines": 1,
+      "size": 46.1,
+      "vw": 6,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 0.98,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.95,
+      "top": 3513,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "34",
+      "words": 1,
+      "chars": 2,
+      "lines": 1,
+      "size": 43.2,
+      "vw": 5.6,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.38,
+      "top": 3854,
+      "tag": "div",
+      "kind": "heading"
+     },
+     {
+      "text": "7",
+      "words": 1,
+      "chars": 1,
+      "lines": 1,
+      "size": 43.2,
+      "vw": 5.6,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.38,
+      "top": 3924,
+      "tag": "div",
+      "kind": "heading"
+     },
+     {
+      "text": "1",
+      "words": 1,
+      "chars": 1,
+      "lines": 1,
+      "size": 43.2,
+      "vw": 5.6,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.38,
+      "top": 3994,
+      "tag": "div",
+      "kind": "heading"
+     },
+     {
+      "text": "Your board stays yours",
+      "words": 4,
+      "chars": 22,
+      "lines": 1,
+      "size": 46.1,
+      "vw": 6,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 0.98,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.95,
+      "top": 4562,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Start with one link.",
+      "words": 4,
+      "chars": 20,
+      "lines": 2,
+      "size": 53.8,
+      "vw": 7,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.045,
+      "leading": 0.92,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.95,
+      "top": 5600,
+      "tag": "h2",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 12,
+     "maxLines": 2,
+     "over2Lines": 0,
+     "statements": 3,
+     "centered": 0,
+     "medianWords": 4,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Switzer",
+       "share": 1,
+       "mono": false
+      }
+     ],
+     "familyCount": 1,
+     "sizes": [
+      14,
+      18,
+      23,
+      46,
+      54
+     ],
+     "sizeCount": 5,
+     "notLoaded": [],
+     "body": {
+      "font": "Switzer",
+      "size": 17.9,
+      "leading": 1.5,
+      "weight": 400,
+      "tracking": -0.005,
+      "contrast": 14.6
+     },
+     "measureChars": 63,
+     "max": {
+      "size": 68.2,
+      "vw": 8.9,
+      "font": "Switzer",
+      "text": "34"
+     },
+     "monoShare": 0,
+     "monoProseShare": 0,
+     "monoFamilies": [],
+     "monoSamples": [],
+     "microLabels": 0,
+     "microLabelShare": 0,
+     "microSamples": [],
+     "upperShare": 0,
+     "centerShare": 0.01,
+     "smallText": 0
+    },
+    "eyebrows": [],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#f0f2f5",
+     "bodyBgHsl": {
+      "h": 216,
+      "s": 0.2,
+      "l": 0.95
+     },
+     "dark": false,
+     "sectionBgs": [
+      {
+       "color": "#ffffff",
+       "top": 1441,
+       "hsl": {
+        "h": 0,
+        "s": 0,
+        "l": 1
+       }
+      },
+      {
+       "color": "#d6dde8",
+       "top": 3734,
+       "hsl": {
+        "h": 217,
+        "s": 0.28,
+        "l": 0.87
+       }
+      },
+      {
+       "color": "#0f57fe",
+       "top": 5536,
+       "hsl": {
+        "h": 222,
+        "s": 0.99,
+        "l": 0.53
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#1c2028",
+       "share": 0.66
+      },
+      {
+       "color": "#4b5260",
+       "share": 0.21
+      },
+      {
+       "color": "#ffffff",
+       "share": 0.07
+      },
+      {
+       "color": "#bcc3ce",
+       "share": 0.05
+      },
+      {
+       "color": "#f3f5f8",
+       "share": 0.01
+      }
+     ],
+     "button": {
+      "bg": "#0f57fe",
+      "hsl": {
+       "h": 222,
+       "s": 0.99,
+       "l": 0.53
+      },
+      "fg": "#ffffff"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 5,
+     "inHero": 4,
+     "radius": "pill",
+     "height": 48,
+     "withShadow": 0,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "Skip to content",
+      "Start your board",
+      "Start your board",
+      "Log in"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 0,
+     "shadowOverlay": 2,
+     "shadowSamples": [],
+     "gradients": 0,
+     "scrims": 0,
+     "gradientSamples": [],
+     "gradientText": 0,
+     "hairlines": 0,
+     "hairlineSamples": [],
+     "outlinedBoxes": 0,
+     "dashed": 0,
+     "blurred": 0,
+     "roundedBoxes": 10,
+     "boxRadius": 16,
+     "squareMedia": 0,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": []
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 3,
+     "fixed": false,
+     "height": 76,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "switzer"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "pageH": 6603,
+    "margins": {
+     "left": 19,
+     "right": 35
+    },
+    "sections": [
+     {
+      "sel": "section.hero",
+      "tag": "section",
+      "top": 117,
+      "height": 820,
+      "words": 100,
+      "media": 0,
+      "middle": 20,
+      "heading": {
+       "text": "34",
+       "size": 68,
+       "tag": "div"
+      },
+      "left": 19,
+      "right": 35,
+      "textLeft": 19,
+      "textRight": 35,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#how.section",
+      "tag": "section",
+      "top": 937,
+      "height": 2465,
+      "words": 276,
+      "media": 1,
+      "middle": 3,
+      "heading": {
+       "text": "How the card gets made",
+       "size": 46,
+       "tag": "h2"
+      },
+      "left": 19,
+      "right": 39,
+      "textLeft": 19,
+      "textRight": 39,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#recaps.section",
+      "tag": "section",
+      "top": 3401,
+      "height": 1049,
+      "words": 57,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Any range becomes a card",
+       "size": 46,
+       "tag": "h2"
+      },
+      "left": 19,
+      "right": 227,
+      "textLeft": 19,
+      "textRight": 227,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#privacy.section",
+      "tag": "section",
+      "top": 4450,
+      "height": 973,
+      "words": 97,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Your board stays yours",
+       "size": 46,
+       "tag": "h2"
+      },
+      "left": 19,
+      "right": 23,
+      "textLeft": 19,
+      "textRight": 23,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section.close",
+      "tag": "section",
+      "top": 5536,
+      "height": 651,
+      "words": 50,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Start with",
+       "size": 54,
+       "tag": "h2"
+      },
+      "left": 19,
+      "right": 278,
+      "textLeft": 19,
+      "textRight": 278,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "footer.foot",
+      "tag": "footer",
+      "top": 6187,
+      "height": 416,
+      "words": 17,
+      "media": 0,
+      "middle": 0,
+      "heading": null,
+      "left": 19,
+      "right": 500,
+      "textLeft": 19,
+      "textRight": 500,
+      "fullBleed": false,
+      "footer": true,
+      "hero": false,
+      "continues": false,
+      "pinned": false
+     }
+    ],
+    "gaps": [
+     {
+      "top": 6104,
+      "height": 388
+     }
+    ],
+    "h1s": [
+     {
+      "text": "Track the search. Share the month.",
+      "size": 46,
+      "top": 155,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 19,
+      "n": 17
+     }
+    ],
+    "leftBlocks": 17,
+    "bodySize": 18,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0,
+    "voidBox": null
+   },
+   "app": null,
+   "consoleErrors": []
+  },
+  {
+   "width": 390,
+   "height": 844,
+   "load": "load",
+   "screens": 9,
+   "filled": [
+    0.69,
+    0.58,
+    0.73,
+    0.76,
+    0.67,
+    0.73,
+    0.42,
+    0.76,
+    0.62
+   ],
+   "motion": {
+    "elements": 33,
+    "css": 4,
+    "transitions": 29,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "page": {
+     "height": 7178,
+     "screens": 8.5,
+     "words": 625,
+     "img": 5,
+     "video": 0,
+     "canvas": 0,
+     "svg": 2,
+     "sections": 5,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 6,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 6,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "34",
+     "words": 1,
+     "chars": 2,
+     "lines": 1,
+     "size": 80.9,
+     "vw": 20.7,
+     "font": "Switzer",
+     "weight": 600,
+     "tracking": -0.05,
+     "leading": 0.9,
+     "upper": false,
+     "italic": false,
+     "mono": false,
+     "align": "left",
+     "position": "right",
+     "widthRatio": 0.61,
+     "top": 570,
+     "tag": "div",
+     "kind": "heading"
+    },
+    "h1": {
+     "text": "Track the search. Share the month.",
+     "words": 6,
+     "lines": 2,
+     "size": 38,
+     "font": "Switzer"
+    },
+    "headings": [
+     {
+      "text": "Track the search. Share the month.",
+      "words": 6,
+      "chars": 34,
+      "lines": 2,
+      "size": 38,
+      "vw": 9.7,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 0.98,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.92,
+      "top": 170,
+      "tag": "h1",
+      "kind": "heading"
+     },
+     {
+      "text": "34",
+      "words": 1,
+      "chars": 2,
+      "lines": 1,
+      "size": 80.9,
+      "vw": 20.7,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.05,
+      "leading": 0.9,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "right",
+      "widthRatio": 0.61,
+      "top": 570,
+      "tag": "div",
+      "kind": "heading"
+     },
+     {
+      "text": "34",
+      "words": 1,
+      "chars": 2,
+      "lines": 1,
+      "size": 35.7,
+      "vw": 9.2,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.61,
+      "top": 570,
+      "tag": "div",
+      "kind": "statement"
+     },
+     {
+      "text": "7",
+      "words": 1,
+      "chars": 1,
+      "lines": 1,
+      "size": 35.7,
+      "vw": 9.2,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.61,
+      "top": 633,
+      "tag": "div",
+      "kind": "statement"
+     },
+     {
+      "text": "1",
+      "words": 1,
+      "chars": 1,
+      "lines": 1,
+      "size": 35.7,
+      "vw": 9.2,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.61,
+      "top": 696,
+      "tag": "div",
+      "kind": "statement"
+     },
+     {
+      "text": "How the card gets made",
+      "words": 5,
+      "chars": 22,
+      "lines": 2,
+      "size": 38,
+      "vw": 9.7,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 0.98,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.92,
+      "top": 1156,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Any range becomes a card",
+      "words": 5,
+      "chars": 24,
+      "lines": 2,
+      "size": 38,
+      "vw": 9.7,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 0.98,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.92,
+      "top": 3954,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "34",
+      "words": 1,
+      "chars": 2,
+      "lines": 1,
+      "size": 43.2,
+      "vw": 11.1,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.74,
+      "top": 4381,
+      "tag": "div",
+      "kind": "heading"
+     },
+     {
+      "text": "7",
+      "words": 1,
+      "chars": 1,
+      "lines": 1,
+      "size": 43.2,
+      "vw": 11.1,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.74,
+      "top": 4451,
+      "tag": "div",
+      "kind": "heading"
+     },
+     {
+      "text": "1",
+      "words": 1,
+      "chars": 1,
+      "lines": 1,
+      "size": 43.2,
+      "vw": 11.1,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.74,
+      "top": 4521,
+      "tag": "div",
+      "kind": "heading"
+     },
+     {
+      "text": "Your board stays yours",
+      "words": 4,
+      "chars": 22,
+      "lines": 2,
+      "size": 38,
+      "vw": 9.7,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.04,
+      "leading": 0.98,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.92,
+      "top": 5054,
+      "tag": "h2",
+      "kind": "heading"
+     },
+     {
+      "text": "Start with one link.",
+      "words": 4,
+      "chars": 20,
+      "lines": 2,
+      "size": 52,
+      "vw": 13.3,
+      "font": "Switzer",
+      "weight": 600,
+      "tracking": -0.045,
+      "leading": 0.92,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.92,
+      "top": 6192,
+      "tag": "h2",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 12,
+     "maxLines": 2,
+     "over2Lines": 0,
+     "statements": 3,
+     "centered": 0,
+     "medianWords": 4,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Switzer",
+       "share": 1,
+       "mono": false
+      }
+     ],
+     "familyCount": 1,
+     "sizes": [
+      14,
+      17,
+      20,
+      38,
+      52
+     ],
+     "sizeCount": 5,
+     "notLoaded": [],
+     "body": {
+      "font": "Switzer",
+      "size": 17,
+      "leading": 1.5,
+      "weight": 400,
+      "tracking": -0.005,
+      "contrast": 14.6
+     },
+     "measureChars": 35,
+     "max": {
+      "size": 80.9,
+      "vw": 20.7,
+      "font": "Switzer",
+      "text": "34"
+     },
+     "monoShare": 0,
+     "monoProseShare": 0,
+     "monoFamilies": [],
+     "monoSamples": [],
+     "microLabels": 0,
+     "microLabelShare": 0,
+     "microSamples": [],
+     "upperShare": 0,
+     "centerShare": 0.01,
+     "smallText": 0
+    },
+    "eyebrows": [],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#f0f2f5",
+     "bodyBgHsl": {
+      "h": 216,
+      "s": 0.2,
+      "l": 0.95
+     },
+     "dark": false,
+     "sectionBgs": [
+      {
+       "color": "#1c2028",
+       "top": 506,
+       "hsl": {
+        "h": 220,
+        "s": 0.18,
+        "l": 0.13
+       }
+      },
+      {
+       "color": "#d6dde8",
+       "top": 506,
+       "hsl": {
+        "h": 217,
+        "s": 0.28,
+        "l": 0.87
+       }
+      },
+      {
+       "color": "#ffffff",
+       "top": 530,
+       "hsl": {
+        "h": 0,
+        "s": 0,
+        "l": 1
+       }
+      },
+      {
+       "color": "#0f57fe",
+       "top": 6128,
+       "hsl": {
+        "h": 222,
+        "s": 0.99,
+        "l": 0.53
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#1c2028",
+       "share": 0.62
+      },
+      {
+       "color": "#4b5260",
+       "share": 0.24
+      },
+      {
+       "color": "#ffffff",
+       "share": 0.07
+      },
+      {
+       "color": "#bcc3ce",
+       "share": 0.06
+      },
+      {
+       "color": "#f3f5f8",
+       "share": 0.01
+      }
+     ],
+     "button": {
+      "bg": "#0f57fe",
+      "hsl": {
+       "h": 222,
+       "s": 0.99,
+       "l": 0.53
+      },
+      "fg": "#ffffff"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 5,
+     "inHero": 4,
+     "radius": "pill",
+     "height": 48,
+     "withShadow": 0,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "Skip to content",
+      "Start your board",
+      "Start your board",
+      "Log in"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 0,
+     "shadowOverlay": 2,
+     "shadowSamples": [],
+     "gradients": 0,
+     "scrims": 0,
+     "gradientSamples": [],
+     "gradientText": 0,
+     "hairlines": 0,
+     "hairlineSamples": [],
+     "outlinedBoxes": 0,
+     "dashed": 0,
+     "blurred": 0,
+     "roundedBoxes": 10,
+     "boxRadius": 16,
+     "squareMedia": 0,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": []
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 3,
+     "fixed": false,
+     "height": 76,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "switzer"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "pageH": 7178,
+    "margins": {
+     "left": 16,
+     "right": 4
+    },
+    "sections": [
+     {
+      "sel": "section.hero",
+      "tag": "section",
+      "top": 138,
+      "height": 906,
+      "words": 76,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "34",
+       "size": 81,
+       "tag": "div"
+      },
+      "left": 16,
+      "right": 0,
+      "textLeft": 16,
+      "textRight": 0,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#how.section",
+      "tag": "section",
+      "top": 1044,
+      "height": 2797,
+      "words": 258,
+      "media": 1,
+      "middle": 0,
+      "heading": {
+       "text": "How the card gets made",
+       "size": 38,
+       "tag": "h2"
+      },
+      "left": 16,
+      "right": 27,
+      "textLeft": 16,
+      "textRight": 27,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#recaps.section",
+      "tag": "section",
+      "top": 3842,
+      "height": 1101,
+      "words": 57,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Any range becomes a card",
+       "size": 38,
+       "tag": "h2"
+      },
+      "left": 16,
+      "right": 45,
+      "textLeft": 16,
+      "textRight": 45,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section#privacy.section",
+      "tag": "section",
+      "top": 4942,
+      "height": 1074,
+      "words": 97,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Your board stays yours",
+       "size": 38,
+       "tag": "h2"
+      },
+      "left": 16,
+      "right": 16,
+      "textLeft": 16,
+      "textRight": 16,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "section.close",
+      "tag": "section",
+      "top": 6128,
+      "height": 688,
+      "words": 50,
+      "media": 0,
+      "middle": 0,
+      "heading": {
+       "text": "Start with",
+       "size": 52,
+       "tag": "h2"
+      },
+      "left": 16,
+      "right": 19,
+      "textLeft": 16,
+      "textRight": 19,
+      "fullBleed": false,
+      "footer": false,
+      "hero": false,
+      "continues": true,
+      "pinned": false
+     },
+     {
+      "sel": "footer.foot",
+      "tag": "footer",
+      "top": 6816,
+      "height": 362,
+      "words": 17,
+      "media": 0,
+      "middle": 0,
+      "heading": null,
+      "left": 16,
+      "right": 125,
+      "textLeft": 16,
+      "textRight": 125,
+      "fullBleed": false,
+      "footer": true,
+      "hero": false,
+      "continues": false,
+      "pinned": false
+     }
+    ],
+    "gaps": [
+     {
+      "top": 6736,
+      "height": 332
+     }
+    ],
+    "h1s": [
+     {
+      "text": "Track the search. Share the month.",
+      "size": 38,
+      "top": 170,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 16,
+      "n": 17
+     }
+    ],
+    "leftBlocks": 17,
+    "bodySize": 17,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0,
+    "voidBox": null
+   },
+   "app": null,
+   "consoleErrors": []
+  }
+ ],
+ "findings": [
+  {
+   "level": "WARN",
+   "id": "no-real-pictures",
+   "width": 1440,
+   "message": "Only 0 real photograph(s) or clip(s); the rest are interface fragments.",
+   "fix": "Add two or more real pictures of the customer's world from scripts/assets.mjs, not stock of people at laptops."
+  },
+  {
+   "level": "WARN",
+   "id": "no-footage",
+   "width": 1440,
+   "message": "No video anywhere on the page.",
+   "fix": "Look for one honest clip with scripts/assets.mjs --video (the place, the material, the process) and use it as a muted loop with a poster frame. Defend its absence only if no clip fits the subject."
+  },
+  {
+   "level": "WARN",
+   "id": "off-centre",
+   "width": 1440,
+   "message": "The margins differ: 32px on the left, 48px on the right, at 1440px.",
+   "fix": "Put the navigation and the content on one pair of margins; check for padding on one side only, a scrollbar gutter, or a header on another inset than the page.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "blank-gap",
+   "width": 1440,
+   "message": "A 384px stretch at 6152px holds nothing.",
+   "fix": "Check that it is a deliberate rest (once per page at most); otherwise close it to the normal section gap."
+  }
+ ],
+ "images": [
+  {
+   "viewport": "desktop",
+   "width": 1440,
+   "fold": "C:\\Users\\elija\\Documents\\jTracks\\.taste-skill\\inspect-fog\\desktop-fold.jpg",
+   "pages": [
+    "C:\\Users\\elija\\Documents\\jTracks\\.taste-skill\\inspect-fog\\desktop-page-01.jpg",
+    "C:\\Users\\elija\\Documents\\jTracks\\.taste-skill\\inspect-fog\\desktop-page-02.jpg"
+   ],
+   "film": []
+  },
+  {
+   "viewport": "tablet",
+   "width": 768,
+   "fold": "C:\\Users\\elija\\Documents\\jTracks\\.taste-skill\\inspect-fog\\tablet-fold.jpg",
+   "pages": [
+    "C:\\Users\\elija\\Documents\\jTracks\\.taste-skill\\inspect-fog\\tablet-page-01.jpg",
+    "C:\\Users\\elija\\Documents\\jTracks\\.taste-skill\\inspect-fog\\tablet-page-02.jpg"
+   ],
+   "film": []
+  },
+  {
+   "viewport": "mobile",
+   "width": 390,
+   "fold": "C:\\Users\\elija\\Documents\\jTracks\\.taste-skill\\inspect-fog\\mobile-fold.jpg",
+   "pages": [
+    "C:\\Users\\elija\\Documents\\jTracks\\.taste-skill\\inspect-fog\\mobile-page-01.jpg",
+    "C:\\Users\\elija\\Documents\\jTracks\\.taste-skill\\inspect-fog\\mobile-page-02.jpg"
+   ],
+   "film": []
+  }
+ ]
+}
