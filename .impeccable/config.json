@@ -1,0 +1,26 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          "docs/wireframes/app-v1.html"
+        ],
+        "createdAt": "2026-11-11T02:09:53.218Z",
+        "reason": "Claude triage: both hits are false positives (the .seg segmented-control track, whose buttons carry their own inset; the recap dialog, whose head/body/footer sections carry their own padding). Rule has no per-element value, so scoped to this one wireframe file."
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          "docs/wireframes/app-v2.html"
+        ],
+        "createdAt": "2026-11-11T06:45:38.514Z",
+        "reason": "Claude triage: same two false positives as app-v1 (the .seg segmented-control track, whose buttons carry their own inset; the recap dialog, whose head/body/footer sections carry their own padding). Scoped to this one wireframe file."
+      }
+    ]
+  }
+}
