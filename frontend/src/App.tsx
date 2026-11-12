@@ -1,5 +1,5 @@
 import { Suspense, lazy } from "react"
-import { Route, Routes } from "react-router"
+import { Navigate, Route, Routes } from "react-router"
 import { AppLayout } from "@/components/layout/AppLayout"
 import { GuestRoute, ProtectedRoute } from "@/components/ProtectedRoute"
 import { TooltipProvider } from "@/components/ui/tooltip"
@@ -7,7 +7,6 @@ import { ApplicationsProvider } from "@/lib/applications-context"
 import { AnalyticsPage } from "@/routes/AnalyticsPage"
 import { ApplicationsPage } from "@/routes/ApplicationsPage"
 import { LoginPage } from "@/routes/LoginPage"
-import { SettingsPage } from "@/routes/SettingsPage"
 import { SignupPage } from "@/routes/SignupPage"
 
 /**
@@ -79,7 +78,8 @@ function App() {
           <Route path="app" element={<AppLayout />}>
             <Route index element={<ApplicationsPage />} />
             <Route path="analytics" element={<AnalyticsPage />} />
-            <Route path="profile" element={<SettingsPage />} />
+            {/* Settings became a modal over any page (`?settings=<tab>`); the old URL still lands there. */}
+            <Route path="profile" element={<Navigate to="/app?settings=ghosting" replace />} />
           </Route>
         </Route>
       </Routes>

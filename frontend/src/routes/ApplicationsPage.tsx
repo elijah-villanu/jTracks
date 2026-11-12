@@ -1,400 +1,221 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { ALL_STATUSES, STATUS_LABEL } from "@/components/StatusBadge"
 import { ConfirmAppliedDialog } from "@/components/applications/confirm-applied-dialog"
 import { ApplicationsBoard } from "@/components/board/applications-board"
-import { ViewModeToggle } from "@/components/board/view-mode-toggle"
-import {
-  ApplicationsToolbar,
-  type StatusFilter,
-} from "@/components/table/applications-toolbar"
-import { ApplicationsCardList } from "@/components/table/applications-card-list"
+import { ALL_STATUSES, STATUS_LABEL } from "@/components/StatusBadge"
 import { ApplicationsTable } from "@/components/table/applications-table"
-import { COLUMN_LABEL, type SortDirection, type SortKey } from "@/components/table/columns"
-import { statusSelectId } from "@/components/table/status-select"
-import { BlurFade } from "@/components/ui/blur-fade"
+import { ApplicationsToolbar, FILTER_BUTTON_ID } from "@/components/table/applications-toolbar"
 import { useApplicationsContext } from "@/hooks/useApplicationsContext"
+import { useAuth } from "@/hooks/useAuth"
 import { useDocumentTitle } from "@/hooks/useDocumentMetadata"
-import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { useViewMode } from "@/hooks/useViewMode"
 import { ApiError, apiErrorMessage } from "@/lib/api-client"
+import { todayDay } from "@/lib/days"
+import { statusTriggerId, type ColumnSort, type TableSort, type TableSortKey } from "@/lib/tracker"
 import type { Application, ApplicationStatus } from "@/types/api"
 
 /**
- * F32 (R13.2 option B): below this width the table has no viable
- * column-hiding left (see applications-table.tsx's own two breakpoints)
- * and swaps out entirely for ApplicationsCardList. Matches Tailwind's
- * `sm` boundary, one step narrower than that component's own two
- * breakpoints, so the progression is: full table -> Location hidden ->
- * Location + Date Applied hidden -> card rendering.
- */
-const CARD_LAYOUT_QUERY = "(max-width: 639px)"
-
-/**
- * Fallback focus target for a status change whose row can no longer be
- * found -- see `resolveStatusFocusTarget`. The status filter is the only
- * control that can hide a row as a *result* of changing its status, so
- * it's also the control that explains where the row went.
- */
-const STATUS_FILTER_TRIGGER_ID = "applications-status-filter"
-
-/**
- * Where keyboard focus belongs after `applicationId`'s status changed:
- * its own status trigger, re-resolved by id because the board renders
- * each status as a separate column and so *remounts* a card that changes
- * status (a new trigger node, same id) -- or, if the card is no longer
- * rendered at all (filtered out, or past a collapsed board column's
- * "Show N more" cut-off), the status filter.
+ * Where focus belongs after an application's status changed: its own status
+ * button, found again by id because the board remounts a card in its new
+ * column, or the status filter when the card is no longer shown.
  */
 function resolveStatusFocusTarget(applicationId: string): HTMLElement | null {
-  return (
-    document.getElementById(statusSelectId(applicationId)) ??
-    document.getElementById(STATUS_FILTER_TRIGGER_ID)
-  )
+  return document.getElementById(statusTriggerId(applicationId)) ?? document.getElementById(FILTER_BUTTON_ID)
 }
 
 /**
- * The Pipeline View (UXPLAN.md): a single sortable/filterable
- * spreadsheet of every application, with a toolbar for filtering by
- * status and a search bar. Replaces F1's static placeholder table.
+ * The Tracker: every application as a status board or a table, with one search
+ * box and one status filter shared by both views.
  */
 export function ApplicationsPage() {
-  useDocumentTitle("Applications")
-  const { applications, isLoading, error, updateApplication } = useApplicationsContext()
-
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
-  const [search, setSearch] = useState("")
-  const [sortKey, setSortKey] = useState<SortKey | null>(null)
-  const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
-
-  // F51: the status-grouped Board (default) or Table, persisted to
-  // `jtracks_view_mode` -- see hooks/useViewMode.ts. Read synchronously
-  // on first render, so a reload restores the chosen view without a
-  // visible swap.
+  useDocumentTitle("Tracker")
+  const { user } = useAuth()
+  const { applications, isLoading, error, updateApplication, openEditForm } = useApplicationsContext()
   const [viewMode, setViewMode] = useViewMode()
 
-  // F32: JS-driven, not a CSS `hidden`/`sm:block` swap -- a CSS-only swap
-  // would mount both ApplicationsTable and ApplicationsCardList at once,
-  // duplicating every row's `statusSelectId` DOM id (ConfirmAppliedDialog's
-  // `finalFocus` resolves its target lazily by that id, so a duplicate
-  // would silently break focus restore).
-  const isCardLayout = useMediaQuery(CARD_LAYOUT_QUERY)
+  const [search, setSearch] = useState("")
+  const [statuses, setStatuses] = useState<ReadonlySet<ApplicationStatus>>(() => new Set(ALL_STATUSES))
+  const [columnSorts, setColumnSorts] = useState<Partial<Record<ApplicationStatus, ColumnSort>>>({})
+  const [tableSort, setTableSort] = useState<TableSort>({ key: "updated", dir: -1 })
 
   const [actionError, setActionError] = useState<string | null>(null)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
-
-  // A11y (WCAG 4.1.3 Status Messages): every one of the interactions on
-  // this page -- picking a status, typing in search, choosing a filter,
-  // clicking a column header -- silently rewrites the table body. Sighted
-  // users see rows reflow; a screen reader user got nothing at all. These
-  // two polite live regions cover the two kinds of change: a one-shot
-  // action result, and "what does the table contain now".
+  // Two polite regions, so a move's result and a filter's result can't talk over each other.
   const [actionStatus, setActionStatus] = useState("")
+  const [listStatus, setListStatus] = useState("")
 
-  // Saved -> Applied is the one transition the PRD requires a confirm
-  // step for (it sets `date_applied`, which starts the ghosting
-  // clock); every other transition still fires immediately below.
-  const [confirmApplied, setConfirmApplied] = useState<{ id: string; company: string } | null>(
-    null
-  )
+  // Saved -> Applied is the one move that asks first: it sets date_applied, which starts the ghosting clock.
+  const [confirmApplied, setConfirmApplied] = useState<{ id: string; company: string } | null>(null)
   const [confirmAppliedError, setConfirmAppliedError] = useState<string | null>(null)
   const [isConfirmingApplied, setIsConfirmingApplied] = useState(false)
+  // Only the id is kept; the node is looked up when the dialog closes, since the move remounts it.
+  const confirmFocusIdRef = useRef<string | null>(null)
 
-  function handleSort(key: SortKey) {
-    if (key === sortKey) {
-      setSortDirection((previous) => (previous === "asc" ? "desc" : "asc"))
-    } else {
-      setSortKey(key)
-      setSortDirection("asc")
+  const today = todayDay()
+  const ghostDays = user?.ghost_days_default ?? null
+
+  const matches = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    return query
+      ? applications.filter((a) => a.company.toLowerCase().includes(query) || a.title.toLowerCase().includes(query))
+      : applications
+  }, [applications, search])
+  const visible = useMemo(() => matches.filter((a) => statuses.has(a.status)), [matches, statuses])
+  const statusCounts = useMemo(() => {
+    const counts = Object.fromEntries(ALL_STATUSES.map((s) => [s, 0])) as Record<ApplicationStatus, number>
+    for (const a of matches) counts[a.status] += 1
+    return counts
+  }, [matches])
+
+  // Announce the result of a search or filter change, not each keystroke's re-render.
+  const isFirstResult = useRef(true)
+  useEffect(() => {
+    if (isFirstResult.current) {
+      isFirstResult.current = false
+      return
     }
-  }
-
-  // The shared `SortSelect` (components/table/sort-select.tsx) is a single
-  // combobox whose value already spells out both field and direction
-  // ("Company, ascending") -- unlike the table header's click-to-toggle
-  // SortButton, it picks an exact key/direction pair directly rather than
-  // toggling. Used by the card rendering (F32) and, per R13.6, by the
-  // table itself whenever it is hiding a column, so the keys F31 drops
-  // stay sortable. Every path lands in the same `sortKey`/`sortDirection`
-  // state that drives `visibleApplications` below, so no two renderings --
-  // or two controls in the same rendering -- can disagree about the sort.
-  function handleSortSelect(key: SortKey, direction: SortDirection) {
-    setSortKey(key)
-    setSortDirection(direction)
-  }
+    setListStatus(`${visible.length} of ${applications.length} applications shown.`)
+  }, [visible.length, applications.length])
 
   /**
-   * A11y (WCAG 2.4.3 Focus Order): on the board, a status change moves the
-   * card into another column, and React has to remount it there -- the
-   * trigger that held focus is destroyed and focus falls to <body>, so a
-   * keyboard user was thrown to the top of the document on every move. A
-   * status filter that no longer matches does the same thing in the table
-   * and card views. Put focus back only if it was actually lost (never
-   * steal it from wherever the user has since moved). Two frames: one for
-   * React to commit the re-render, one for Base UI to finish its own
-   * focus return from the closed popup.
+   * Put focus back only if the move lost it (never take it from wherever the
+   * user has gone since). Two frames: one for React to commit, one for the
+   * menu to finish returning focus to a trigger that may no longer exist.
    */
   function restoreStatusFocus(applicationId: string) {
     requestAnimationFrame(() =>
       requestAnimationFrame(() => {
         const active = document.activeElement
-        if (active && active !== document.body) {
-          return
-        }
+        if (active && active !== document.body) return
         resolveStatusFocusTarget(applicationId)?.focus()
       })
     )
   }
 
-  /** Appended to a move announcement when the move hides the row, so the disappearance isn't silent. */
-  function hiddenByFilterSuffix(status: ApplicationStatus): string {
-    return statusFilter !== "all" && statusFilter !== status
-      ? " It no longer matches the status filter, so it's hidden from the list."
-      : ""
-  }
+  const hiddenByFilter = (status: ApplicationStatus) =>
+    statuses.has(status) ? "" : " It no longer matches the status filter, so it's hidden."
 
   async function applyStatusChange(id: string, patch: Partial<Application>) {
-    const company = applications.find((application) => application.id === id)?.company ?? "Application"
-
+    const company = applications.find((a) => a.id === id)?.company ?? "Application"
     setActionError(null)
     setActionStatus(`Updating ${company}...`)
     setUpdatingId(id)
     try {
       await updateApplication(id, patch)
       setActionStatus(
-        patch.status
-          ? `${company} moved to ${STATUS_LABEL[patch.status]}.${hiddenByFilterSuffix(patch.status)}`
-          : `${company} updated.`
+        patch.status ? `${company} moved to ${STATUS_LABEL[patch.status]}.${hiddenByFilter(patch.status)}` : `${company} updated.`
       )
       restoreStatusFocus(id)
     } catch (err) {
       setActionStatus("")
       setActionError(
-        err instanceof ApiError
-          ? apiErrorMessage(err, "Failed to update status.")
-          : "Failed to update status. Please try again."
+        err instanceof ApiError ? apiErrorMessage(err, "Failed to update status.") : "Failed to update status. Please try again."
       )
     } finally {
       setUpdatingId(null)
     }
   }
 
-  // A11y (WCAG 2.4.3 Focus Order): ConfirmAppliedDialog is opened from
-  // state rather than from a `DialogTrigger`, so Base UI has no trigger
-  // element to hand focus back to on close -- focus was being dropped to
-  // <body>, dumping a keyboard user at the top of the document and
-  // costing them their place in the table. Point Base UI's `finalFocus`
-  // at the row's status trigger instead.
-  //
-  // Only the *id* is stored here, and the node is looked up by the
-  // function passed as `finalFocus`, which Base UI calls at close time.
-  // An element captured any earlier goes stale: the popup item focused at
-  // open time is unmounted by then, and on the board a confirmed move
-  // remounts the card in the Applied column, so even the trigger node
-  // read right after the save resolved was already detached (verified --
-  // focus still fell to <body> from the board with that approach).
-  const confirmFocusIdRef = useRef<string | null>(null)
-
   function handleStatusChange(id: string, status: ApplicationStatus) {
-    const current = applications.find((application) => application.id === id)
-
+    const current = applications.find((a) => a.id === id)
     if (current?.status === "saved" && status === "applied") {
       confirmFocusIdRef.current = id
       setConfirmAppliedError(null)
       setConfirmApplied({ id, company: current.company })
       return
     }
-
     void applyStatusChange(id, { status })
   }
 
   async function handleConfirmApplied(dateApplied: string) {
-    if (!confirmApplied) {
-      return
-    }
-
+    if (!confirmApplied) return
     const { id, company } = confirmApplied
     setConfirmAppliedError(null)
     setIsConfirmingApplied(true)
     try {
       await updateApplication(id, { status: "applied", date_applied: dateApplied })
       setConfirmApplied(null)
-      // This path bypasses `applyStatusChange`, so it has to do its own
-      // announcing -- otherwise the one status transition that takes an
-      // extra confirmation step was also the only one that completed
-      // silently.
-      setActionStatus(
-        `${company} moved to Applied, dated ${dateApplied}.${hiddenByFilterSuffix("applied")}`
-      )
+      setActionStatus(`${company} moved to Applied, dated ${dateApplied}.${hiddenByFilter("applied")}`)
     } catch (err) {
       setConfirmAppliedError(
-        err instanceof ApiError
-          ? apiErrorMessage(err, "Failed to update status.")
-          : "Failed to update status. Please try again."
+        err instanceof ApiError ? apiErrorMessage(err, "Failed to update status.") : "Failed to update status. Please try again."
       )
     } finally {
       setIsConfirmingApplied(false)
     }
   }
 
-  function handleCancelApplied() {
-    setConfirmApplied(null)
-    setConfirmAppliedError(null)
+  function toggleStatus(status: ApplicationStatus) {
+    const next = new Set(statuses)
+    if (next.has(status)) next.delete(status)
+    else next.add(status)
+    setStatuses(next)
+    setListStatus(`Showing ${next.size} of ${ALL_STATUSES.length} statuses.`)
   }
 
-  const visibleApplications = useMemo(() => {
-    const query = search.trim().toLowerCase()
+  function showAll() {
+    setStatuses(new Set(ALL_STATUSES))
+    setListStatus(`Showing all ${ALL_STATUSES.length} statuses.`)
+    document.getElementById(FILTER_BUTTON_ID)?.focus()
+  }
 
-    const filtered = applications.filter((application) => {
-      const matchesStatus = statusFilter === "all" || application.status === statusFilter
-      const matchesSearch =
-        query.length === 0 ||
-        application.company.toLowerCase().includes(query) ||
-        application.title.toLowerCase().includes(query)
+  function handleTableSort(key: TableSortKey) {
+    setTableSort((prev) => ({
+      key,
+      dir: prev.key === key ? (prev.dir === 1 ? -1 : 1) : key === "company" || key === "status" ? 1 : -1,
+    }))
+  }
 
-      return matchesStatus && matchesSearch
-    })
-
-    if (!sortKey) {
-      return filtered
-    }
-
-    const direction = sortDirection === "asc" ? 1 : -1
-    return [...filtered].sort((a, b) => direction * compareByKey(a, b, sortKey))
-  }, [applications, statusFilter, search, sortKey, sortDirection])
-
-  // Announce the *result* of filtering/sorting, not the keystroke. Skipped
-  // on the initial render (the table caption already states the count when
-  // the page is first read).
-  const [tableStatus, setTableStatus] = useState("")
-  const isFirstResultRender = useRef(true)
-
-  useEffect(() => {
-    if (isFirstResultRender.current) {
-      isFirstResultRender.current = false
-      return
-    }
-
-    const sortSuffix = sortKey
-      ? `, sorted by ${COLUMN_LABEL[sortKey]} ${sortDirection === "asc" ? "ascending" : "descending"}`
-      : ""
-
-    setTableStatus(
-      `${visibleApplications.length} of ${applications.length} application${
-        applications.length === 1 ? "" : "s"
-      } shown${sortSuffix}.`
-    )
-  }, [visibleApplications.length, applications.length, sortKey, sortDirection])
+  const columns = ALL_STATUSES.filter((s) => statuses.has(s))
 
   return (
-    <div className="flex flex-col gap-4">
-      {/*
-        Single once-per-mount entrance on the header only -- this page is
-        data-dense/interactive (filter, search, sort, per-row status
-        changes), so per docs/decisions/magicui-conventions.md's restraint
-        rule the toolbar and table are deliberately left untouched: neither
-        should re-animate on every keystroke/filter change.
-      */}
-      <BlurFade delay={0}>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-semibold text-foreground">Applications</h1>
-            <p className="text-sm text-muted-foreground">
-              Every application in your pipeline -- filter, search, sort, and move a row through
-              its status right from the table, or group them by status on the board.
-            </p>
-          </div>
-          {/*
-            F51: outside the `isLoading` branch below and with no
-            breakpoint conditions, so the toggle is present and operable
-            at every width (R16.1) -- at 375px it wraps under the
-            description rather than disappearing.
-          */}
-          <ViewModeToggle viewMode={viewMode} onViewModeChange={setViewMode} />
-        </div>
-      </BlurFade>
+    <section className="tracker" data-view={viewMode} aria-labelledby="tracker-title">
+      <ApplicationsToolbar
+        shownCount={visible.length}
+        totalCount={applications.length}
+        search={search}
+        onSearchChange={setSearch}
+        statuses={statuses}
+        statusCounts={statusCounts}
+        onToggleStatus={toggleStatus}
+        onShowAll={showAll}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+      />
 
-      {/*
-        Two independent failures, two alerts. They used to share one
-        element rendering `error ?? actionError`, which meant a load
-        failure permanently masked every subsequent status-change failure
-        underneath it -- the user would click a status, watch nothing
-        happen, and see only the stale "couldn't load" banner. They are
-        also different in kind: `error` describes the list you are looking
-        at, `actionError` describes the edit you just attempted.
-      */}
-      {error && (
-        <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {error}
-        </p>
-      )}
-      {actionError && (
-        <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {actionError}
-        </p>
-      )}
-
-      {/* Two separate polite regions so an action result and a
-          filter/sort result can't clobber each other mid-announcement. */}
-      <p aria-live="polite" aria-atomic="true" className="sr-only">
-        {actionStatus}
-      </p>
-      <p aria-live="polite" aria-atomic="true" className="sr-only">
-        {tableStatus}
-      </p>
+      {/* Two failures, two alerts: a load error must never hide a later move error. */}
+      {error && <p role="alert" className="alert">{error}</p>}
+      {actionError && <p role="alert" className="alert">{actionError}</p>}
+      <p aria-live="polite" aria-atomic="true" className="sr-only">{actionStatus}</p>
+      <p aria-live="polite" aria-atomic="true" className="sr-only">{listStatus}</p>
 
       {isLoading ? (
-        <p role="status" className="text-sm text-muted-foreground">
-          Loading applications...
-        </p>
+        <p role="status" className="loading">Loading applications...</p>
+      ) : viewMode === "board" ? (
+        <ApplicationsBoard
+          applications={visible}
+          columns={columns}
+          searching={search.trim().length > 0}
+          columnSorts={columnSorts}
+          onColumnSort={(status, sort) => setColumnSorts((prev) => ({ ...prev, [status]: sort }))}
+          ghostDays={ghostDays}
+          today={today}
+          updatingId={updatingId}
+          onStatusChange={handleStatusChange}
+          onEdit={openEditForm}
+          onShowAll={showAll}
+        />
       ) : (
-        <>
-          <ApplicationsToolbar
-            statusFilterTriggerId={STATUS_FILTER_TRIGGER_ID}
-            statusFilter={statusFilter}
-            onStatusFilterChange={setStatusFilter}
-            search={search}
-            onSearchChange={setSearch}
-          />
-          {/*
-            F51: three renderings, exactly one mounted at a time. Board
-            wins over the narrow-width card swap because it's an explicit
-            user choice (R16.1: "a real user choice, not a replacement"),
-            and because a mounted-but-hidden second rendering would
-            duplicate every row's `statusSelectId` DOM id -- the same
-            trap F32 documents just below. All three take the identical
-            `visibleApplications` array and the identical
-            `handleStatusChange` reference.
-          */}
-          {viewMode === "board" ? (
-            <ApplicationsBoard
-              applications={visibleApplications}
-              totalCount={applications.length}
-              onStatusChange={handleStatusChange}
-              updatingId={updatingId}
-            />
-          ) : isCardLayout ? (
-            <ApplicationsCardList
-              applications={visibleApplications}
-              totalCount={applications.length}
-              sortKey={sortKey}
-              sortDirection={sortDirection}
-              onSortChange={handleSortSelect}
-              onStatusChange={handleStatusChange}
-              updatingId={updatingId}
-            />
-          ) : (
-            <ApplicationsTable
-              applications={visibleApplications}
-              totalCount={applications.length}
-              sortKey={sortKey}
-              sortDirection={sortDirection}
-              onSort={handleSort}
-              onSortSelect={handleSortSelect}
-              onStatusChange={handleStatusChange}
-              updatingId={updatingId}
-            />
-          )}
-        </>
+        <ApplicationsTable
+          applications={visible}
+          search={search}
+          sort={tableSort}
+          onSort={handleTableSort}
+          ghostDays={ghostDays}
+          today={today}
+          updatingId={updatingId}
+          onStatusChange={handleStatusChange}
+          onEdit={openEditForm}
+        />
       )}
 
       <ConfirmAppliedDialog
@@ -402,30 +223,12 @@ export function ApplicationsPage() {
         isSubmitting={isConfirmingApplied}
         error={confirmAppliedError}
         onConfirm={handleConfirmApplied}
-        onCancel={handleCancelApplied}
-        finalFocus={() =>
-          confirmFocusIdRef.current ? resolveStatusFocusTarget(confirmFocusIdRef.current) : true
-        }
+        onCancel={() => {
+          setConfirmApplied(null)
+          setConfirmAppliedError(null)
+        }}
+        finalFocus={() => (confirmFocusIdRef.current ? resolveStatusFocusTarget(confirmFocusIdRef.current) : true)}
       />
-    </div>
+    </section>
   )
-}
-
-/**
- * Comparator for the ascending-direction sort; ApplicationsPage flips
- * the sign for descending. `status` sorts by pipeline order (Saved ->
- * ... -> Ghosted) rather than alphabetically since that's the
- * meaningful order per UXPLAN.md. Nullable date/location fields fall
- * back to an empty string, so ascending sorts them first and
- * descending sorts them last -- acceptable given how few applications
- * have a null value in either column.
- */
-function compareByKey(a: Application, b: Application, key: SortKey): number {
-  if (key === "status") {
-    return ALL_STATUSES.indexOf(a.status) - ALL_STATUSES.indexOf(b.status)
-  }
-
-  const aValue = a[key] ?? ""
-  const bValue = b[key] ?? ""
-  return aValue.localeCompare(bValue)
 }

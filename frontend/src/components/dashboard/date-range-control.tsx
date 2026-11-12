@@ -1,12 +1,4 @@
-import { useId, useState } from "react"
-import { format } from "date-fns"
-import { CalendarIcon } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Calendar } from "@/components/ui/calendar"
-import { Field, FieldLabel } from "@/components/ui/field"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { cn } from "@/lib/utils"
-import { dateToIsoDateString, isoDateStringToDate } from "@/lib/date-range"
+import { useId } from "react"
 import type { DashboardRange } from "@/types/api"
 
 const RANGE_OPTIONS: { value: DashboardRange; label: string }[] = [
@@ -20,28 +12,21 @@ const RANGE_OPTIONS: { value: DashboardRange; label: string }[] = [
 export interface DateRangeControlProps {
   range: DashboardRange
   onRangeChange: (range: DashboardRange) => void
-  /** ISO `YYYY-MM-DD`, only meaningful (and rendered) when `range === "custom"`. */
+  /** ISO `YYYY-MM-DD`, used when `range === "custom"`. */
   start: string | null
   end: string | null
   onStartChange: (value: string | null) => void
   onEndChange: (value: string | null) => void
-  /** `aria-label` for the range button group -- callers use distinct copy ("Date range" vs. "Recap range"). */
+  /** Names the group ("Range", "Recap range"). */
   ariaLabel: string
-  /** Client-side validation error for the current custom range (see `lib/date-range.ts`'s `validateCustomRange`), owned by the caller so it can also gate the actual fetch. */
+  /** From `validateCustomRange`, owned by the caller because it also gates the fetch. */
   error?: string | null
 }
 
 /**
- * F13's shared range toggle -- week/month/year/all/custom -- used by both
- * AnalyticsPage (F7) and RecapDialog (F8), which previously each had
- * their own inline 3-/2-option toggle. `custom` reveals a pair of
- * start/end date pickers (shadcn's Calendar + Popover, added via the
- * shadcn CLI for F13) below the toggle.
- *
- * Fully controlled: the parent owns `range`/`start`/`end` state (and
- * feeds them to its own `useDashboardStats`/`useRecap` call) since
- * AnalyticsPage and RecapDialog each need independent range state --
- * this component holds no state of its own.
+ * The range switch shared by Analytics and the recap dialog: a segmented
+ * control, plus two date fields for Custom. Fully controlled; it returns a
+ * fragment so each caller's own row lays the pieces out.
  */
 export function DateRangeControl({
   range,
@@ -53,129 +38,46 @@ export function DateRangeControl({
   ariaLabel,
   error,
 }: DateRangeControlProps) {
-  // A11y: the calendar popovers are controlled so that choosing a day
-  // closes them. Previously the popover stayed open with focus parked
-  // inside the day grid -- not a trap (Escape works), but a keyboard user
-  // had to know to press Escape, and the trigger's newly-updated value
-  // was never announced. Closing on select returns focus to the trigger,
-  // which is then re-announced with the date now in its label.
-  const [openPicker, setOpenPicker] = useState<"start" | "end" | null>(null)
-
-  const startId = useId()
-  const endId = useId()
-  const startLabelId = `${startId}-label`
-  const endLabelId = `${endId}-label`
-  const errorId = `${startId}-error`
+  const errorId = useId()
+  const invalid = range === "custom" && Boolean(error)
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap gap-1.5" role="group" aria-label={ariaLabel}>
+    <>
+      <div className="seg" role="group" aria-label={ariaLabel}>
         {RANGE_OPTIONS.map((option) => (
-          <Button
-            key={option.value}
-            type="button"
-            size="sm"
-            variant={range === option.value ? "default" : "outline"}
-            aria-pressed={range === option.value}
-            onClick={() => onRangeChange(option.value)}
-          >
+          <button key={option.value} type="button" aria-pressed={range === option.value} onClick={() => onRangeChange(option.value)}>
             {option.label}
-          </Button>
+          </button>
         ))}
       </div>
-
       {range === "custom" && (
-        <div className="flex flex-wrap items-end gap-2">
-          {/*
-            A11y (WCAG 4.1.2 Name, Role, Value): `<label for>` pointing at
-            a <button> does *not* feed that button's accessible name --
-            per the accname spec a button is named by its own contents.
-            Both triggers therefore announced identically as "Pick a date,
-            button", with no way to tell Start from End. `aria-labelledby`
-            chains the visible "Start"/"End" label in front of the
-            button's own text, so it now announces "Start Pick a date" /
-            "Start Aug 1, 2026". `htmlFor` is kept so clicking the visible
-            label still opens the picker.
-          */}
-          <Field className="w-auto">
-            <FieldLabel id={startLabelId} htmlFor={startId}>
-              Start
-            </FieldLabel>
-            <Popover open={openPicker === "start"} onOpenChange={(o) => setOpenPicker(o ? "start" : null)}>
-              <PopoverTrigger
-                id={startId}
-                aria-labelledby={`${startLabelId} ${startId}`}
-                aria-describedby={error ? errorId : undefined}
-                aria-invalid={error ? true : undefined}
-                render={
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className={cn("justify-start font-normal", !start && "text-muted-foreground")}
-                  />
-                }
-              >
-                <CalendarIcon />
-                {start ? format(isoDateStringToDate(start), "PP") : "Pick a date"}
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  autoFocus
-                  selected={start ? isoDateStringToDate(start) : undefined}
-                  onSelect={(date) => {
-                    onStartChange(date ? dateToIsoDateString(date) : null)
-                    setOpenPicker(null)
-                  }}
-                />
-              </PopoverContent>
-            </Popover>
-          </Field>
-
-          <Field className="w-auto">
-            <FieldLabel id={endLabelId} htmlFor={endId}>
-              End
-            </FieldLabel>
-            <Popover open={openPicker === "end"} onOpenChange={(o) => setOpenPicker(o ? "end" : null)}>
-              <PopoverTrigger
-                id={endId}
-                aria-labelledby={`${endLabelId} ${endId}`}
-                aria-describedby={error ? errorId : undefined}
-                aria-invalid={error ? true : undefined}
-                render={
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className={cn("justify-start font-normal", !end && "text-muted-foreground")}
-                  />
-                }
-              >
-                <CalendarIcon />
-                {end ? format(isoDateStringToDate(end), "PP") : "Pick a date"}
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  autoFocus
-                  selected={end ? isoDateStringToDate(end) : undefined}
-                  onSelect={(date) => {
-                    onEndChange(date ? dateToIsoDateString(date) : null)
-                    setOpenPicker(null)
-                  }}
-                />
-              </PopoverContent>
-            </Popover>
-          </Field>
-        </div>
+        <span className="custom">
+          <input
+            className="field"
+            type="date"
+            aria-label={`${ariaLabel} start`}
+            value={start ?? ""}
+            onChange={(event) => onStartChange(event.target.value || null)}
+            aria-invalid={invalid || undefined}
+            aria-describedby={invalid ? errorId : undefined}
+          />
+          <span>to</span>
+          <input
+            className="field"
+            type="date"
+            aria-label={`${ariaLabel} end`}
+            value={end ?? ""}
+            onChange={(event) => onEndChange(event.target.value || null)}
+            aria-invalid={invalid || undefined}
+            aria-describedby={invalid ? errorId : undefined}
+          />
+        </span>
       )}
-
-      {range === "custom" && error && (
-        <p id={errorId} role="alert" className="text-sm text-destructive">
+      {invalid && (
+        <p id={errorId} role="alert" className="range-error">
           {error}
         </p>
       )}
-    </div>
+    </>
   )
 }

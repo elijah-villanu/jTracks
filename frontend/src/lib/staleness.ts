@@ -12,9 +12,6 @@ import type { Application } from "@/types/api"
  */
 export const STALE_INTERVIEW_THRESHOLD_DAYS = 28
 
-export const STALE_INTERVIEW_MESSAGE =
-  "No activity for over 28 days — consider updating this application's status."
-
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 
 /**

@@ -5,34 +5,6 @@
   is scoped to .landing, so nothing here reaches the app.
 */
 
-/*
-  Switzer, the wireframe's typeface, is served by Fontshare instead of this
-  repo: its licence (ITF FFL 2.0) allows self-hosting but forbids putting the
-  files in a public repository, and jTracks is public. Only text set in
-  Switzer triggers a download, so the app's own routes never fetch these.
-*/
-@font-face {
-  font-family: "Switzer";
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url("https://cdn.fontshare.com/wf/BLNB4FAQFNK56DWWNF7PMGTCOTZHOEII/ST3WKSSDMBK2MIQQO3MAVYWLF4FTOLFV/6IN5WOLRCYP4G4MOCOHOMXNON6Q7MDAR.woff2") format("woff2");
-}
-@font-face {
-  font-family: "Switzer";
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url("https://cdn.fontshare.com/wf/OYB4CXKJQXKTNSLJMTDQOIVUL2V5EL7S/WYO2P7DQVV5RNXGMCUO2HL4RJP4VFUAS/6XPIMU23OJVRY676OG5YVJMWEHWICATX.woff2") format("woff2");
-}
-@font-face {
-  font-family: "Switzer";
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url("https://cdn.fontshare.com/wf/5SZVFDB7V52TI6ULVC6J3WQZQCIZVDV5/ODYPSTCUDMKSTYIPTV4CLQ7URIK7XYBJ/YS3VPNVO4B3TOJMEXDGFZQ4TLZGGSRZC.woff2") format("woff2");
-}
-
 .landing {
   /* Palette: near-white neutral ground + the binding brand blue. */
   --bg: #fafafa;

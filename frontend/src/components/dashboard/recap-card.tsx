@@ -1,61 +1,111 @@
-import { forwardRef } from "react"
-import { RECAP_SKINS } from "@/components/dashboard/recap-skins"
-import type { RecapSkinId } from "@/components/dashboard/recap-skins"
-import type { DashboardRecap } from "@/types/api"
+import type { Ref } from "react"
+import logoOnDark from "@/assets/JourneyJobLogoDark.png"
+import logoOnLight from "@/assets/JourneyJobLogoLight.png"
+import type { RecapDesign, RecapFigures } from "@/components/dashboard/chart-summaries"
 
-interface RecapCardProps {
-  recap: DashboardRecap
-  /** Which design from the `RECAP_SKINS` registry to render. */
-  skin: RecapSkinId
+function Foot({ dates, logo }: { dates: string; logo: string }) {
+  return (
+    <div className="card-foot">
+      <span className="soft">{dates}</span>
+      <img src={logo} alt="" width="78" height="15" />
+    </div>
+  )
 }
 
 /**
- * F8's exportable recap sticker -- a fixed 9:16 (Instagram-Stories-
- * aspect) card, sized 270x480 on screen so recap-dialog.tsx can export it
- * at `pixelRatio: 4` for a clean 1080x1920 PNG.
- *
- * F48 turned this from *the* recap design into a thin dispatcher over the
- * `RECAP_SKINS` registry (`recap-skins/index.ts`). The design that used
- * to live in this file is now `recap-skins/strava-skin.tsx`; the other
- * two are `duolingo-skin.tsx` (F49) and `beli-skin.tsx` (F50). Everything
- * that made this component's contract worth documenting lives with the
- * skins now, and each carries the same rules in its own doc comment --
- * this indirection deliberately keeps zero design decisions of its own so
- * that adding a skin never means editing this file.
- *
- * The forwarded ref goes straight through to whichever skin is selected,
- * because that node *is* the export target: `recap-dialog.tsx` holds one
- * ref per skin and hands `toBlob` only the one currently on screen. That
- * is what satisfies F48's "exactly one skin renders in the exportable
- * subtree at a time" -- all three cards exist in the carousel's DOM, but
- * an export only ever reaches into one of them.
- *
- * Two invariants that apply to *every* skin, restated here because this
- * is where a new one gets registered:
- *
- * 1. **Theme independence (F28).** A skin may not resolve any
- *    `var(--...)` token for its own colors. html-to-image's clone step
- *    resolves custom properties through `getComputedStyle` before
- *    serializing, so a tokened color bakes whichever theme was active on
- *    `<html>` at export time into a PNG that has no theme context once it
- *    leaves the app. Use the fixed literals in `recap-skins/shared.tsx`
- *    and `STATUS_LITERAL_COLORS`.
- * 2. **No animation in the exported subtree (F35).** No Motion or MagicUI
- *    component (`BlurFade`, `NumberTicker`, ...) may appear
- *    anywhere inside a skin. An in-flight animation serializes at
- *    whatever frame it is on, and Motion's inline transforms are not
- *    guaranteed to survive serialization -- either way the PNG silently
- *    differs from what the user saw. Motion elsewhere in the dialog is
- *    fine; it is outside these refs. R12.5 makes this a hard gate: verify
- *    changes with a real export against the per-skin baselines in
- *    `frontend/reference/`, not by eye in the dialog preview.
+ * One 9:16 recap card, the node the dialog exports as a PNG. Its colours are
+ * literals (app.css, `.card`), never theme tokens, because the image leaves the
+ * app and has no theme. Nothing inside it animates, so the export always
+ * matches what's on screen.
  */
-export const RecapCard = forwardRef<HTMLDivElement, RecapCardProps>(function RecapCard(
-  { recap, skin },
-  ref
-) {
-  const entry = RECAP_SKINS.find((candidate) => candidate.id === skin) ?? RECAP_SKINS[0]
-  const SkinComponent = entry.Component
+export function RecapCard({ r, design, label, ref }: { r: RecapFigures; design: RecapDesign; label: string; ref?: Ref<HTMLDivElement> }) {
+  if (design === "ink") {
+    return (
+      <div className="card card-ink" role="img" aria-label={label} ref={ref}>
+        <div className="card-head">{r.title}</div>
+        <div className="stats">
+          <div>
+            <div className="n-l">{r.total}</div>
+            <span className="soft">Applications</span>
+          </div>
+          <div>
+            <div className="n-l">{r.interviews}</div>
+            <span className="soft">Interviews</span>
+          </div>
+          <div>
+            <div className="n-l">{r.offers}</div>
+            <span className="soft">{r.offerWord}</span>
+          </div>
+        </div>
+        <div className="cbar">
+          <span className="seg-int" style={{ flex: r.interviews }} />
+          <span className="seg-rej" style={{ flex: r.rejected }} />
+          <span className="seg-gho" style={{ flex: r.ghosted }} />
+          <span className="seg-wait" style={{ flex: r.waiting }} />
+        </div>
+        <div className="bar-key soft">
+          <span>{r.interviews} interviewed</span>
+          <span>{r.rejected} rejected</span>
+          <span>{r.ghosted} ghosted</span>
+          <span>{r.waiting} waiting</span>
+        </div>
+        <Foot dates={r.dates} logo={logoOnDark} />
+      </div>
+    )
+  }
 
-  return <SkinComponent ref={ref} recap={recap} />
-})
+  if (design === "field") {
+    return (
+      <div className="card card-field" role="img" aria-label={label} ref={ref}>
+        <div className="card-head">{r.title}</div>
+        <div>
+          <div className="n-xl">{r.total}</div>
+          <span>applications sent</span>
+        </div>
+        <div className="tiles">
+          <div>
+            <span className="n-m">{r.interviews}</span>
+            <span className="soft">Interviews</span>
+          </div>
+          <div>
+            <span className="n-m">{r.offers}</span>
+            <span className="soft">{r.offerWord}</span>
+          </div>
+          <div>
+            <span className="n-m">{r.responseRate}%</span>
+            <span className="soft">Response</span>
+          </div>
+          <div>
+            <span className="n-m">{r.ghostRate}%</span>
+            <span className="soft">Ghosted</span>
+          </div>
+        </div>
+        <Foot dates={r.dates} logo={logoOnLight} />
+      </div>
+    )
+  }
+
+  const ranked: [string, string | number][] = [
+    ["Applications", r.total],
+    ["Interviews", r.interviews],
+    ["Response rate", `${r.responseRate}%`],
+    ["Ghost rate", `${r.ghostRate}%`],
+    ["Rejection/fail rate", `${r.rejectionFailRate}%`],
+    [r.offerWord, r.offers],
+  ]
+  return (
+    <div className="card card-paper" role="img" aria-label={label} ref={ref}>
+      <div className="card-head">{r.title}</div>
+      <ol className="rank">
+        {ranked.map(([name, value], i) => (
+          <li key={name}>
+            <span className="soft">{i + 1}</span>
+            <span>{name}</span>
+            <b>{value}</b>
+          </li>
+        ))}
+      </ol>
+      <Foot dates={r.dates} logo={logoOnLight} />
+    </div>
+  )
+}

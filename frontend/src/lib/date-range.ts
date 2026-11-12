@@ -1,11 +1,9 @@
 /**
  * Shared helpers for F13's `custom` dashboard range: UTC-safe day-span
  * math (mirroring `backend/app/core/clock.py`'s reasoning -- never do
- * local-timezone `new Date()` arithmetic on `YYYY-MM-DD` strings) plus
- * conversion between those ISO date strings and the `Date` objects
- * `react-day-picker`'s `Calendar` (src/components/ui/calendar.tsx) hands
- * back on selection. Used by both `date-range-control.tsx` (the shared
- * range toggle) and the mock handlers (src/mocks/handlers/dashboard.ts /
+ * local-timezone `new Date()` arithmetic on `YYYY-MM-DD` strings). Used by
+ * Analytics and the recap dialog (custom-range validation) and the mock
+ * handlers (src/mocks/handlers/dashboard.ts /
  * recap.ts), which mirror the same 1-366-day validation server-side per
  * BACKEND_TASKS.md's B22.
  */
@@ -55,20 +53,6 @@ export function validateCustomRange(start: string | null, end: string | null): s
     return `Custom range can't span more than ${MAX_CUSTOM_RANGE_DAYS} days (currently ${span}).`
   }
   return null
-}
-
-/** Formats a `Date` (as produced by the Calendar's local-midnight selection) as a `YYYY-MM-DD` string, reading local fields directly rather than going through `toISOString` (which would shift the date in positive-UTC-offset timezones). */
-export function dateToIsoDateString(date: Date): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, "0")
-  const day = String(date.getDate()).padStart(2, "0")
-  return `${year}-${month}-${day}`
-}
-
-/** Parses a `YYYY-MM-DD` string into a local-midnight `Date`, the inverse of `dateToIsoDateString` -- deliberately not `new Date(iso)`, which parses as UTC midnight and would display as the previous day in positive-UTC-offset timezones. */
-export function isoDateStringToDate(iso: string): Date {
-  const [year, month, day] = iso.split("-").map(Number)
-  return new Date(year, month - 1, day)
 }
 
 const MONTH_ABBREVIATIONS = [
