@@ -20,6 +20,15 @@
         ],
         "createdAt": "2026-11-11T06:45:38.514Z",
         "reason": "Claude triage: same two false positives as app-v1 (the .seg segmented-control track, whose buttons carry their own inset; the recap dialog, whose head/body/footer sections carry their own padding). Scoped to this one wireframe file."
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          "docs/wireframes/login-v1.html"
+        ],
+        "createdAt": "2026-11-13T03:45:04.923Z",
+        "reason": "Claude triage: false positive on the .wf-bar wireframe-chrome strip (padding 6px var(--m), i.e. 16-32px sides); not part of the design. Scoped to this one wireframe file."
       }
     ]
   }

@@ -1,0 +1,646 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JourneyJob log in (wireframe v1)</title>
+<meta name="description" content="Mid-fidelity wireframe of JourneyJob's log in, sign up and password reset screens: one question per screen, in the app's own look.">
+<link rel="preconnect" href="https://api.fontshare.com">
+<link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
+<link href="https://api.fontshare.com/v2/css?f[]=switzer@400,500,600&display=swap" rel="stylesheet">
+<script>
+  // Theme before first paint; shares its key with app-v2.html, so the choice carries into the app.
+  (function () {
+    var t = 'system';
+    try { t = localStorage.getItem('wf-app-theme') || 'system'; } catch (e) {}
+    var dark = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  })();
+</script>
+<style>
+  /*
+    Wireframe v1 of log in, sign up and password reset (2026-11-12).
+    One question per screen: Google or an email first, then the password. Same world as app-v2:
+    Switzer, zinc neutrals on #fafafa, #171717 dark, the 56px top bar, 8px-radius controls.
+    Blue #0F57FE fills the one primary button on each screen; everything else is ink and grey.
+    The reset flow is designed ahead of the backend (no endpoint yet).
+  */
+  :root {
+    --bg: #fafafa;
+    --surface: #ffffff;
+    --raised: #f1f1f2;
+    --field: #e6e6e9;
+    --border: #e4e4e7;
+    --control: #d4d4d8;
+    --ink: #18181b;
+    --muted: #52525b;
+    --faint: #6b6b73;
+    --accent: #0F57FE;
+    --accent-hover: #0a45cc;
+    --accent-tint: #e7eeff;
+    --focus: #0F57FE;
+    --danger: #c31b1f;
+    --danger-tint: #fdecec;
+    --positive: #247b50;
+    --shadow-float: 0 1px 2px rgb(0 0 0 / 0.06), 0 8px 24px rgb(0 0 0 / 0.12);
+    --font: "Switzer", ui-sans-serif, system-ui, sans-serif;
+    --m: clamp(16px, 2.5vw, 32px);
+    --top-h: 56px;
+    --ctl-h: 44px;
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    color-scheme: light;
+  }
+  :root[data-theme="dark"] {
+    --bg: #171717;
+    --surface: #202020;
+    --raised: #2a2a2a;
+    --field: #333333;
+    --border: #2e2e2e;
+    --control: #404040;
+    --ink: #ebebeb;
+    --muted: #b1b1b1;
+    --faint: #949494;
+    --accent-hover: #296aff;
+    --accent-tint: #1b2a4d;
+    --focus: #4f88ff;
+    --danger: #ec5d53;
+    --danger-tint: #3a1d1b;
+    --positive: #4cc38a;
+    --shadow-float: 0 1px 2px rgb(0 0 0 / 0.4), 0 12px 32px rgb(0 0 0 / 0.5);
+    color-scheme: dark;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; min-height: 100svh; background: var(--bg); color: var(--ink);
+    font: 400 14px/1.43 var(--font); letter-spacing: -0.005em; -webkit-font-smoothing: antialiased;
+  }
+  h1, p { margin: 0; }
+  button, input, select { font: inherit; color: inherit; letter-spacing: inherit; }
+  a { color: inherit; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+  img, svg { display: block; }
+  ::selection { background: var(--accent-tint); color: var(--ink); }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  input { caret-color: var(--accent); }
+  [hidden] { display: none !important; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+  .muted { color: var(--muted); }
+
+  /* ---------- wireframe bar (not part of the design) ---------- */
+  .wf-bar {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: space-between;
+    padding: 6px var(--m); background: var(--raised); color: var(--muted); font-size: 13px;
+  }
+  .wf-bar label { display: inline-flex; align-items: center; gap: 8px; }
+  .wf-bar select { height: 28px; max-width: 100%; border: 1px solid var(--control); border-radius: 6px; background: var(--surface); padding: 0 6px; font-size: 13px; }
+  .wf-flag { color: var(--ink); font-weight: 500; }
+
+  /* ---------- controls (app-v2's, sized up for a form you fill once) ---------- */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid transparent;
+    background: transparent; font-weight: 500; white-space: nowrap; cursor: pointer; text-decoration: none;
+    transition: background-color 150ms ease, color 150ms ease, transform 120ms var(--ease-out);
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-lg { width: 100%; height: var(--ctl-h); font-size: 15px; }
+  .btn-accent { background: var(--accent); color: #fff; }
+  .btn-line { background: var(--surface); border-color: var(--control); }
+  .btn-ghost { color: var(--muted); }
+  .btn[aria-disabled="true"] { cursor: default; }
+  .btn[aria-disabled="true"]:active { transform: none; }
+  .btn-accent[aria-disabled="true"] { background: var(--accent); opacity: 0.72; }
+  .btn-line[aria-disabled="true"] { color: var(--muted); }
+  @media (hover: hover) and (pointer: fine) {
+    .btn-accent:not([aria-disabled="true"]):hover { background: var(--accent-hover); }
+    .btn-line:not([aria-disabled="true"]):hover, .btn-ghost:hover { background: var(--raised); color: var(--ink); }
+  }
+  .link {
+    padding: 0; border: 0; background: none; cursor: pointer; color: var(--ink); font-weight: 500;
+    text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; text-decoration-color: var(--control);
+    transition: text-decoration-color 150ms ease;
+  }
+  @media (hover: hover) and (pointer: fine) { .link:hover { text-decoration-color: currentColor; } }
+  .spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgb(255 255 255 / 0.35); border-top-color: #fff; animation: spin 600ms linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---------- top bar ---------- */
+  .top {
+    position: sticky; top: 0; z-index: 10; height: var(--top-h);
+    display: flex; align-items: center; gap: 12px; padding: 0 var(--m);
+    background: var(--bg); border-bottom: 1px solid var(--border);
+  }
+  .logo { display: inline-flex; align-items: center; height: 40px; flex: none; }
+  .logo img { height: 24px; width: auto; }
+  .logo .on-dark, :root[data-theme="dark"] .logo .on-light { display: none; }
+  :root[data-theme="dark"] .logo .on-dark { display: block; }
+  .top-end { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .icon-btn { width: 32px; padding: 0; color: var(--muted); }
+  @media (hover: hover) and (pointer: fine) { .icon-btn:hover { background: var(--raised); color: var(--ink); } }
+
+  /* ---------- the column ---------- */
+  main { display: grid; justify-items: center; padding: clamp(40px, 15vh, 152px) var(--m) 80px; }
+  .auth { width: min(400px, 100%); }
+  .step h1 { font-size: 40px; line-height: 1.1; font-weight: 600; letter-spacing: -0.035em; text-wrap: balance; }
+  .step h1:focus { outline: none; }
+  .sub { margin-top: 10px; font-size: 16px; line-height: 1.5; color: var(--muted); text-wrap: pretty; }
+  .sub b { color: var(--ink); font-weight: 500; }
+  .body { margin-top: 32px; display: grid; gap: 16px; }
+  form { display: grid; gap: 16px; }
+
+  .or { display: flex; align-items: center; gap: 12px; color: var(--faint); font-size: 13px; }
+  .or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+
+  .fld { display: grid; gap: 8px; }
+  .lbl-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .lbl { font-weight: 500; }
+  .lbl-row .link { font-weight: 400; color: var(--muted); }
+  .input-wrap { position: relative; }
+  .input {
+    width: 100%; height: var(--ctl-h); padding: 0 12px; font-size: 16px;
+    border: 1px solid var(--control); border-radius: 8px; background: var(--surface);
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+  }
+  .input::placeholder { color: var(--faint); }
+  .input:focus { outline: none; border-color: var(--focus); box-shadow: 0 0 0 1px var(--focus); }
+  .input[aria-invalid="true"] { border-color: var(--danger); }
+  .input[aria-invalid="true"]:focus { box-shadow: 0 0 0 1px var(--danger); }
+  .input-wrap .input { padding-right: 48px; }
+  .peek { position: absolute; right: 4px; top: 50%; translate: 0 -50%; width: 36px; height: 36px; padding: 0; color: var(--muted); }
+  @media (hover: hover) and (pointer: fine) { .peek:hover { background: var(--raised); color: var(--ink); } }
+  .hint { font-size: 13px; color: var(--muted); }
+  .err { display: flex; gap: 6px; font-size: 13px; color: var(--danger); }
+  .err .i { width: 14px; height: 14px; margin-top: 2.5px; }
+  .err .link { color: inherit; font-weight: 500; text-decoration-color: currentColor; }
+
+  /* The email you typed, carried into step two. */
+  .who {
+    margin-top: 16px; display: flex; align-items: center; gap: 10px; min-width: 0;
+    height: 44px; padding: 0 4px 0 6px; border-radius: 999px; background: var(--raised); width: fit-content; max-width: 100%;
+  }
+  .who .av { width: 32px; height: 32px; border-radius: 50%; flex: none; display: grid; place-items: center; background: var(--surface); font-weight: 600; font-size: 13px; }
+  .who .em { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+  .who .btn { height: 32px; border-radius: 999px; color: var(--muted); }
+  @media (hover: hover) and (pointer: fine) { .who .btn:hover { background: var(--surface); color: var(--ink); } }
+
+  .notice {
+    display: flex; gap: 10px; padding: 12px 14px; border-radius: 8px; background: var(--raised); font-size: 14px;
+  }
+  .notice .i { margin-top: 2px; color: var(--muted); }
+  .notice.bad { background: var(--danger-tint); color: var(--danger); }
+  .notice.bad .i { color: currentColor; }
+  .notice p + p, .notice .btn { margin-top: 8px; }
+  .notice.bad .btn-line { color: var(--ink); }
+
+  /* The other way in, under the primary button. */
+  .alt { margin-top: 4px; color: var(--muted); }
+  .alt .link { text-decoration-color: currentColor; }
+
+  /* Session ended: a small notice under the top bar's right edge. It closes itself after 5s; the bar drains to show
+     how long is left, and pauses while it is hovered, focused, or the tab is hidden. */
+  .toast-host { position: absolute; top: calc(100% + 12px); right: var(--m); z-index: 20; }
+  .toast {
+    position: relative; overflow: hidden; display: flex; align-items: center; gap: 8px;
+    max-width: min(360px, calc(100vw - 2 * var(--m)));
+    padding: 8px 4px 10px 12px; border-radius: 8px; font-size: 13px;
+    background: var(--danger-tint); border: 1px solid color-mix(in srgb, var(--danger) 28%, transparent);
+    box-shadow: var(--shadow-float);
+    animation: toast-in 200ms var(--ease-out);
+  }
+  .toast > .i { color: var(--danger); width: 14px; height: 14px; }
+  .toast p { flex: 1; min-width: 0; }
+  .toast-x { width: 28px; height: 28px; padding: 0; color: var(--muted); }
+  @media (hover: hover) and (pointer: fine) { .toast-x:hover { color: var(--ink); background: color-mix(in srgb, var(--danger) 12%, transparent); } }
+  .toast-bar {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--danger);
+    transform-origin: left; animation: drain 5s linear forwards;
+  }
+  .toast:hover .toast-bar, .toast:focus-within .toast-bar, .toast-host.paused .toast-bar { animation-play-state: paused; }
+  @keyframes drain { to { transform: scaleX(0); } }
+  @keyframes toast-in { from { opacity: 0; transform: translateY(-6px); } }
+  @media (prefers-reduced-motion: reduce) {
+    @keyframes toast-in { from { opacity: 0; } }
+  }
+
+  .after { display: grid; gap: 12px; justify-items: start; margin-top: 8px; color: var(--muted); }
+  .after .btn-ghost { margin-left: -12px; }
+  .resend { font-variant-numeric: tabular-nums; }
+  .resend[aria-disabled="true"] { color: var(--faint); text-decoration: none; cursor: default; }
+  .g { width: 18px; height: 18px; }
+  @media (prefers-reduced-motion: reduce) { .spin { animation-duration: 1.2s; } }
+
+  /* ---------- phones ---------- */
+  @media (max-width: 639px) {
+    :root { --ctl-h: 48px; }
+    main { justify-items: stretch; padding-top: 32px; }
+    .auth { width: 100%; }
+    .step h1 { font-size: 32px; }
+    .body { margin-top: 28px; }
+    .btn, .link, .input { -webkit-tap-highlight-color: transparent; }
+  }
+  @media (max-width: 899px), (hover: none), (pointer: coarse) {
+    .icon-btn { width: 40px; height: 40px; }
+    .toast-x { width: 36px; height: 36px; }
+  }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c4.97 0 8.07 3.42 9.94 6.65a1 1 0 0 1 0 .7 13.2 13.2 0 0 1-1.67 2.68M14.08 14.16a3 3 0 0 1-4.24-4.24M17.48 17.5A10.75 10.75 0 0 1 2.06 12.35a1 1 0 0 1 0-.7 13.6 13.6 0 0 1 4.45-5.15M2 2l20 20"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+</svg>
+
+<div class="wf-bar">
+  <span>Wireframe v1 · log in, sign up, reset · sample data <span class="wf-flag" id="wf-flag" hidden>· Reset isn't built yet: no backend endpoint. The 30-minute, one-use link and the 30s resend wait are proposals.</span></span>
+  <label>Screen
+    <select id="wf-jump" aria-label="Jump to a screen">
+      <optgroup label="Log in">
+        <option value="login">Email</option>
+        <option value="login/password">Password</option>
+        <option value="login/password/wrong">Wrong password</option>
+        <option value="login/password/loading">Logging in</option>
+        <option value="login/email/ended">Session ended</option>
+        <option value="login/email/google">Google didn't finish</option>
+      </optgroup>
+      <optgroup label="Sign up">
+        <option value="signup">Email</option>
+        <option value="signup/password">Password</option>
+        <option value="signup/password/short">Password too short</option>
+        <option value="signup/password/mismatch">Passwords don't match</option>
+        <option value="signup/password/taken">Email already has an account</option>
+      </optgroup>
+      <optgroup label="Reset (not built yet)">
+        <option value="reset">Email</option>
+        <option value="reset/sent">Check your email</option>
+        <option value="reset/new">New password (from the link)</option>
+        <option value="reset/new/expired">Link expired</option>
+      </optgroup>
+    </select>
+  </label>
+</div>
+
+<header class="top">
+  <a class="logo" href="landing-v5.html" aria-label="JourneyJob home">
+    <img class="on-light" src="../../frontend/src/assets/JourneyJobLogoLight.png" alt="JourneyJob" width="125" height="24">
+    <img class="on-dark" src="../../frontend/src/assets/JourneyJobLogoDark.png" alt="JourneyJob" width="125" height="24">
+  </a>
+  <div class="top-end">
+    <button class="btn icon-btn" type="button" id="theme" aria-label="Dark theme" aria-pressed="false"><svg class="i"><use href="#i-moon"/></svg></button>
+  </div>
+  <div class="toast-host" id="toast-host"></div>
+</header>
+
+<main id="main">
+  <div class="auth" id="auth"></div>
+</main>
+<p class="sr-only" role="status" aria-live="polite" id="live"></p>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const auth = $('#auth');
+const SAMPLE = 'jordan.lee@gmail.com';
+const RESEND_WAIT = 30;
+const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+let email = '';
+let resendTimer = 0;
+let lastRank = 0;
+
+/* ---------- small pieces ---------- */
+const icon = (id, cls = 'i') => `<svg class="${cls}" aria-hidden="true"><use href="#${id}"/></svg>`;
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const googleMark = `<svg class="g" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2A11.9 11.9 0 0 1 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3a12 12 0 0 1-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>`;
+const err = (id, html) => `<p class="err" id="${id}">${icon('i-alert')}<span>${html}</span></p>`;
+
+function who() {
+  return `<div class="who">
+    <span class="av" aria-hidden="true">${esc((email[0] || 'J').toUpperCase())}</span>
+    <span class="em">${esc(email)}</span>
+    <button class="btn" type="button" data-back>Change<span class="sr-only"> email</span></button>
+  </div>`;
+}
+
+function googleBlock(flow, failed) {
+  return `<button class="btn btn-line btn-lg" type="button" data-google>${googleMark}Continue with Google</button>
+    ${failed ? err('google-err', 'Google sign-in didn’t finish. Try again, or use your email below.') : ''}
+    <div class="or" aria-hidden="true">or</div>`;
+}
+
+function emailField(autocomplete, error) {
+  const msg = { empty: 'Enter your email.', bad: 'That doesn’t look like an email. Check it for a typo.' }[error];
+  return `<div class="fld">
+    <label class="lbl" for="email">Email</label>
+    <input class="input" id="email" type="email" inputmode="email" autocomplete="${autocomplete}" spellcheck="false" autocapitalize="off"
+      placeholder="name@example.com" value="${esc(email)}" ${msg ? 'aria-invalid="true" aria-describedby="email-err"' : ''}>
+    ${msg ? err('email-err', msg) : ''}
+  </div>`;
+}
+
+function passwordField({ id, label, autocomplete, hint, error, forgot }) {
+  const desc = [hint && `${id}-hint`, error && `${id}-err`].filter(Boolean).join(' ');
+  return `<div class="fld">
+    <div class="lbl-row"><label class="lbl" for="${id}">${label}</label>${forgot ? '<a class="link" href="#reset">Forgot password?</a>' : ''}</div>
+    <div class="input-wrap">
+      <input class="input" id="${id}" type="password" autocomplete="${autocomplete}" ${desc ? `aria-describedby="${desc}"` : ''} ${error ? 'aria-invalid="true"' : ''}>
+      <button class="btn peek" type="button" data-peek="${id}" aria-label="Show password" aria-pressed="false">${icon('i-eye')}</button>
+    </div>
+    ${hint && !error ? `<p class="hint" id="${id}-hint">${hint}</p>` : ''}
+    ${error ? err(`${id}-err`, error) : ''}
+  </div>`;
+}
+
+const primary = (label, busy) => `<button class="btn btn-accent btn-lg" type="submit" ${busy ? 'aria-disabled="true"' : ''}>${busy ? `<span class="spin" aria-hidden="true"></span>${busy}` : label}</button>`;
+// Password managers pair the saved password with this hidden username.
+const hiddenUser = () => `<input type="email" autocomplete="username" value="${esc(email)}" hidden readonly>`;
+
+/* ---------- screens ---------- */
+const screens = {
+  'login/email': (v) => ({
+    rank: 1,
+    title: 'Log in',
+    html: `<h1 tabindex="-1">Log in</h1>
+      <div class="body">
+        ${googleBlock('login', v === 'google')}
+        <form data-next="login/password" novalidate>${emailField('username', v === 'empty' || v === 'bad' ? v : null)}${primary('Continue')}</form>
+        <p class="alt">New here? <a class="link" href="#signup">Register</a></p>
+      </div>`,
+  }),
+  'login/password': (v) => ({
+    rank: 2,
+    title: 'Enter your password',
+    html: `<h1 tabindex="-1">Enter your password</h1>
+      ${who()}
+      <div class="body">
+        <form data-submit="login" novalidate>
+          ${hiddenUser()}
+          ${passwordField({ id: 'password', label: 'Password', autocomplete: 'current-password', forgot: true,
+            error: v === 'wrong' ? 'That email and password don’t match. Check the email above, or <a class="link" href="#reset">reset your password</a>.' : v === 'empty' ? 'Enter your password.' : null })}
+          ${primary('Log in', v === 'loading' && 'Logging in…')}
+        </form>
+      </div>`,
+  }),
+  'signup/email': (v) => ({
+    rank: 1,
+    title: 'Create your account',
+    html: `<h1 tabindex="-1">Create your account</h1>
+      <p class="sub">Share your job search journey one step at a time.</p>
+      <div class="body">
+        ${googleBlock('signup', v === 'google')}
+        <form data-next="signup/password" novalidate>${emailField('email', v === 'empty' || v === 'bad' ? v : null)}${primary('Continue')}</form>
+        <p class="alt">Have an account? <a class="link" href="#login">Log in</a></p>
+      </div>`,
+  }),
+  'signup/password': (v) => ({
+    rank: 2,
+    title: 'Choose a password',
+    html: `<h1 tabindex="-1">Choose a password</h1>
+      ${who()}
+      <div class="body">
+        ${v === 'taken' ? `<div class="notice bad" role="alert">${icon('i-alert')}<div><p>There’s already an account for <b>${esc(email)}</b>.</p><a class="btn btn-line" href="#login/password" data-keep>Log in instead</a></div></div>` : ''}
+        <form data-submit="signup" novalidate>
+          ${hiddenUser()}
+          ${passwordField({ id: 'password', label: 'Password', autocomplete: 'new-password', hint: 'At least 8 characters.',
+            error: v === 'short' ? 'Use at least 8 characters.' : null })}
+          ${passwordField({ id: 'confirm', label: 'Confirm password', autocomplete: 'new-password',
+            error: v === 'mismatch' ? 'These don’t match. Type the same password in both.' : null })}
+          ${primary('Create account', v === 'loading' && 'Creating your account…')}
+        </form>
+      </div>`,
+  }),
+  'reset/email': (v) => ({
+    rank: 1,
+    title: 'Reset your password',
+    html: `<h1 tabindex="-1">Reset your password</h1>
+      <p class="sub">Enter the email you log in with. We’ll send a link to choose a new password.</p>
+      <div class="body">
+        <form data-next="reset/sent" novalidate>${emailField('username', v === 'empty' || v === 'bad' ? v : null)}${primary('Email me a link')}</form>
+        <p class="hint">Signed up with Google? There’s no password to reset. <button class="link" type="button" data-google>Continue with Google</button> instead.</p>
+      </div>
+      <div class="after"><a class="btn btn-ghost" href="#login">${icon('i-left')}Back to log in</a></div>`,
+  }),
+  'reset/sent': () => ({
+    rank: 2,
+    title: 'Check your email',
+    html: `<h1 tabindex="-1">Check your email</h1>
+      <p class="sub">If an account uses <b>${esc(email)}</b>, a link to reset your password is on its way. It works for 30 minutes.</p>
+      <div class="body">
+        <a class="btn btn-line btn-lg" href="#login">Back to log in</a>
+        <p class="hint" id="resend-row">Nothing after a few minutes? Check your spam folder, or <button class="link resend" type="button" data-resend aria-disabled="true">send it again in <span id="resend-s">${RESEND_WAIT}</span>s</button>.</p>
+      </div>`,
+  }),
+  'reset/new': (v) => v === 'expired' ? ({
+    rank: 3,
+    title: 'This link has expired',
+    html: `<h1 tabindex="-1">This link has expired</h1>
+      <p class="sub">Reset links work for 30 minutes, and each one works once. Ask for a new one and use it soon after it arrives.</p>
+      <div class="body"><a class="btn btn-accent btn-lg" href="#reset">Email me a new link</a></div>
+      <div class="after"><a class="btn btn-ghost" href="#login">${icon('i-left')}Back to log in</a></div>`,
+  }) : ({
+    rank: 3,
+    title: 'Choose a new password',
+    html: `<h1 tabindex="-1">Choose a new password</h1>
+      <div class="body">
+        <form data-submit="reset" novalidate>
+          ${hiddenUser()}
+          ${passwordField({ id: 'password', label: 'New password', autocomplete: 'new-password', hint: 'At least 8 characters.',
+            error: v === 'short' ? 'Use at least 8 characters.' : null })}
+          ${passwordField({ id: 'confirm', label: 'Confirm new password', autocomplete: 'new-password',
+            error: v === 'mismatch' ? 'These don’t match. Type the same password in both.' : null })}
+          ${primary('Save and log in', v === 'loading' && 'Saving…')}
+        </form>
+      </div>`,
+  }),
+};
+
+/* ---------- routing ---------- */
+function parse() {
+  const [flow = 'login', step, variant = null] = location.hash.slice(1).split('/');
+  const f = ['login', 'signup', 'reset'].includes(flow) ? flow : 'login';
+  const s = step && screens[`${f}/${step}`] ? step : 'email';
+  return { flow: f, step: s, variant };
+}
+
+function render(fromUser) {
+  const { flow, step, variant } = parse();
+  // Steps past the first need an email; the wireframe fills the sample one in.
+  if (step !== 'email' && !email) email = SAMPLE;
+  const scr = screens[`${flow}/${step}`](variant);
+
+  const prevFlow = auth.dataset.flow;
+  const dir = prevFlow === flow ? Math.sign(scr.rank - lastRank) : 0;
+  auth.dataset.flow = flow;
+  lastRank = scr.rank;
+
+  auth.innerHTML = `<section class="step" aria-labelledby="h">${scr.html.replace('<h1 ', '<h1 id="h" ')}</section>`;
+  document.title = `${scr.title} · JourneyJob (wireframe)`;
+
+  $('#wf-flag').hidden = flow !== 'reset';
+  const jump = $('#wf-jump');
+  const key = [flow, step === 'email' && !variant ? null : step, variant].filter(Boolean).join('/');
+  jump.value = [...jump.options].some((o) => o.value === key) ? key : '';
+
+  // The next question arrives from the side you are heading to; reduced motion keeps only the fade.
+  const node = auth.firstElementChild;
+  const x = reduce.matches || !dir ? 0 : dir * 12;
+  node.animate([{ opacity: 0, transform: `translateX(${x}px)` }, { opacity: 1, transform: 'none' }], { duration: dir ? 200 : 150, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
+
+  if (step === 'sent') startResend();
+  else clearInterval(resendTimer);
+  if (flow === 'login' && variant === 'ended') showToast();
+
+  // Focus follows the question on every move the visitor makes; a fresh page load leaves focus alone.
+  if (fromUser) {
+    const target = node.querySelector('[aria-invalid="true"]') || node.querySelector('.notice.bad .btn') || node.querySelector('.input') || node.querySelector('h1');
+    target.focus({ preventScroll: true });
+    $('#live').textContent = scr.title;
+  }
+}
+
+function go(hash) {
+  if (location.hash === `#${hash}`) render(true);
+  else location.hash = hash;
+}
+
+/* ---------- session-ended notice ---------- */
+const toastHost = $('#toast-host');
+const TOAST_TEXT = 'Session ended. You’ve been logged out.';
+function showToast() {
+  toastHost.innerHTML = `<div class="toast">${icon('i-alert')}<p>${TOAST_TEXT}</p>
+    <button class="btn toast-x" type="button" aria-label="Dismiss">${icon('i-x')}</button>
+    <span class="toast-bar" aria-hidden="true"></span></div>`;
+  $('#live').textContent = TOAST_TEXT;
+}
+function closeToast() {
+  const t = toastHost.firstElementChild;
+  if (!t || t.dataset.closing) return;
+  t.dataset.closing = '1';
+  // Closing from the keyboard would drop focus to <body>; hand it to the form instead.
+  const hadFocus = t.contains(document.activeElement);
+  t.animate([{ opacity: 1 }, { opacity: 0, transform: reduce.matches ? 'none' : 'translateY(-4px)' }], { duration: 150, easing: 'ease-out', fill: 'forwards' })
+    .finished.then(() => {
+      t.remove();
+      if (hadFocus) (auth.querySelector('.input') || auth.querySelector('h1')).focus({ preventScroll: true });
+    });
+}
+toastHost.addEventListener('click', (e) => { if (e.target.closest('.toast-x')) closeToast(); });
+// The draining bar is the timer: when it runs out, the notice closes, so pausing one pauses both.
+toastHost.addEventListener('animationend', (e) => { if (e.target.classList.contains('toast-bar')) closeToast(); });
+document.addEventListener('visibilitychange', () => toastHost.classList.toggle('paused', document.hidden));
+
+/* ---------- behaviour ---------- */
+function startResend() {
+  clearInterval(resendTimer);
+  let left = RESEND_WAIT;
+  const btn = $('[data-resend]');
+  resendTimer = setInterval(() => {
+    left -= 1;
+    if (left > 0) { $('#resend-s').textContent = left; return; }
+    clearInterval(resendTimer);
+    btn.removeAttribute('aria-disabled');
+    btn.textContent = 'send it again';
+  }, 1000);
+}
+
+function busy(form, label) {
+  const b = form.querySelector('[type="submit"]');
+  b.setAttribute('aria-disabled', 'true');
+  b.innerHTML = `<span class="spin" aria-hidden="true"></span>${label}`;
+  $('#live').textContent = label;
+}
+
+// The wireframe signs you "in" by opening the app wireframe.
+const enterApp = () => { location.href = 'app-v2.html#board'; };
+
+auth.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const form = e.target;
+  if (form.querySelector('[aria-disabled="true"][type="submit"]')) return;
+  const { flow } = parse();
+
+  if (form.dataset.next) {
+    const v = $('#email').value.trim();
+    email = v;
+    if (!v) return go(`${flow}/email/empty`);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return go(`${flow}/email/bad`);
+    return go(form.dataset.next);
+  }
+
+  const pw = $('#password').value;
+  const confirm = $('#confirm')?.value;
+  if (form.dataset.submit === 'login') {
+    if (!pw) return go('login/password/empty');
+    busy(form, 'Logging in…');
+    // Sample: the password "wrong" shows the error; anything else opens the app.
+    return setTimeout(() => (pw === 'wrong' ? go('login/password/wrong') : enterApp()), 700);
+  }
+  if (pw.length < 8) return go(`${flow}/${flow === 'reset' ? 'new' : 'password'}/short`);
+  if (pw !== confirm) return go(`${flow}/${flow === 'reset' ? 'new' : 'password'}/mismatch`);
+  busy(form, flow === 'reset' ? 'Saving…' : 'Creating your account…');
+  // Sample: an email starting with "taken" already has an account.
+  setTimeout(() => (flow === 'signup' && /^taken/i.test(email) ? go('signup/password/taken') : enterApp()), 700);
+});
+
+auth.addEventListener('click', (e) => {
+  const t = e.target.closest('button, a');
+  if (!t) return;
+  if (t.matches('[data-back]')) return go(parse().flow === 'reset' ? 'reset' : parse().flow);
+  if (t.matches('[data-peek]')) {
+    const input = document.getElementById(t.dataset.peek);
+    const show = input.type === 'password';
+    input.type = show ? 'text' : 'password';
+    t.setAttribute('aria-pressed', String(show));
+    t.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+    t.innerHTML = icon(show ? 'i-eye-off' : 'i-eye');
+    return;
+  }
+  if (t.matches('[data-google]')) {
+    if (t.getAttribute('aria-disabled') === 'true') return;
+    t.setAttribute('aria-disabled', 'true');
+    t.innerHTML = `<span class="spin" style="border-color:var(--control);border-top-color:var(--ink)" aria-hidden="true"></span>Opening Google…`;
+    return setTimeout(enterApp, 700);
+  }
+  if (t.matches('[data-resend]')) {
+    if (t.getAttribute('aria-disabled') === 'true') return;
+    t.setAttribute('aria-disabled', 'true');
+    t.innerHTML = `send it again in <span id="resend-s">${RESEND_WAIT}</span>s`;
+    $('#live').textContent = 'Sent again.';
+    return startResend();
+  }
+});
+
+// Typing clears a field's error, so the message never outlives the problem.
+auth.addEventListener('input', (e) => {
+  const input = e.target.closest('.input');
+  if (!input || input.getAttribute('aria-invalid') !== 'true') return;
+  input.removeAttribute('aria-invalid');
+  const fld = input.closest('.fld');
+  fld.querySelector('.err')?.remove();
+});
+
+$('#wf-jump').addEventListener('change', (e) => { if (e.target.value) go(e.target.value); });
+window.addEventListener('hashchange', () => render(true));
+
+/* ---------- theme ---------- */
+const themeBtn = $('#theme');
+function paintTheme() {
+  const dark = document.documentElement.dataset.theme === 'dark';
+  themeBtn.setAttribute('aria-pressed', String(dark));
+  themeBtn.innerHTML = icon(dark ? 'i-sun' : 'i-moon');
+}
+themeBtn.addEventListener('click', () => {
+  const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem('wf-app-theme', next); } catch (e) {}
+  paintTheme();
+});
+paintTheme();
+render(false);
+</script>
+</body>
+</html>
