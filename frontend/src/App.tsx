@@ -1,12 +1,14 @@
 import { Suspense, lazy } from "react"
 import { Navigate, Route, Routes } from "react-router"
 import { AppLayout } from "@/components/layout/AppLayout"
+import { AuthLayout } from "@/components/layout/AuthLayout"
 import { GuestRoute, ProtectedRoute } from "@/components/ProtectedRoute"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { ApplicationsProvider } from "@/lib/applications-context"
 import { AnalyticsPage } from "@/routes/AnalyticsPage"
 import { ApplicationsPage } from "@/routes/ApplicationsPage"
 import { LoginPage } from "@/routes/LoginPage"
+import { ForgotPasswordPage, ResetPasswordPage } from "@/routes/PasswordResetPages"
 import { SignupPage } from "@/routes/SignupPage"
 
 /**
@@ -55,8 +57,14 @@ function App() {
         />
 
         <Route element={<GuestRoute />}>
-          <Route path="login" element={<LoginPage />} />
-          <Route path="signup" element={<SignupPage />} />
+          {/* One shell for the signed-out screens, so its top bar and session-ended notice persist between them. */}
+          <Route element={<AuthLayout />}>
+            <Route path="login" element={<LoginPage />} />
+            <Route path="signup" element={<SignupPage />} />
+            {/* Password reset: built ahead of the backend and marked Soon (see PasswordResetPages.tsx). */}
+            <Route path="forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="reset-password" element={<ResetPasswordPage />} />
+          </Route>
         </Route>
 
         <Route

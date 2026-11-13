@@ -1,0 +1,135 @@
+/*
+  Log in, sign up and password reset, built from docs/wireframes/login-v1.html
+  (phones: login-v1-mobile.html). One question per screen.
+
+  The shell carries `.app`, so app.css's tokens (--mute, --blue, --raised...),
+  buttons, top bar, logo and Soon tag apply as they do in the signed-in app.
+  This file adds only what the auth column needs, scoped under `.app.auth-shell`.
+*/
+.app.auth-shell { --ctl-h: 44px; --danger-tint: #fdecec; }
+.dark .app.auth-shell { --danger-tint: #3a1d1b; }
+
+.app.auth-shell .icon-btn { width: 32px; padding: 0; color: var(--mute); }
+@media (hover: hover) and (pointer: fine) { .app.auth-shell .icon-btn:hover { background: var(--raised); color: var(--ink); } }
+
+/* ---------- the column ---------- */
+.app.auth-shell .auth-main { display: grid; justify-items: center; padding: clamp(40px, 15vh, 152px) var(--m) 80px; }
+.app.auth-shell .auth { width: min(400px, 100%); }
+.app.auth-shell .auth-step h1 { font-size: 40px; line-height: 1.1; font-weight: 600; letter-spacing: -0.035em; text-wrap: balance; }
+.app.auth-shell .auth-step h1:focus { outline: none; }
+.app.auth-shell .auth-soon { margin-top: 12px; display: flex; }
+.app.auth-shell .auth-sub { margin-top: 10px; font-size: 16px; line-height: 1.5; color: var(--mute); text-wrap: pretty; }
+.app.auth-shell .auth-sub b { color: var(--ink); font-weight: 500; }
+.app.auth-shell .auth-body { margin-top: 32px; display: grid; gap: 16px; }
+.app.auth-shell .auth-body form { display: grid; gap: 16px; }
+
+/* ---------- controls (app.css's, sized up for a form you fill once) ---------- */
+.app.auth-shell .btn-lg { width: 100%; height: var(--ctl-h); gap: 8px; font-size: 15px; text-decoration: none; }
+/* Busy keeps its colour; app.css greys out only what can't be used yet (the Soon buttons). */
+.app.auth-shell .btn-accent[aria-disabled="true"] { cursor: default; background: var(--blue); color: #fff; opacity: 0.72; }
+.app.auth-shell .btn-line[aria-disabled="true"] { cursor: default; background: var(--surface); border-color: var(--control); color: var(--mute); }
+.app.auth-shell .link {
+  padding: 0; border: 0; background: none; cursor: pointer; color: var(--ink); font-weight: 500;
+  text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; text-decoration-color: var(--control);
+  transition: text-decoration-color 150ms ease;
+}
+@media (hover: hover) and (pointer: fine) { .app.auth-shell .link:hover { text-decoration-color: currentColor; } }
+.app.auth-shell .spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgb(255 255 255 / 0.35); border-top-color: #fff; animation: auth-spin 600ms linear infinite; }
+.app.auth-shell .btn-line .spin { border-color: var(--control); border-top-color: var(--ink); }
+@keyframes auth-spin { to { transform: rotate(360deg); } }
+.app.auth-shell .g { width: 18px; height: 18px; flex: none; }
+
+.app.auth-shell .or { display: flex; align-items: center; gap: 12px; color: var(--faint); font-size: 13px; }
+.app.auth-shell .or::before, .app.auth-shell .or::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+
+/* ---------- fields ---------- */
+.app.auth-shell .fld { display: grid; gap: 8px; }
+.app.auth-shell .fld-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.app.auth-shell .fld-label { font-weight: 500; }
+.app.auth-shell .fld-end { display: inline-flex; align-items: center; gap: 8px; }
+.app.auth-shell .fld-end .link { font-weight: 400; color: var(--mute); }
+.app.auth-shell .input-wrap { position: relative; }
+.app.auth-shell .input {
+  width: 100%; height: var(--ctl-h); padding: 0 12px; font-size: 16px; color: var(--ink); caret-color: var(--blue);
+  border: 1px solid var(--control); border-radius: 8px; background: var(--surface);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.app.auth-shell .input::placeholder { color: var(--faint); }
+.app.auth-shell .input:focus { outline: none; border-color: var(--focus); box-shadow: 0 0 0 1px var(--focus); }
+.app.auth-shell .input[aria-invalid="true"] { border-color: var(--danger); }
+.app.auth-shell .input[aria-invalid="true"]:focus { border-color: var(--danger); box-shadow: 0 0 0 1px var(--danger); }
+.app.auth-shell .input-wrap .input { padding-right: 48px; }
+.app.auth-shell .peek { position: absolute; right: 4px; top: 50%; translate: 0 -50%; width: 36px; height: 36px; padding: 0; color: var(--mute); }
+@media (hover: hover) and (pointer: fine) { .app.auth-shell .peek:hover { background: var(--raised); color: var(--ink); } }
+.app.auth-shell .fld-hint { font-size: 13px; color: var(--mute); }
+.app.auth-shell .fld-err { display: flex; gap: 6px; font-size: 13px; color: var(--danger); }
+.app.auth-shell .fld-err .i { width: 14px; height: 14px; margin-top: 2.5px; }
+
+/* The email you typed, carried into step two. */
+.app.auth-shell .email-chip {
+  margin-top: 16px; display: flex; align-items: center; gap: 10px; min-width: 0; width: fit-content; max-width: 100%;
+  height: 44px; padding: 0 4px 0 6px; border-radius: 999px; background: var(--raised);
+}
+.app.auth-shell .email-chip .av { width: 32px; height: 32px; border-radius: 50%; flex: none; display: grid; place-items: center; background: var(--surface); font-weight: 600; font-size: 13px; }
+.app.auth-shell .email-chip .em { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.app.auth-shell .email-chip .btn { height: 32px; border-radius: 999px; color: var(--mute); }
+@media (hover: hover) and (pointer: fine) { .app.auth-shell .email-chip .btn:hover { background: var(--surface); color: var(--ink); } }
+
+.app.auth-shell .notice { display: flex; gap: 10px; padding: 12px 14px; border-radius: 8px; background: var(--danger-tint); color: var(--danger); font-size: 14px; }
+.app.auth-shell .notice .i { margin-top: 2px; }
+.app.auth-shell .notice .btn { margin-top: 8px; color: var(--ink); text-decoration: none; }
+
+/* The other way in, under the primary button. */
+.app.auth-shell .alt { margin-top: 4px; color: var(--mute); }
+.app.auth-shell .alt .link { text-decoration-color: currentColor; }
+.app.auth-shell .after { display: grid; justify-items: start; margin-top: 8px; }
+.app.auth-shell .after .btn { margin-left: -12px; color: var(--mute); text-decoration: none; }
+@media (hover: hover) and (pointer: fine) { .app.auth-shell .after .btn:hover { background: var(--raised); color: var(--ink); } }
+.app.auth-shell .resend { color: var(--faint); font-variant-numeric: tabular-nums; }
+
+/* The next question arrives from the side you are heading to; reduced motion collapses it (index.css). */
+.app.auth-shell .auth-step { animation: auth-fade 150ms var(--ease-out); }
+.app.auth-shell .auth-step[data-dir="next"] { animation: auth-from-right 200ms var(--ease-out); }
+.app.auth-shell .auth-step[data-dir="back"] { animation: auth-from-left 200ms var(--ease-out); }
+@keyframes auth-fade { from { opacity: 0; } }
+@keyframes auth-from-right { from { opacity: 0; transform: translateX(12px); } }
+@keyframes auth-from-left { from { opacity: 0; transform: translateX(-12px); } }
+
+/* ---------- session ended: a small notice under the top bar's right edge ---------- */
+/* It closes itself after 5s. The bar drains to show how long is left and pauses while hovered, focused or the tab is hidden. */
+.app.auth-shell .toast {
+  position: absolute; top: calc(100% + 12px); right: var(--m); z-index: 20;
+  display: flex; align-items: center; gap: 8px; overflow: hidden;
+  max-width: min(360px, calc(100vw - 2 * var(--m)));
+  padding: 8px 4px 10px 12px; border-radius: 8px; font-size: 13px;
+  background: var(--danger-tint); border: 1px solid color-mix(in srgb, var(--danger) 28%, transparent);
+  box-shadow: var(--shadow-float);
+  animation: auth-toast-in 200ms var(--ease-out);
+}
+.app.auth-shell .toast > .i { width: 14px; height: 14px; color: var(--danger); }
+.app.auth-shell .toast p { flex: 1; min-width: 0; }
+.app.auth-shell .toast-x { width: 28px; height: 28px; padding: 0; color: var(--mute); }
+@media (hover: hover) and (pointer: fine) { .app.auth-shell .toast-x:hover { color: var(--ink); background: color-mix(in srgb, var(--danger) 12%, transparent); } }
+.app.auth-shell .toast-bar {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--danger);
+  transform-origin: left; animation: auth-drain 5s linear forwards;
+}
+.app.auth-shell .toast:hover .toast-bar, .app.auth-shell .toast:focus-within .toast-bar, .app.auth-shell .toast[data-paused] .toast-bar { animation-play-state: paused; }
+@keyframes auth-drain { to { transform: scaleX(0); } }
+@keyframes auth-toast-in { from { opacity: 0; transform: translateY(-6px); } }
+/* The bar is the timer, not decoration: index.css's reduced-motion reset would end it at once and close the notice. */
+@media (prefers-reduced-motion: reduce) {
+  .app.auth-shell .toast-bar { animation-duration: 5s !important; }
+}
+
+/* ---------- phones ---------- */
+@media (max-width: 639px) {
+  .app.auth-shell { --ctl-h: 48px; }
+  .app.auth-shell .auth-main { justify-items: stretch; padding-top: 32px; }
+  .app.auth-shell .auth-step h1 { font-size: 32px; }
+  .app.auth-shell .auth-body { margin-top: 28px; }
+}
+@media (max-width: 899px), (hover: none), (pointer: coarse) {
+  .app.auth-shell .icon-btn { width: 40px; height: 40px; }
+  .app.auth-shell .toast-x { width: 36px; height: 36px; }
+}
