@@ -1,50 +1,74 @@
-import { featuredStats } from "@/components/dashboard/recap-skins/shared"
-import type { DashboardRecap, Sankey } from "@/types/api"
+import { funnelOf } from "@/lib/analytics"
+import { dayOf, shortDate, yearOf } from "@/lib/days"
+import type { DashboardRange, DashboardRecap } from "@/types/api"
 
-/**
- * Plain-text summaries of the dashboard's visual data, shared so every
- * text alternative for the same data says the same thing in the same
- * words. Lives in a `.ts` module, not beside the components that use it,
- * so the helpers don't add `only-export-components` lint warnings.
- */
+export type RecapDesign = "ink" | "field" | "paper"
 
-/**
- * "Applied 128, Interviewing / OA 18, ..." -- every pipeline stage and its
- * total, in payload order. The wording `SankeyChart`'s `ChartDataTable`
- * summary has always used; extracted so the recap's text alternative
- * below reuses it verbatim rather than inventing a second format.
- */
-export function sankeyStageTotals(sankey: Sankey): string {
-  return sankey.nodes.map((node) => `${node.label} ${node.value}`).join(", ")
+/** The three recap designs, in order. The landing page shows the same three (routes/LandingPage.tsx). */
+export const RECAP_DESIGNS: { id: RecapDesign; label: string }[] = [
+  { id: "ink", label: "Dark" },
+  { id: "field", label: "Headline" },
+  { id: "paper", label: "Ranked" },
+]
+
+export const isRecapDesign = (value: unknown): value is RecapDesign => RECAP_DESIGNS.some((d) => d.id === value)
+
+const pct = (part: number, whole: number) => (whole ? Math.round((part / whole) * 100) : 0)
+
+export interface RecapFigures {
+  title: string
+  dates: string
+  total: number
+  interviews: number
+  offers: number
+  rejected: number
+  ghosted: number
+  /** Still Applied: no reply yet, not ghosted yet. */
+  waiting: number
+  responseRate: number
+  ghostRate: number
+  rejectionFailRate: number
+  offerWord: "Offer" | "Offers"
+}
+
+/** "Oct 12 – Nov 10, 2026" (both years spelled out when the range crosses one). */
+function datesOf(startIso: string, endIso: string): string {
+  const a = dayOf(startIso)
+  const b = dayOf(endIso)
+  return yearOf(a) === yearOf(b)
+    ? `${shortDate(a)} – ${shortDate(b)}, ${yearOf(b)}`
+    : `${shortDate(a)}, ${yearOf(a)} – ${shortDate(b)}, ${yearOf(b)}`
+}
+
+/** Everything the three recap designs draw, from one `GET /dashboard/recap` response. */
+export function recapFigures(recap: DashboardRecap, range: DashboardRange): RecapFigures {
+  const f = funnelOf(recap.status_breakdown, recap.total_applications)
+  return {
+    title: range === "custom" ? "Custom range" : recap.period_label,
+    dates: datesOf(recap.period_start, recap.period_end),
+    total: f.total,
+    interviews: f.interviews,
+    offers: f.offer,
+    rejected: f.rejected,
+    ghosted: f.ghosted,
+    waiting: f.applied,
+    responseRate: pct(f.responded, f.total),
+    ghostRate: pct(f.ghosted, f.total),
+    rejectionFailRate: pct(f.rejected + f.failed, f.total),
+    offerWord: f.offer === 1 ? "Offer" : "Offers",
+  }
 }
 
 /**
- * A11y (WCAG 1.1.1 Non-text Content): the text alternative for a recap
- * card. The recap exists to become an image -- a PNG downloaded or handed
- * to the Web Share API -- and a picture of text reaches nobody who can't
- * see it. This is used in two places, so both say exactly the same thing:
- *
- * - `role="img"` + `aria-label` on the on-screen preview (recap-dialog.tsx
- *   and the landing page), which is presented as the image being exported;
- * - the `text` field of `navigator.share()`, so whoever receives the file
- *   also receives a readable version of it.
- *
- * Covers everything a skin can show: period, the headline, the three
- * featured stats every skin draws (`featuredStats`, the same projection
- * the skins use) and the pipeline stage totals behind the Strava skin's
- * flow and the Beli skin's ranked list. Skin-independent on purpose --
- * the three designs arrange the same numbers differently, and the
- * alternative describes the numbers, not the arrangement.
+ * The text alternative for a recap card (WCAG 1.1.1), used for the on-screen
+ * preview and sent as the `text` of a Web Share, so whoever gets the image also
+ * gets a readable version. It describes the numbers, not one design's layout.
  */
-export function recapTextSummary(recap: DashboardRecap): string {
-  const stats = featuredStats(recap.highlights)
-    .map((stat) => `${stat.label}: ${stat.value}`)
-    .join(", ")
-
-  return [
-    `JourneyJob recap for ${recap.period_label.toLowerCase()} (${recap.period_start} to ${recap.period_end}).`,
-    recap.headline,
-    `${stats}.`,
-    `Stage totals: ${sankeyStageTotals(recap.sankey)}.`,
-  ].join(" ")
+export function recapTextSummary(recap: DashboardRecap, range: DashboardRange): string {
+  const r = recapFigures(recap, range)
+  return (
+    `JourneyJob recap, ${r.title.toLowerCase()} (${r.dates}): ${r.total} applications, ${r.interviews} interviews, ` +
+    `${r.offers} ${r.offerWord.toLowerCase()}, ${r.responseRate}% response rate, ${r.ghostRate}% ghost rate, ` +
+    `${r.rejectionFailRate}% rejection or fail rate.`
+  )
 }

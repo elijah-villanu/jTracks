@@ -10,4 +10,8 @@ backend/__pycache__/
 
 # Claude worktrees
 .claude/worktrees/
-.claude\quick_recap.md
+.claude/quick_recap.md
+.claude/
+
+# Unecessary documents
+docs/deployment-readiness.md

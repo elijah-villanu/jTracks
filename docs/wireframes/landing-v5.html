@@ -1,0 +1,792 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JourneyJob — track the search, share the month (wireframe v5)</title>
+<meta name="description" content="JourneyJob keeps every job application on one private board, marks the quiet ones as Ghosted, and turns any range into a Stories recap card.">
+<link rel="preconnect" href="https://api.fontshare.com">
+<link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
+<link href="https://api.fontshare.com/v2/css?f[]=switzer@400,500,600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* Palette: near-white neutral ground, no pastel + the binding brand blue. */
+    --bg: #fafafa;
+    --surface: #f1f1f2;
+    --field: #e6e6e9;
+    --field-press: #d4d4d8;
+    --paper: #ffffff;
+    --ink: #18181b;
+    --muted: #52525b;
+    --rule-strong: #8b8b93;
+    --accent: #0F57FE;
+    --accent-press: #0a45cc;
+    --accent-ink: #ffffff;
+    --danger: #c31b1f;
+
+    --font: "Switzer", ui-sans-serif, system-ui, sans-serif;
+    --step-small: 0.875rem;
+    --step-body: clamp(1.0625rem, 1rem + 0.25vw, 1.1875rem);
+    --step-lead: clamp(1.25rem, 1.1rem + 0.7vw, 1.625rem);
+    --step-head: clamp(2rem, 10.2vw, 3.5rem);    /* phones: two lines hold down to 280px */
+    --step-hero: var(--step-head);
+    --step-display: clamp(2.75rem, 1.6rem + 4.6vw, 5.5rem);
+
+    --m: clamp(16px, 2.5vw, 32px);
+    --gap: clamp(16px, 2vw, 32px);
+    --section: clamp(112px, 12vw, 200px);
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  /* With one card in the hero, the headline has room to lead. */
+  @media (min-width: 900px) { :root { --step-hero: clamp(2.5rem, 6vw, 5.5rem); } }
+  @media (min-width: 1120px) { :root { --step-head: clamp(2.375rem, 3.6vw, 3.25rem); } }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 400 var(--step-body)/1.5 var(--font); letter-spacing: -0.005em;
+    font-variant-numeric: tabular-nums;
+  }
+  ::selection { background: var(--field); color: var(--ink); }
+  img, svg { display: block; max-width: 100%; }
+  h1, h2, h3, p, dl, dd, figure, fieldset { margin: 0; }
+  h1, h2 { font-size: var(--step-head); font-weight: 600; line-height: 0.98; letter-spacing: -0.04em; text-wrap: balance; }
+  h3 { font-size: var(--step-small); font-weight: 600; }
+  a { color: inherit; text-underline-offset: 3px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .frame { width: 100%; max-width: 1440px; margin: 0 auto; padding-left: var(--m); padding-right: var(--m); }
+  .section { padding-top: var(--section); }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .skip { position: absolute; left: var(--m); top: -100px; z-index: 2; }
+  .skip:focus { top: 8px; }
+
+  /* ---------- controls ---------- */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 24px;
+    border: 0; border-radius: 999px; font: 500 var(--step-body)/1 var(--font); text-decoration: none; cursor: pointer; white-space: nowrap;
+    transition: transform 160ms var(--ease-out), background-color 160ms ease;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-solid { background: var(--accent); color: var(--accent-ink); }
+  .btn-soft { background: var(--surface); color: var(--ink); }
+  .btn-sm { min-height: 40px; padding: 0 18px; font-size: var(--step-small); }
+  .icon-btn { display: inline-grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 999px; background: var(--surface); color: var(--ink); cursor: pointer; transition: transform 160ms var(--ease-out); }
+  .icon-btn:active { transform: scale(0.95); }
+  @media (hover: hover) and (pointer: fine) {
+    .btn-solid:hover { background: var(--accent-press); }
+    .btn-soft:hover, .icon-btn:hover { background: var(--field); }
+    .nav a:not(.btn):hover, .foot a:hover { text-decoration: underline; }
+    .car-arrow:hover { background: var(--surface); }
+    .seg label:hover:not(:has(input:checked)) { background: var(--field-press); }
+  }
+
+  /* ---------- top bar + header ---------- */
+  .wf-bar { background: var(--surface); font-size: var(--step-small); color: var(--muted); padding: 10px 0; }
+  .site-header .frame { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 76px; }
+  .logo { flex: none; display: inline-flex; align-items: center; min-height: 44px; }
+  .logo img { height: 28px; width: auto; }
+  .nav { display: flex; align-items: center; gap: 28px; font-size: var(--step-small); font-weight: 500; }
+  .nav a { text-decoration: none; }
+  .nav .nav-link { display: none; }
+  @media (min-width: 900px) { .nav .nav-link { display: inline-flex; align-items: center; min-height: 44px; } .logo img { height: 32px; } }
+  @media (max-width: 479px) { .nav { gap: 14px; } .nav .icon-btn { display: none; } }
+  /* Narrow phones: the hero already shows Log in on the first screen, so the header keeps only the logo and the main action. */
+  @media (max-width: 399px) { .site-header .nav > a[href="/login"] { display: none; } }
+  @media (max-width: 374px) { .logo img { height: 24px; } }
+  @media (max-width: 339px) { .nav .btn-sm { padding: 0 12px; } }
+  @media (max-width: 300px) { .nav .btn { display: none; } }
+
+  /* ---------- hero ---------- */
+  .hero { padding-top: clamp(32px, 5vw, 72px); }
+  .hero-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 48px; } /* minmax(0, ...): the card strip must scroll inside the column, not widen it */
+  .hero-copy { display: grid; gap: 32px; align-content: center; min-width: 0; }
+  .hero h1 { font-size: var(--step-hero); }
+  .hero h1 span { display: block; }
+  .lede { font-size: var(--step-body); max-width: 34rem; }
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+  @media (min-width: 900px) {
+    .hero-grid { grid-template-columns: minmax(0, 1fr) auto; gap: 48px; align-items: center; }
+  }
+
+  /* ---------- hero carousel: one card at a time, neighbours peeking as a faint fade ---------- */
+  .carousel {
+    --peek-gap: 16px;
+    --edge: 72px;
+    --card-w: min(320px, calc(100vw - 2 * var(--m) - 2 * var(--edge)));
+    position: relative; justify-self: center; width: calc(var(--card-w) + 2 * var(--edge)); max-width: 100%;
+  }
+  @media (min-width: 900px) {
+    /* Tall enough to lead, never taller than the first screen. */
+    .carousel { --card-w: clamp(240px, min(26vw, calc((100svh - 200px) * 0.5625)), 320px); justify-self: end; }
+  }
+  @media (max-width: 639px) {
+    .carousel { --peek-gap: 12px; --card-w: max(200px, min(270px, calc(100vw - 104px))); justify-self: start; width: calc(100% + 2 * var(--m)); max-width: none; margin-left: calc(var(--m) * -1); }
+  }
+  .car-view {
+    position: relative; display: flex; gap: var(--peek-gap); margin: 0; list-style: none;
+    padding: 0 calc((100% - var(--card-w)) / 2);
+    overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 calc((100% - var(--card-w)) / 2), #000 calc(100% - (100% - var(--card-w)) / 2), transparent); /* taste-skill-ignore: the requested faint preview of the next and previous card */
+    mask-image: linear-gradient(to right, transparent, #000 calc((100% - var(--card-w)) / 2), #000 calc(100% - (100% - var(--card-w)) / 2), transparent); /* taste-skill-ignore: the requested faint preview of the next and previous card */
+  }
+  .car-view::-webkit-scrollbar { display: none; }
+  .car-view:focus-visible { outline: none; }
+  .car-view:focus-visible .is-current .card { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .slide { flex: 0 0 var(--card-w); scroll-snap-align: center; opacity: 0.4; transition: opacity 200ms ease; }
+  .slide:not(.is-current) { cursor: pointer; }
+  .slide.is-current { opacity: 1; }
+  .car-arrow {
+    position: absolute; top: 50%; z-index: 1; display: grid; place-items: center; width: 44px; height: 44px; padding: 0;
+    border: 0; border-radius: 999px; background: var(--paper); color: var(--ink); cursor: pointer; transform: translateY(-50%);
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 120ms var(--ease-out), background-color 160ms ease, opacity 200ms ease, visibility 0s;
+  }
+  .car-arrow { box-shadow: 0 1px 2px rgb(0 0 0 / 0.1), 0 4px 12px rgb(0 0 0 / 0.1); } /* taste-skill-ignore: the arrow floats over the card edge */
+  .car-arrow:active { transform: translateY(-50%) scale(0.95); }
+  .car-arrow.is-off { opacity: 0; visibility: hidden; transition: opacity 120ms ease, visibility 0s linear 120ms; }
+  .car-prev { left: 0; }
+  .car-next { right: 0; }
+  html:not(.js) .car-arrow { display: none; }
+  html:not(.js) .slide { opacity: 1; }
+  html:not(.js) .ticks i.on::after { transform: none; }
+  @media (max-width: 639px) { .car-prev { left: 4px; } .car-next { right: 4px; } }
+
+  /* ---------- recap card (data-ui: the product's conventions apply inside) ---------- */
+  .card {
+    container-type: inline-size; aspect-ratio: 9 / 16; border-radius: 16px; overflow: hidden;
+    display: flex; flex-direction: column; gap: 14px; padding: 16px 16px 14px;
+    font-size: 13px; line-height: 1.3;
+  }
+  .card-ink { background: var(--ink); color: #fafafa; }
+  .card-ink .soft { color: #c4c4c8; }
+  .card-field { background: var(--field); color: var(--ink); }
+  .card-paper { background: var(--paper); color: var(--ink); }
+  .card-paper { box-shadow: inset 0 0 0 1px #e4e4e7; } /* taste-skill-ignore: keeps the white card's edge visible, in its faint preview too */
+  .soft { color: var(--muted); }
+  /* The three bars say which card this is. The active one fills as the card arrives. */
+  .ticks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+  .ticks i { height: 3px; border-radius: 2px; background: color-mix(in oklab, currentColor 25%, transparent); overflow: hidden; }
+  .ticks i.on::after { content: ""; display: block; height: 100%; background: currentColor; transform: scaleX(0); transform-origin: left; }
+  .is-current .ticks i.on::after { transform: scaleX(1); }
+  .card-head { font-weight: 500; }
+  .n-xl { font-size: 34cqw; font-weight: 600; line-height: 0.9; letter-spacing: -0.05em; }
+  .n-l { font-size: 17cqw; font-weight: 600; line-height: 1.05; letter-spacing: -0.04em; }
+  .n-m { font-size: 9cqw; font-weight: 600; line-height: 1.05; letter-spacing: -0.03em; }
+  .stats { display: grid; gap: 5cqw; }
+  .bar { margin-top: auto; display: flex; height: 10px; border-radius: 3px; overflow: hidden; gap: 2px; }
+  .bar span { display: block; height: 100%; }
+  .seg-int { background: var(--field); } .seg-rej { background: #a1a1aa; } .seg-gho { background: #71717a; }
+  .seg-wait { background: repeating-linear-gradient(45deg, #a1a1aa 0 2px, transparent 2px 5px); } /* taste-skill-ignore: striped "still open" segment inside the data-ui recap card */
+  .bar-key { display: flex; flex-wrap: wrap; gap: 2px 10px; margin-top: -6px; }
+  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: auto; }
+  .tiles div { background: color-mix(in oklab, var(--ink) 8%, transparent); border-radius: 8px; padding: 8px 10px; display: grid; gap: 2px; }
+  .rank { list-style: none; margin: 0; padding: 0; display: grid; }
+  .rank li { display: grid; grid-template-columns: 18px 1fr auto; gap: 6px; align-items: baseline; padding: 8px 0; border-top: 1px solid color-mix(in oklab, var(--ink) 12%, transparent); } /* taste-skill-ignore: list rule inside the data-ui recap card */
+  .rank li b { font-size: 15px; font-weight: 600; }
+  /* Month bottom-left, logo bottom-right. */
+  .card-foot { margin-top: auto; display: flex; flex-wrap: wrap; gap: 4px 8px; justify-content: space-between; align-items: center; }
+  .card-ink .card-foot { margin-top: 0; } /* keeps the chart near the bottom of the card, sitting on the footer */
+  .card-foot img { height: 15px; width: auto; }
+  .card-paper .rank { margin-bottom: auto; }
+  @media (max-width: 300px) { .card { gap: 8px; padding: 12px; } .rank li { padding: 4px 0; } }
+
+  /* ---------- how it works: statement + call | response ---------- */
+  .how-head { margin-bottom: clamp(48px, 6vw, 88px); }
+  .rows { display: grid; gap: clamp(80px, 9vw, 136px); }
+  .row { display: grid; gap: 32px; align-items: start; }
+  .row-text { display: grid; gap: 16px; max-width: 34rem; }
+  .order { font-size: var(--step-lead); font-weight: 500; line-height: 1.2; letter-spacing: -0.02em; }
+  .call { background: var(--surface); border-radius: 12px; padding: 20px; display: grid; gap: 10px; margin-top: 8px; }
+  .call label { font-size: var(--step-small); font-weight: 500; }
+  .call input[type="url"] {
+    width: 100%; min-height: 48px; border: 0; border-radius: 8px; background: var(--paper);
+    font: 400 15px/1.2 var(--font); color: var(--ink); padding: 0 14px;
+  }
+  .call input[type="range"] { width: 100%; accent-color: var(--accent); height: 28px; }
+  .call output { font-weight: 600; }
+  @media (min-width: 960px) {
+    .row { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: var(--gap); column-gap: clamp(32px, 4vw, 64px); }
+    .row-wide .ui-flow { grid-column: 1 / -1; }
+    /* The ghosting step mirrors the first: table left, its controls right and right-aligned. */
+    .row-flip { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
+    .row-flip > .ui { grid-column: 1; grid-row: 1; }
+    .row-flip > .row-text { grid-column: 2; grid-row: 1; justify-self: end; justify-items: end; width: 100%; text-align: right; }
+    .row-flip .call { justify-self: stretch; }
+  }
+
+  /* fragments: the app's own panels */
+  .ui { background: var(--paper); border-radius: 14px; padding: 20px; font-size: 14px; line-height: 1.35; color: var(--ink); min-width: 0; }
+  .ui-title { font-size: 16px; font-weight: 600; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .ui-title small { font-size: 13px; font-weight: 400; color: var(--muted); }
+  .ui-form { display: grid; gap: 12px; }
+  .ui-field { display: grid; gap: 4px; }
+  .ui-field span { font-size: 13px; color: var(--muted); }
+  .ui-field div { min-height: 40px; border: 1px solid #d4d4d8; border-radius: 8px; padding: 9px 12px; } /* taste-skill-ignore: form field inside a data-ui fragment */
+  .ui-field .filled { background: #f4f4f5; border-color: transparent; }
+  .ui-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .ui-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+  .ui-btn { min-height: 38px; padding: 0 16px; border-radius: 8px; border: 0; font: 500 14px/1 var(--font); display: inline-flex; align-items: center; white-space: nowrap; }
+  /* Folded-phone cover screens: one field per row, and Save moves above Cancel instead of breaking its label. */
+  @media (max-width: 300px) { .ui-2 { grid-template-columns: 1fr; } .ui-actions { flex-wrap: wrap-reverse; } }
+  .ui-btn-ghost { background: transparent; color: var(--ink); }
+  .ui-btn-blue { background: var(--accent); color: #fff; }
+  .pill { display: inline-flex; align-items: center; min-height: 24px; padding: 0 10px; border-radius: 999px; font-size: 13px; font-weight: 500; white-space: nowrap; }
+  .pill-applied { background: #ececee; color: var(--ink); }
+  .pill-ghosted { background: var(--ink); color: #fff; }
+
+  .ui-table { width: 100%; border-collapse: collapse; }
+  .ui-table caption { text-align: left; font-size: 16px; font-weight: 600; padding-bottom: 12px; }
+  .ui-table th { text-align: left; font-size: 13px; font-weight: 500; color: var(--muted); padding: 0 8px 8px 0; }
+  .ui-table td { padding: 10px 8px 10px 0; border-top: 1px solid #e4e4e7; vertical-align: middle; }
+  .ui-table td:last-child, .ui-table th:last-child { text-align: right; padding-right: 0; }
+  .ui-table .co { font-weight: 500; }
+  .ui-table .quiet { color: var(--muted); white-space: nowrap; }
+  .ui-sum { margin-top: 14px; padding-top: 12px; border-top: 1px solid #e4e4e7; } /* taste-skill-ignore: table footer rule inside a data-ui fragment */
+  .ui-sum b { font-weight: 600; }
+  @media (max-width: 639px) { .ui-table .role { display: none; } }
+
+  /* funnel */
+  .ui-flow { padding: 24px; }
+  .flow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; }
+  .flow-plot { position: relative; height: 320px; }
+  .flow-plot svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .lab { position: absolute; font-size: 13px; line-height: 1.2; white-space: nowrap; }
+  .lab b { font-weight: 600; }
+  .flow-out { position: relative; height: 320px; width: clamp(150px, 14vw, 190px); }
+  .flow-note { margin-top: 18px; color: var(--muted); font-size: 14px; max-width: 60ch; }
+  .flow-legend { display: none; }
+  /* Phone: the plot is too narrow to label in place, so its labels move to a list under it. */
+  @media (max-width: 639px) {
+    .flow { grid-template-columns: 1fr; }
+    .flow-out, .flow-plot .lab { display: none; }
+    .flow-plot { height: 220px; }
+    .flow-legend { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; margin-top: 16px; font-size: 14px; }
+    .flow-legend dt.sub { padding-left: 14px; color: var(--muted); }
+    .flow-legend dd { font-weight: 600; text-align: right; }
+  }
+
+  /* ---------- showcase: output index + live sheet, pinned on desktop ---------- */
+  .show-grid { display: grid; gap: 32px; }
+  .show-index { display: grid; gap: 24px; align-content: start; }
+  .ranges { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 24px; }
+  .range-btn {
+    border: 0; background: none; padding: 4px 0; cursor: pointer; text-align: left;
+    font: 600 var(--step-lead)/1.1 var(--font); letter-spacing: -0.03em; color: var(--muted);
+    transition: color 160ms ease, transform 160ms var(--ease-out);
+  }
+  .range-btn[aria-pressed="true"] { color: var(--ink); }
+  .range-btn:active { transform: scale(0.98); }
+  /* Below desktop the ranges are tapped, not scrolled past: a 2x2 set of pills, the selected one filled. */
+  @media (max-width: 1119px) {
+    .ranges { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .range-btn {
+      width: 100%; min-height: 48px; padding: 0 16px; border-radius: 999px; text-align: center;
+      background: var(--surface); color: var(--ink); font-size: var(--step-body); letter-spacing: -0.01em;
+      transition: background-color 160ms ease, color 160ms ease, transform 160ms var(--ease-out);
+    }
+    .range-btn[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  }
+  .stage { background: var(--field); min-height: 70svh; display: grid; place-items: start center; padding: 56px 16px; overflow: hidden; }
+  .sheet { width: min(320px, 100%); transition: opacity 200ms ease, filter 200ms ease; }
+  .sheet.is-swapping { opacity: 0; filter: blur(2px); }
+  @media (min-width: 1120px) {
+    .show-grid { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); column-gap: clamp(32px, 4vw, 64px); align-items: stretch; }
+    .ranges { display: block; margin-top: clamp(64px, 7vw, 112px); }
+    .ranges li { min-height: 52svh; display: grid; align-content: start; gap: 12px; }
+    .ranges li:last-child { min-height: 30svh; }
+    .range-btn { font-size: var(--step-head); letter-spacing: -0.04em; }
+    .stage-pin { position: sticky; top: 10svh; }
+    .sheet { width: max(200px, min(320px, calc((80svh - 48px) * 0.5625))); } /* short laptop screens: the whole card stays inside the pinned stage */
+    .stage { height: 80svh; min-height: 0; place-items: center; }
+  }
+
+  /* ---------- close: the first step, already open (v4's section) ---------- */
+  .close { margin-top: clamp(72px, 40px + 8vw, 160px); background: var(--accent); color: var(--accent-ink); }
+  .close-grid { display: grid; gap: 40px; align-items: center; padding-top: clamp(64px, 40px + 5vw, 112px); padding-bottom: clamp(64px, 40px + 5vw, 112px); }
+  @media (min-width: 1024px) { .close-grid { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); column-gap: clamp(32px, 4.5vw, 64px); } }
+  .close h2 { font-size: var(--step-display); line-height: 1.05; letter-spacing: -0.03em; }
+  .close-copy p { margin-top: 16px; font-size: 1.0625rem; }
+  .start-form { display: grid; gap: 12px; padding: 24px; border-radius: 16px; background: var(--paper); color: var(--ink); }
+  .start-row { display: grid; gap: 16px; }
+  @media (min-width: 480px) { .start-row { grid-template-columns: minmax(0, 1fr) auto; align-items: end; } }
+  .field-label, legend { display: block; padding: 0; margin-bottom: 4px; font-size: 0.875rem; font-weight: 500; }
+  fieldset { border: 0; padding: 0; min-width: 0; }
+  .text-input { width: 100%; min-height: 48px; padding: 0 12px; border: 1px solid var(--rule-strong); border-radius: 8px; background: var(--paper); color: var(--ink); font: 400 1rem/1.2 var(--font); } /* taste-skill-ignore: form field inside a data-ui fragment */
+  .text-input::placeholder { color: var(--muted); }
+  .text-input[aria-invalid="true"] { border-color: var(--danger); }
+  /* One reserved line under the field: the hint, or the error in its place, so nothing below jumps. */
+  .field-note { display: flex; align-items: center; gap: 4px; min-height: 20px; margin-top: 4px; font-size: 0.8125rem; line-height: 20px; color: var(--muted); }
+  .field-note svg { display: none; flex: none; width: 16px; height: 16px; }
+  .field-note.is-error { color: var(--danger); }
+  .field-note.is-error svg { display: block; }
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 2px; padding: 2px; border-radius: 8px; background: var(--field); }
+  .seg label {
+    position: relative; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 12px;
+    border: 1px solid transparent; border-radius: 6px; color: var(--ink); font: 500 0.875rem/1 var(--font); white-space: nowrap; cursor: pointer; /* taste-skill-ignore: transparent until selected, so the label does not shift, inside a data-ui fragment */
+    -webkit-tap-highlight-color: transparent; transition: background-color 120ms ease;
+  }
+  .seg label:has(input:checked) { background: var(--paper); border-color: var(--rule-strong); font-weight: 600; box-shadow: 0 1px 2px rgb(0 0 0 / 0.1), 0 4px 12px rgb(0 0 0 / 0.05); } /* taste-skill-ignore: selected segment inside a data-ui fragment */
+  .seg input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+  .seg label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .start-form .btn { min-height: 48px; border-radius: 8px; background: var(--ink); color: var(--accent-ink); font-size: 1.0625rem; }
+  @media (hover: hover) and (pointer: fine) { .start-form .btn:hover { background: #27272a; } }
+
+  /* ---------- footer: one quiet line ---------- */
+  .foot { padding-top: 30svh; padding-bottom: 30px; font-size: var(--step-small); color: var(--muted); }
+  .foot .frame { display: grid; gap: 8px; }
+  .foot nav { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+  .foot a { color: var(--ink); text-decoration: none; }
+  @media (min-width: 900px) { .foot .frame { grid-template-columns: 1fr auto 1fr; align-items: baseline; } .foot .end { text-align: right; } }
+
+  /* ---------- touch and narrow screens ---------- */
+  @media (pointer: coarse), (max-width: 639px) {
+    .btn-sm { min-height: 44px; }
+    .icon-btn { width: 44px; height: 44px; }
+    .nav > a[href="/login"], .foot a { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 44px; }
+    .call input[type="range"] { height: 44px; }
+    .call input[type="url"] { font-size: 16px; } /* under 16px, iOS zooms the page on focus */
+    .btn, .icon-btn, .range-btn { -webkit-tap-highlight-color: transparent; }
+  }
+  @media (max-width: 359px) { .ui, .ui-flow { padding: 16px; } }
+  /* Phones held sideways: keep the headline and both hero buttons inside the short first screen. */
+  @media (orientation: landscape) and (max-height: 500px) {
+    :root { --step-head: clamp(2rem, 5vw, 2.5rem); --step-hero: clamp(2rem, 5vw, 2.5rem); }
+    .site-header .frame { min-height: 60px; }
+    .hero { padding-top: 16px; }
+    .hero-copy { gap: 20px; }
+    .carousel { --card-w: max(200px, min(320px, calc((100svh - 32px) * 0.5625))); } /* the whole card fits one short screen */
+  }
+
+  /* ---------- motion ---------- */
+  @media (prefers-reduced-motion: no-preference) {
+    .js [data-rise] { opacity: 0; transform: translateY(24px); transition: opacity 700ms var(--ease-out), transform 700ms var(--ease-out); transition-delay: calc(var(--i, 0) * 70ms); }
+    .js [data-rise].in { opacity: 1; transform: none; }
+    .ticks i.on::after { transition: transform 320ms var(--ease-out); }
+  }
+</style>
+</head>
+<body>
+<script>document.documentElement.classList.add('js')</script>
+<a class="btn btn-solid btn-sm skip" href="#main">Skip to content</a>
+
+<p class="wf-bar"><span class="frame" style="display:block">Wireframe v5 · neutral · sample data</span></p>
+
+<header class="site-header">
+  <div class="frame">
+    <a class="logo" href="/" aria-label="JourneyJob home"><img src="../../frontend/src/assets/JourneyJobLogoLight.png" alt="JourneyJob" width="166" height="32"></a>
+    <nav class="nav" aria-label="Main">
+      <a class="nav-link" href="#how">How it works</a>
+      <a class="nav-link" href="#recaps">Recaps</a>
+      <a href="/login">Log in</a>
+      <button class="icon-btn" type="button" aria-label="Theme: system">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
+      <a class="btn btn-solid btn-sm" href="/signup">Start your journey</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <!-- Hero: the shared artifact, one card at a time -->
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="frame hero-grid">
+      <div class="hero-copy">
+        <h1 id="hero-title" data-rise><span>Track the search.</span> <span>Share the month.</span></h1>
+        <p class="lede" data-rise style="--i:1">Every application on one private board. Any month becomes a card you can post.</p>
+        <div class="actions" data-rise style="--i:2">
+          <a class="btn btn-solid" href="/signup">Start your journey</a>
+          <a class="btn btn-soft" href="/login">Log in</a>
+        </div>
+      </div>
+
+      <div class="carousel" data-ui data-rise style="--i:3" role="group" aria-roledescription="carousel" aria-label="One sample month as a recap card, in three designs">
+        <button class="car-arrow car-prev is-off" id="car-prev" type="button" aria-label="Previous card" aria-controls="car-view">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <ul class="car-view" id="car-view" tabindex="0" aria-label="Recap cards">
+          <li class="slide is-current">
+            <div class="card card-ink" role="img" aria-label="Card 1 of 3. Sample recap, August 2026: 34 applications, 7 interviews, 1 offer.">
+              <div class="ticks"><i class="on"></i><i></i><i></i></div>
+              <div class="card-head">This month</div>
+              <div class="stats">
+                <div><div class="n-l">34</div><span class="soft">Applications</span></div>
+                <div><div class="n-l">7</div><span class="soft">Interviews</span></div>
+                <div><div class="n-l">1</div><span class="soft">Offer</span></div>
+              </div>
+              <div class="bar"><span class="seg-int" style="flex:7"></span><span class="seg-rej" style="flex:11"></span><span class="seg-gho" style="flex:6"></span><span class="seg-wait" style="flex:10"></span></div>
+              <div class="bar-key soft"><span>7 interviewed</span><span>11 rejected</span><span>6 ghosted</span><span>10 waiting</span></div>
+              <div class="card-foot"><span class="soft">Aug 2026</span><img src="../../frontend/src/assets/JourneyJobLogoDark.png" alt="" width="78" height="15"></div>
+            </div>
+          </li>
+          <li class="slide">
+            <div class="card card-field" role="img" aria-label="Card 2 of 3. Sample recap, August 2026: 34 applications sent, 7 interviews, 1 offer, 53 percent response rate, 18 percent ghost rate.">
+              <div class="ticks"><i></i><i class="on"></i><i></i></div>
+              <div class="card-head">This month</div>
+              <div><div class="n-xl">34</div><span>applications sent</span></div>
+              <div class="tiles">
+                <div><span class="n-m">7</span><span class="soft">Interviews</span></div>
+                <div><span class="n-m">1</span><span class="soft">Offer</span></div>
+                <div><span class="n-m">53%</span><span class="soft">Response</span></div>
+                <div><span class="n-m">18%</span><span class="soft">Ghosted</span></div>
+              </div>
+              <div class="card-foot"><span class="soft">Aug 2026</span><img src="../../frontend/src/assets/JourneyJobLogoLight.png" alt="" width="78" height="15"></div>
+            </div>
+          </li>
+          <li class="slide">
+            <div class="card card-paper" role="img" aria-label="Card 3 of 3. Sample recap, August 2026, ranked: 34 applications, 7 interviews, 53 percent response rate, 18 percent ghost rate, 38 percent rejection or fail rate, 1 offer.">
+              <div class="ticks"><i></i><i></i><i class="on"></i></div>
+              <div class="card-head">This month</div>
+              <ol class="rank">
+                <li><span class="soft">1</span><span>Applications</span><b>34</b></li>
+                <li><span class="soft">2</span><span>Interviews</span><b>7</b></li>
+                <li><span class="soft">3</span><span>Response rate</span><b>53%</b></li>
+                <li><span class="soft">4</span><span>Ghost rate</span><b>18%</b></li>
+                <li><span class="soft">5</span><span>Rejection/fail rate</span><b>38%</b></li>
+                <li><span class="soft">6</span><span>Offers</span><b>1</b></li>
+              </ol>
+              <div class="card-foot"><span class="soft">Aug 2026</span><img src="../../frontend/src/assets/JourneyJobLogoLight.png" alt="" width="78" height="15"></div>
+            </div>
+          </li>
+        </ul>
+        <button class="car-arrow car-next" id="car-next" type="button" aria-label="Next card" aria-controls="car-view">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+        <p class="sr-only" id="car-status" aria-live="polite"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- How it works: what you give, what comes back -->
+  <section id="how" class="section" aria-labelledby="how-title">
+    <div class="frame">
+      <h2 id="how-title" class="how-head" data-rise>How the card gets made</h2>
+      <div class="rows">
+        <div class="row">
+          <div class="row-text">
+            <h3 class="order" data-rise>Paste the posting</h3>
+            <p data-rise style="--i:1">Greenhouse and Workday links fill in the form.</p>
+            <div class="call" data-rise style="--i:2">
+              <label for="posting-1">Job posting link</label>
+              <input id="posting-1" type="url" value="https://boards.greenhouse.io/northwind/jobs/4182093" spellcheck="false">
+            </div>
+          </div>
+          <div class="ui" data-ui data-rise style="--i:3">
+            <p class="ui-title">New application <small>Autofilled from Greenhouse</small></p>
+            <div class="ui-form">
+              <div class="ui-2">
+                <label class="ui-field"><span>Company</span><div class="filled">Northwind</div></label>
+                <label class="ui-field"><span>Location</span><div class="filled">Remote (US)</div></label>
+              </div>
+              <label class="ui-field"><span>Job title</span><div class="filled">Software Engineer, New Grad</div></label>
+              <div class="ui-2">
+                <label class="ui-field"><span>Status</span><div>Applied</div></label>
+                <label class="ui-field"><span>Date applied</span><div>Nov 4, 2026</div></label>
+              </div>
+              <div class="ui-actions"><span class="ui-btn ui-btn-ghost">Cancel</span><span class="ui-btn ui-btn-blue">Save application</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row row-flip">
+          <div class="row-text">
+            <h3 class="order" data-rise>Then choose when silence counts</h3>
+            <p data-rise style="--i:1">Quiet past your limit turns Ghosted. Interviews never do.</p>
+            <div class="call" data-rise style="--i:2">
+              <label for="ghost-days">Ghost after <output id="ghost-out" for="ghost-days">14</output> days</label>
+              <input id="ghost-days" type="range" min="7" max="30" value="14" aria-describedby="ghost-sum">
+            </div>
+          </div>
+          <div class="ui" data-ui data-rise style="--i:3">
+            <table class="ui-table">
+              <caption>Waiting to hear back</caption>
+              <thead><tr><th scope="col">Company</th><th scope="col" class="role">Role</th><th scope="col">Quiet for</th><th scope="col">Status</th></tr></thead>
+              <tbody id="ghost-rows">
+                <tr data-days="31"><td class="co">Northwind</td><td class="role">Software Engineer, New Grad</td><td class="quiet">31 days</td><td><span class="pill">Ghosted</span></td></tr>
+                <tr data-days="22"><td class="co">Halcyon Labs</td><td class="role">Frontend Engineer</td><td class="quiet">22 days</td><td><span class="pill">Ghosted</span></td></tr>
+                <tr data-days="17"><td class="co">Brightline</td><td class="role">Platform Engineer I</td><td class="quiet">17 days</td><td><span class="pill">Ghosted</span></td></tr>
+                <tr data-days="15"><td class="co">Kestrel</td><td class="role">Data Engineer, New Grad</td><td class="quiet">15 days</td><td><span class="pill">Ghosted</span></td></tr>
+                <tr data-days="12"><td class="co">Fieldnote</td><td class="role">Software Engineer</td><td class="quiet">12 days</td><td><span class="pill">Applied</span></td></tr>
+                <tr data-days="9"><td class="co">Copperleaf</td><td class="role">Mobile Engineer</td><td class="quiet">9 days</td><td><span class="pill">Applied</span></td></tr>
+                <tr data-days="5"><td class="co">Juniper Health</td><td class="role">Backend Engineer</td><td class="quiet">5 days</td><td><span class="pill">Applied</span></td></tr>
+                <tr data-days="2"><td class="co">Tidewater</td><td class="role">Full-Stack Engineer</td><td class="quiet">2 days</td><td><span class="pill">Applied</span></td></tr>
+              </tbody>
+            </table>
+            <p class="ui-sum" id="ghost-sum" aria-live="polite"><b id="ghost-count">4</b> of <span id="ghost-total">8</span> ghosted</p>
+          </div>
+        </div>
+
+        <div class="row row-wide">
+          <div class="row-text">
+            <h3 class="order" data-rise>Visualize your progress</h3>
+          </div>
+          <figure class="ui ui-flow" data-ui data-rise style="--i:1">
+            <p class="ui-title">Pipeline · Aug 2026 <small>34 applications</small></p>
+            <div class="flow">
+              <div class="flow-plot">
+                <svg viewBox="0 0 860 320" preserveAspectRatio="none" aria-hidden="true">
+                  <defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#f4f4f5"/><line x1="0" y1="0" x2="0" y2="6" stroke="#a1a1aa" stroke-width="2"/></pattern></defs>
+                  <!-- Applied 34 -> Interviewing/OA 7, Rejected 11, Ghosted 6; 10 waiting stay in the node -->
+                  <path d="M14 24 C220 24 220 24 423 24 L423 80 C220 80 220 80 14 80 Z" fill="#71717a"/>
+                  <path d="M14 80 C220 80 220 100 423 100 L423 188 C220 188 220 168 14 168 Z" fill="#d4d4d8"/>
+                  <path d="M14 168 C220 168 220 208 423 208 L423 256 C220 256 220 216 14 216 Z" fill="#a1a1aa"/>
+                  <!-- Interviewing/OA 7 -> Offer 1, Failed Interview/OA 2; 4 still interviewing -->
+                  <path d="M437 24 C640 24 640 24 846 24 L846 32 C640 32 640 32 437 32 Z" fill="#0F57FE"/>
+                  <path d="M437 32 C640 32 640 56 846 56 L846 72 C640 72 640 48 437 48 Z" fill="#3f3f46"/>
+                  <rect x="0" y="24" width="14" height="192" fill="#18181b"/>
+                  <rect x="0" y="216" width="14" height="80" fill="url(#hatch)"/>
+                  <rect x="423" y="24" width="14" height="24" fill="#18181b"/>
+                  <rect x="423" y="48" width="14" height="32" fill="url(#hatch)"/>
+                  <rect x="423" y="100" width="14" height="88" fill="#71717a"/>
+                  <rect x="423" y="208" width="14" height="48" fill="#71717a"/>
+                  <rect x="846" y="24" width="14" height="8" fill="#0F57FE"/>
+                  <rect x="846" y="56" width="14" height="16" fill="#18181b"/>
+                </svg>
+                <span class="lab" style="left:0;top:2px"><b>Applied</b> 34</span>
+                <span class="lab" style="left:22px;top:248px">10 waiting</span>
+                <span class="lab" style="left:calc(50% - 7px);top:2px"><b>Interviewing / OA</b> 7</span>
+                <span class="lab" style="left:calc(50% + 14px);top:82px">4 still interviewing</span>
+                <span class="lab" style="left:calc(50% + 16px);top:136px"><b>Rejected</b> 11</span>
+                <span class="lab" style="left:calc(50% + 16px);top:224px"><b>Ghosted</b> 6</span>
+              </div>
+              <div class="flow-out">
+                <span class="lab" style="left:0;top:20px"><b>Offer</b> 1</span>
+                <span class="lab" style="left:0;top:56px"><b>Failed Interview/OA</b> 2</span>
+              </div>
+            </div>
+            <dl class="flow-legend">
+              <dt>Applied</dt><dd>34</dd>
+              <dt class="sub">Interviewing / OA</dt><dd>7</dd>
+              <dt class="sub">Rejected</dt><dd>11</dd>
+              <dt class="sub">Ghosted</dt><dd>6</dd>
+              <dt class="sub">Still waiting</dt><dd>10</dd>
+              <dt>From Interviewing / OA</dt><dd>7</dd>
+              <dt class="sub">Offer</dt><dd>1</dd>
+              <dt class="sub">Failed Interview/OA</dt><dd>2</dd>
+              <dt class="sub">Still interviewing</dt><dd>4</dd>
+            </dl>
+            <figcaption class="flow-note">Striped: still open</figcaption>
+          </figure>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Showcase: any range becomes a card -->
+  <section id="recaps" class="section" aria-labelledby="recaps-title">
+    <div class="frame show-grid">
+      <div class="show-index">
+        <h2 id="recaps-title" data-rise>Any range becomes a card</h2>
+        <ul class="ranges" data-rise style="--i:1">
+          <li data-step="week"><button class="range-btn" type="button" data-range="week" aria-pressed="false" aria-controls="sheet">This week</button></li>
+          <li data-step="month"><button class="range-btn" type="button" data-range="month" aria-pressed="true" aria-controls="sheet">This month</button></li>
+          <li data-step="year"><button class="range-btn" type="button" data-range="year" aria-pressed="false" aria-controls="sheet">This year</button></li>
+          <li data-step="all"><button class="range-btn" type="button" data-range="all" aria-pressed="false" aria-controls="sheet">All time</button></li>
+        </ul>
+      </div>
+      <div class="stage-col">
+        <div class="stage-pin">
+          <div class="stage">
+            <div class="sheet" id="sheet" data-ui aria-live="polite">
+              <div class="card card-ink" role="img" id="sheet-card" aria-label="Recap for this month: 34 applications, 7 interviews, 1 offer.">
+                <div class="card-head" data-k="title">This month</div>
+                <div class="stats">
+                  <div><div class="n-l" data-k="apps">34</div><span class="soft">Applications</span></div>
+                  <div><div class="n-l" data-k="interviews">7</div><span class="soft">Interviews</span></div>
+                  <div><div class="n-l" data-k="offers">1</div><span class="soft" data-k="offerLabel">Offer</span></div>
+                </div>
+                <div class="bar" id="sheet-bar"><span class="seg-int" style="flex:7"></span><span class="seg-rej" style="flex:11"></span><span class="seg-gho" style="flex:6"></span><span class="seg-wait" style="flex:10"></span></div>
+                <div class="bar-key soft" id="sheet-key"><span>7 interviewed</span><span>11 rejected</span><span>6 ghosted</span><span>10 waiting</span></div>
+                <div class="card-foot"><span class="soft" data-k="dates">Aug 2026</span><img src="../../frontend/src/assets/JourneyJobLogoDark.png" alt="" width="78" height="15"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Close: the first step, already open (v4's section) -->
+  <section class="close" aria-labelledby="close-title">
+    <div class="frame close-grid">
+      <div class="close-copy">
+        <h2 id="close-title" data-rise>Start with one link</h2>
+        <p data-rise style="--i:1">As easy as pasting a link. Start tracking now</p>
+      </div>
+      <form class="start-form" id="start-form" data-ui action="/signup" method="get" data-rise style="--i:2">
+        <div>
+          <label class="field-label" for="posting">Job posting link</label>
+          <input class="text-input" id="posting" name="posting" type="url" inputmode="url" placeholder="https://boards.greenhouse.io/…" spellcheck="false" aria-describedby="posting-note">
+          <p class="field-note" id="posting-note" aria-live="polite">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+          </p>
+        </div>
+        <div class="start-row">
+          <fieldset>
+            <legend>Status</legend>
+            <div class="seg">
+              <label><input type="radio" name="status" value="applied" checked>Applied</label>
+              <label><input type="radio" name="status" value="saved">Saved</label>
+            </div>
+          </fieldset>
+          <button class="btn" type="submit">Start your journey</button>
+        </div>
+      </form>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="frame">
+    <span>JourneyJob</span>
+    <nav aria-label="Footer"><a href="/app">Open the app</a><a href="/login">Log in</a><a href="/signup">Sign up</a></nav>
+    <span class="end">© 2026</span>
+  </div>
+</footer>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Entrances: each part rises once as its section arrives. Content is visible without script.
+  const rise = new IntersectionObserver((entries) => {
+    for (const e of entries) if (e.isIntersecting) { e.target.classList.add('in'); rise.unobserve(e.target); }
+  }, { rootMargin: '0px 0px -8% 0px' });
+  document.querySelectorAll('[data-rise]').forEach((el) => rise.observe(el));
+
+  // Hero carousel: native scroll-snap does the swiping; the arrows scroll to a card.
+  const view = $('car-view');
+  const slides = [...view.children];
+  const prev = $('car-prev');
+  const next = $('car-next');
+  let current = 0;
+  let byArrow = false;
+  let arrowTimer;
+  let frame;
+  const show = (i) => {
+    const focused = document.activeElement;
+    current = i;
+    slides.forEach((s, n) => s.classList.toggle('is-current', n === i));
+    prev.classList.toggle('is-off', i === 0);
+    next.classList.toggle('is-off', i === slides.length - 1);
+    // A hidden arrow cannot keep keyboard focus, so hand it to the other one.
+    if (focused === next && i === slides.length - 1) prev.focus();
+    if (focused === prev && i === 0) next.focus();
+    $('car-status').textContent = `Card ${i + 1} of ${slides.length}`;
+  };
+  const go = (i) => {
+    if (i < 0 || i >= slides.length) return;
+    show(i); // the bars and arrows answer on press, not when the scroll lands
+    byArrow = true;
+    clearTimeout(arrowTimer);
+    arrowTimer = setTimeout(() => { byArrow = false; }, 700);
+    const s = slides[i];
+    view.scrollTo({ left: s.offsetLeft - (view.clientWidth - s.offsetWidth) / 2, behavior: reduce ? 'auto' : 'smooth' });
+  };
+  const nearest = () => {
+    const middle = view.scrollLeft + view.clientWidth / 2;
+    let best = 0;
+    slides.forEach((s, n) => {
+      if (Math.abs(s.offsetLeft + s.offsetWidth / 2 - middle) < Math.abs(slides[best].offsetLeft + slides[best].offsetWidth / 2 - middle)) best = n;
+    });
+    return best;
+  };
+  view.addEventListener('scroll', () => {
+    cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(() => {
+      if (byArrow) return;
+      const i = nearest();
+      if (i !== current) show(i);
+    });
+  }, { passive: true });
+  view.addEventListener('scrollend', () => { byArrow = false; clearTimeout(arrowTimer); });
+  prev.addEventListener('click', () => go(current - 1));
+  next.addEventListener('click', () => go(current + 1));
+  slides.forEach((s, n) => s.addEventListener('click', () => { if (n !== current) go(n); }));
+
+  // The ghost threshold re-sorts the rows on screen, and the count is taken from those same rows.
+  const slider = $('ghost-days');
+  const rows = [...document.querySelectorAll('#ghost-rows tr')];
+  const applyThreshold = () => {
+    const limit = Number(slider.value);
+    let ghosted = 0;
+    for (const r of rows) {
+      const isGhosted = Number(r.dataset.days) >= limit;
+      const pill = r.querySelector('.pill');
+      pill.textContent = isGhosted ? 'Ghosted' : 'Applied';
+      pill.className = 'pill ' + (isGhosted ? 'pill-ghosted' : 'pill-applied');
+      if (isGhosted) ghosted += 1;
+    }
+    $('ghost-out').textContent = limit;
+    $('ghost-count').textContent = ghosted;
+    $('ghost-total').textContent = rows.length;
+  };
+  slider.addEventListener('input', applyThreshold);
+  applyThreshold();
+
+  // Ranges: sample recaps; totals add up (interviewed + rejected + ghosted + waiting = applications).
+  const RANGES = {
+    week:  { title: 'This week',  dates: 'Aug 25 – 31',    apps: 9,   int: 2,  off: 0, rej: 3,  gho: 1,  wait: 3 },
+    month: { title: 'This month', dates: 'Aug 2026',       apps: 34,  int: 7,  off: 1, rej: 11, gho: 6,  wait: 10 },
+    year:  { title: 'This year',  dates: '2026',           apps: 96,  int: 14, off: 2, rej: 31, gho: 21, wait: 30 },
+    all:   { title: 'All time',   dates: 'Since Oct 2025', apps: 128, int: 18, off: 3, rej: 41, gho: 27, wait: 42 },
+  };
+  const sheet = $('sheet');
+  const card = $('sheet-card');
+  const buttons = [...document.querySelectorAll('[data-range]')];
+  let range = 'month';
+  let timer;
+  const paint = (k) => {
+    const r = RANGES[k];
+    const set = (key, v) => { card.querySelector(`[data-k="${key}"]`).textContent = v; };
+    set('title', r.title); set('dates', r.dates); set('apps', r.apps); set('interviews', r.int);
+    set('offers', r.off); set('offerLabel', r.off === 1 ? 'Offer' : 'Offers');
+    document.querySelectorAll('#sheet-bar span').forEach((s, i) => { s.style.flex = [r.int, r.rej, r.gho, r.wait][i]; });
+    $('sheet-key').innerHTML = `<span>${r.int} interviewed</span><span>${r.rej} rejected</span><span>${r.gho} ghosted</span><span>${r.wait} waiting</span>`;
+    card.setAttribute('aria-label', `Recap for ${r.title.toLowerCase()}: ${r.apps} applications, ${r.int} interviews, ${r.off} ${r.off === 1 ? 'offer' : 'offers'}.`);
+  };
+  const select = (k) => {
+    if (k === range) return;
+    range = k;
+    buttons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.range === k)));
+    clearTimeout(timer);
+    if (reduce) { paint(k); return; }
+    sheet.classList.add('is-swapping');
+    timer = setTimeout(() => { paint(k); sheet.classList.remove('is-swapping'); }, 120);
+  };
+  buttons.forEach((b) => b.addEventListener('click', () => select(b.dataset.range)));
+
+  // Pinned story on wide screens: the step crossing the middle of the screen drives the card.
+  const wide = matchMedia('(min-width: 1120px)');
+  const steps = new IntersectionObserver((entries) => {
+    if (!wide.matches) return;
+    for (const e of entries) if (e.isIntersecting) select(e.target.dataset.step);
+  }, { rootMargin: '-45% 0px -45% 0px' });
+  document.querySelectorAll('[data-step]').forEach((el) => steps.observe(el));
+
+  // Closing form: the link is optional, but a wrong one is caught when the visitor leaves the field or submits.
+  const form = $('start-form');
+  const posting = form.elements.posting;
+  const note = $('posting-note');
+  const noteText = note.querySelector('span') || note.appendChild(document.createElement('span')); // the hint line can be left empty; the error still needs a place
+  const HINT = noteText.textContent;
+  form.noValidate = true; // native URL validation stays as the fallback without this script
+  const isLink = (value) => {
+    try { return /^https?:$/.test(new URL(value.trim()).protocol); } catch { return false; }
+  };
+  const isOk = () => !posting.value.trim() || isLink(posting.value);
+  const showError = (bad) => {
+    if (bad) posting.setAttribute('aria-invalid', 'true'); else posting.removeAttribute('aria-invalid');
+    note.classList.toggle('is-error', bad);
+    noteText.textContent = bad ? 'That is not a full link. It should start with https://' : HINT;
+  };
+  posting.addEventListener('blur', () => showError(!isOk()));
+  posting.addEventListener('input', () => { if (posting.hasAttribute('aria-invalid') && isOk()) showError(false); });
+  form.addEventListener('submit', (e) => {
+    if (!isOk()) { e.preventDefault(); showError(true); posting.focus(); }
+  });
+})();
+</script>
+</body>
+</html>

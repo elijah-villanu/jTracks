@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Log in v1 on phones and tablets</title>
+<link rel="preconnect" href="https://api.fontshare.com">
+<link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
+<link href="https://api.fontshare.com/v2/css?f[]=switzer@400,500,600&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #fafafa; --ink: #18181b; --muted: #52525b; --frame: #e4e4e7; --accent: #0F57FE; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 400 16px/1.5 "Switzer", system-ui, sans-serif; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  main { padding: 32px clamp(16px, 2.5vw, 32px) 64px; }
+  header { display: grid; gap: 4px; margin-bottom: 32px; }
+  h1 { margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.03em; }
+  h2 { margin: 0 0 16px; font-size: 18px; font-weight: 600; }
+  header p { margin: 0; color: var(--muted); max-width: 80ch; }
+  header a { color: var(--ink); }
+  .row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 40px 32px; }
+  section + section { margin-top: 56px; }
+  figure { margin: 0; display: grid; gap: 10px; }
+  figcaption { font-size: 14px; color: var(--muted); }
+  figcaption b { color: var(--ink); font-weight: 600; }
+  /* Device screen: exact CSS width; the frame's own scrollbar is pushed out of view (phones use overlay scrollbars). */
+  .screen { width: var(--w); height: var(--h); overflow: hidden; border-radius: 22px; background: #fff; outline: 8px solid var(--frame); outline-offset: 0; }
+  .screen iframe { display: block; border: 0; width: var(--w); height: var(--h); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Log in v1 on phones and tablets</h1>
+    <p>Each screen runs <a href="login-v1.html">login-v1.html</a> at that width, and everything works inside the frames: continue, change the email, show the password, switch to sign up. Use the Screen menu in each frame to reach any state. Theme follows your system until you pick one (reload to see it in every frame).</p>
+  </header>
+
+  <section>
+    <h2>390 · iPhone 12–14</h2>
+    <div class="row">
+      <figure>
+        <figcaption><b>Log in</b> · email</figcaption>
+        <div class="screen" style="--w:390px;--h:844px"><iframe src="login-v1.html#login" title="Log in, email step, at 390 pixels wide"></iframe></div>
+      </figure>
+      <figure>
+        <figcaption><b>Log in</b> · session ended (the notice closes after 5s; reload to see it again)</figcaption>
+        <div class="screen" style="--w:390px;--h:844px"><iframe src="login-v1.html#login/email/ended" title="Log in with the session-ended notice, at 390 pixels wide"></iframe></div>
+      </figure>
+      <figure>
+        <figcaption><b>Log in</b> · wrong password</figcaption>
+        <div class="screen" style="--w:390px;--h:844px"><iframe src="login-v1.html#login/password/wrong" title="Log in, wrong password, at 390 pixels wide"></iframe></div>
+      </figure>
+      <figure>
+        <figcaption><b>Sign up</b> · email already has an account</figcaption>
+        <div class="screen" style="--w:390px;--h:844px"><iframe src="login-v1.html#signup/password/taken" title="Sign up, email taken, at 390 pixels wide"></iframe></div>
+      </figure>
+      <figure>
+        <figcaption><b>Reset</b> · check your email</figcaption>
+        <div class="screen" style="--w:390px;--h:844px"><iframe src="login-v1.html#reset/sent" title="Reset, check your email, at 390 pixels wide"></iframe></div>
+      </figure>
+    </div>
+  </section>
+
+  <section>
+    <h2>375 × 667 · iPhone SE, the project's floor</h2>
+    <div class="row">
+      <figure>
+        <figcaption><b>Sign up</b> · email</figcaption>
+        <div class="screen" style="--w:375px;--h:667px"><iframe src="login-v1.html#signup" title="Sign up, email step, at 375 pixels wide"></iframe></div>
+      </figure>
+      <figure>
+        <figcaption><b>Sign up</b> · passwords don't match</figcaption>
+        <div class="screen" style="--w:375px;--h:667px"><iframe src="login-v1.html#signup/password/mismatch" title="Sign up, passwords don't match, at 375 pixels wide"></iframe></div>
+      </figure>
+      <figure>
+        <figcaption><b>Reset</b> · new password</figcaption>
+        <div class="screen" style="--w:375px;--h:667px"><iframe src="login-v1.html#reset/new" title="Reset, new password, at 375 pixels wide"></iframe></div>
+      </figure>
+    </div>
+  </section>
+
+  <section>
+    <h2>820 · iPad Air, portrait</h2>
+    <div class="row">
+      <figure>
+        <figcaption><b>Log in</b> · password</figcaption>
+        <div class="screen" style="--w:820px;--h:1000px"><iframe src="login-v1.html#login/password" title="Log in, password step, at 820 pixels wide"></iframe></div>
+      </figure>
+    </div>
+  </section>
+</main>
+<script>
+  // Desktop browsers may reserve room for a scrollbar inside each frame, which would narrow the page's layout width.
+  // Widen each iframe by that amount and let the screen clip it, so the page lays out at the exact device width.
+  const probe = Object.assign(document.createElement('div'), { style: 'position:absolute;top:-999px;width:100px;height:100px;overflow:scroll' });
+  document.body.append(probe);
+  const bar = probe.offsetWidth - probe.clientWidth;
+  probe.remove();
+  if (bar) for (const f of document.querySelectorAll('.screen iframe')) f.style.width = `calc(var(--w) + ${bar}px)`;
+</script>
+</body>
+</html>

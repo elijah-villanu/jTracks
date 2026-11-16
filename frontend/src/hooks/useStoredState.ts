@@ -1,4 +1,7 @@
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
+
+/** Tells every other `useStoredState` on the same key that it changed (settings and the open page share these). */
+const CHANGE_EVENT = "stored-state-change"
 
 /**
  * A string display preference persisted in `localStorage` (theme, recap
@@ -24,6 +27,15 @@ export function useStoredState<T extends string>(
     }
   })
 
+  useEffect(() => {
+    const onChange = (event: Event) => {
+      const detail = (event as CustomEvent<{ key: string; value: string }>).detail
+      if (detail.key === key && isValid(detail.value)) setValue(detail.value)
+    }
+    window.addEventListener(CHANGE_EVENT, onChange)
+    return () => window.removeEventListener(CHANGE_EVENT, onChange)
+  }, [key, isValid])
+
   const setAndStore = useCallback(
     (next: T) => {
       setValue(next)
@@ -32,6 +44,7 @@ export function useStoredState<T extends string>(
       } catch {
         // Best-effort; see above.
       }
+      window.dispatchEvent(new CustomEvent(CHANGE_EVENT, { detail: { key, value: next } }))
     },
     [key]
   )

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useEffect, useState, type ReactNode } from "react"
+import { createContext, useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { apiClient, performLogout, refreshAccessToken, setSessionExpiredHandler } from "@/lib/api-client"
 import { setAccessToken } from "@/lib/token-store"
 import type { AuthResponse, User } from "@/types/api"
@@ -18,6 +18,9 @@ export interface AuthContextValue {
    * `useAuth()`, so this is the one place that value gets updated.
    */
   updateSettings: (ghostDaysDefault: number) => Promise<void>
+  /** True after a signed-in session could not be refreshed, until /login's notice about it closes. */
+  sessionEnded: boolean
+  dismissSessionEnded: () => void
 }
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -36,6 +39,12 @@ export const AuthContext = createContext<AuthContextValue | undefined>(undefined
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [sessionEnded, setSessionEnded] = useState(false)
+  // The expired handler is registered once, so it reads "was someone signed in" from a ref.
+  const signedIn = useRef(false)
+  useEffect(() => {
+    signedIn.current = user !== null
+  }, [user])
 
   useEffect(() => {
     let cancelled = false
@@ -80,7 +89,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // all that's needed, since `ProtectedRoute` already redirects to
     // `/login` whenever `user` is `null` (a clean SPA-native redirect, no
     // hard reload, no new routing logic here).
-    setSessionExpiredHandler(() => setUser(null))
+    // A failed refresh on a fresh visit just means "not logged in"; only a live session can end.
+    setSessionExpiredHandler(() => {
+      if (signedIn.current) setSessionEnded(true)
+      setUser(null)
+    })
     return () => setSessionExpiredHandler(null)
   }, [])
 
@@ -93,6 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAccessToken(response.access_token)
     const me = await apiClient.get<User>("/auth/me")
     setUser(me)
+    setSessionEnded(false)
   }, [])
 
   const login = useCallback(
@@ -146,9 +160,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser((prev) => (prev ? { ...prev, ghost_days_default: response.ghost_days_default } : prev))
   }, [])
 
+  const dismissSessionEnded = useCallback(() => setSessionEnded(false), [])
+
   return (
     <AuthContext.Provider
-      value={{ user, isLoading, login, signup, loginWithGoogle, logout, updateSettings }}
+      value={{ user, isLoading, login, signup, loginWithGoogle, logout, updateSettings, sessionEnded, dismissSessionEnded }}
     >
       {children}
     </AuthContext.Provider>

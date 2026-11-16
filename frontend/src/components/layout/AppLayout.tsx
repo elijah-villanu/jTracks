@@ -1,96 +1,63 @@
-import { useEffect, useRef, useState } from "react"
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router"
-import { ClipboardPaste, LogOut, Menu, Plus } from "lucide-react"
+import { useEffect, useRef, useState, type ReactElement, type RefObject } from "react"
+import { Link, NavLink, Outlet, useLocation, useNavigate, useSearchParams } from "react-router"
+import { ChartColumn, ChevronDown, Columns3, Link2, LogOut, Monitor, Moon, Plus, Settings2, SquarePen, Sun } from "lucide-react"
 import { ApplicationFormDialog } from "@/components/applications/application-form-dialog"
 import { AutofillDialog } from "@/components/applications/autofill-dialog"
-import { BlurFade } from "@/components/ui/blur-fade"
-import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
+import { MenuContent } from "@/components/layout/app-ui"
 import { Logo } from "@/components/layout/logo"
-import { ThemeToggle } from "@/components/layout/theme-toggle"
+import { SettingsDialog } from "@/components/layout/settings-dialog"
 import {
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet"
+  DropdownMenu,
+  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { useApplicationsContext } from "@/hooks/useApplicationsContext"
 import { useAuth } from "@/hooks/useAuth"
-import { cn } from "@/lib/utils"
+import { useTheme } from "@/hooks/useTheme"
+import type { Theme } from "@/lib/theme-context"
+import "./app.css"
 
-/**
- * F40: every app route now lives under `/app` (`/` is the public landing
- * page). `end` matters on the index link and only there: NavLink marks a
- * link active when the location equals its path *or* is a descendant of
- * it, so an un-`end`ed `/app` would light up "Tracker" while the user is
- * on `/app/analytics`. The pre-F40 `to="/"` never had this problem --
- * NavLink's descendant test requires a `/` separator right after the
- * prefix, which the root path can never produce -- so the flag is new
- * work the prefix created, not a pre-existing bug.
- */
-const NAV_LINKS = [
-  { to: "/app", label: "Tracker", end: true },
-  { to: "/app/analytics", label: "Analytics", end: false },
-  { to: "/app/profile", label: "Profile", end: false },
-] as const
-
-/**
- * Page title announced to screen readers after a client-side route change.
- * Keys are full pathnames and must track the `/app` prefix above -- a
- * stale key doesn't error, it silently degrades the announcement to
- * "Page — navigated".
- */
+/** Announced after a client-side route change. Keys track the `/app` prefix. */
 const ROUTE_TITLES: Record<string, string> = {
-  "/app": "Applications",
+  "/app": "Tracker",
   "/app/analytics": "Analytics",
-  "/app/profile": "Settings",
 }
+
+const THEME_OPTIONS: { value: Theme; label: string; Icon: typeof Sun }[] = [
+  { value: "light", label: "Light", Icon: Sun },
+  { value: "dark", label: "Dark", Icon: Moon },
+  { value: "system", label: "System", Icon: Monitor },
+]
 
 /**
- * Base app shell: logo, nav tabs, and the "Add Job" primary action.
- * Per UXPLAN.md's Dashboard Page Structure. The add/edit application
- * dialog is rendered once here (rather than per-page) since both the
- * header's "Add Job" button and the table's per-row edit button (deep
- * inside ApplicationsPage) need to open the same dialog -- see
- * src/lib/applications-context.tsx's `formState`.
+ * The signed-in shell: a top bar (logo, Tracker and Analytics, one Add menu and
+ * the account menu), and on phones a bottom bar with the same three. The
+ * add/edit form, the paste-a-link dialog and Settings are mounted once here so
+ * every page opens the same ones.
  */
-/** Shared active-state styling for the Tracker/Analytics/Profile nav links. */
-function navLinkClassName({ isActive }: { isActive: boolean }) {
-  return cn(
-    "rounded-md px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-    isActive && "bg-muted text-foreground"
-  )
-}
-
 export function AppLayout() {
   const { user, logout } = useAuth()
   const { openCreateForm } = useApplicationsContext()
+  const { theme, setTheme } = useTheme()
   const navigate = useNavigate()
   const location = useLocation()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [isAutofillOpen, setIsAutofillOpen] = useState(false)
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
-  // A11y (WCAG 2.4.3): the header control that started the current
-  // add/autofill flow, handed to both dialogs as their focus-return
-  // fallback -- they're opened from state, and the element focused at the
-  // moment they open is often gone by the time they close (a Sheet item,
-  // or the autofill dialog's own input). From the Sheet, that's the menu
-  // trigger, since the item itself unmounts with the Sheet.
+  // The control that started an add flow: both dialogs hand focus back to it, since the menu item is gone by then.
   const actionOpenerRef = useRef<HTMLElement | null>(null)
-  const menuTriggerRef = useRef<HTMLButtonElement>(null)
+  const avatarRef = useRef<HTMLButtonElement>(null)
+  const addRef = useRef<HTMLButtonElement>(null)
+  const fabRef = useRef<HTMLButtonElement>(null)
 
-  // A11y: a client-side route change replaces the whole page body without
-  // moving focus or firing anything a screen reader notices -- focus stays
-  // on the nav link that was just activated and nothing is announced (WCAG
-  // 2.4.3 Focus Order / 4.1.3 Status Messages). Move focus to <main> and
-  // announce the new page title, but skip the very first render so landing
-  // directly on a URL doesn't yank focus out of the document start.
+  // A route change swaps the page without moving focus or saying anything; move focus to <main> and announce
+  // the new page (WCAG 2.4.3 / 4.1.3). Not on first render, so landing on a URL doesn't move focus.
   const mainRef = useRef<HTMLElement>(null)
   const isFirstRender = useRef(true)
   const [routeAnnouncement, setRouteAnnouncement] = useState("")
-
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false
@@ -101,212 +68,156 @@ export function AppLayout() {
   }, [location.pathname])
 
   async function handleLogout() {
-    // Await first: `logout()` clears `user` only in its `finally`, and
-    // navigating to `/login` before that lands `GuestRoute` (which reads
-    // `user` too) mid-flight -- it would see the still-truthy `user` and
-    // immediately bounce back to `/`. Awaiting avoids that flicker; the
-    // explicit navigate below is otherwise redundant with `ProtectedRoute`'s
-    // reactive redirect-on-`user-null`, but keeps the transition instant.
+    // Await first: navigating before `user` clears would let GuestRoute bounce straight back.
     await logout()
     navigate("/login", { replace: true })
   }
 
+  function setSettings(tab: string | null, replace: boolean) {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (tab) next.set("settings", tab)
+        else next.delete("settings")
+        return next
+      },
+      { replace }
+    )
+  }
+
+  function addMenu(trigger: ReactElement, side: "top" | "bottom", opener: RefObject<HTMLButtonElement | null>) {
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger render={trigger} />
+        <MenuContent aria-label="Add application" side={side}>
+          <DropdownMenuItem
+            onClick={() => {
+              actionOpenerRef.current = opener.current
+              setIsAutofillOpen(true)
+            }}
+          >
+            <Link2 className="i" aria-hidden="true" />
+            <span>
+              Paste a job link
+              <span className="sub">Greenhouse and Workday fill in for you</span>
+            </span>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => {
+              actionOpenerRef.current = opener.current
+              openCreateForm()
+            }}
+          >
+            <SquarePen className="i" aria-hidden="true" />
+            <span>
+              Enter details yourself
+              <span className="sub">Any job, from anywhere</span>
+            </span>
+          </DropdownMenuItem>
+        </MenuContent>
+      </DropdownMenu>
+    )
+  }
+
+  const email = user?.email ?? ""
+
   return (
-    <div className="flex min-h-screen flex-col">
-      {/*
-        A11y (WCAG 2.4.1 Bypass Blocks): the header repeats 3 nav links +
-        3-4 action buttons on every page, so a keyboard-only user had to
-        tab past all of them to reach the table. Visually hidden until
-        focused.
-      */}
-      <a
-        href="#main-content"
-        className="sr-only rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50"
-      >
-        Skip to main content
+    <div className="app app-shell">
+      <a href="#main-content" className="skip">
+        Skip to content
       </a>
 
-      {/*
-        Single once-per-mount entrance for the whole header shell -- see
-        docs/decisions/magicui-conventions.md. AppLayout wraps <Outlet />
-        rather than being remounted by it, so this only plays once per
-        authenticated session (login/refresh), not on every client-side
-        route change -- unlike page content, which does remount per route.
-        No continuous/looping accent anywhere: `BorderBeam` was removed
-        app-wide on 2026-09-15 (WCAG 2.2.2).
-      */}
-      <BlurFade delay={0}>
-        <header className="border-b border-border">
-          <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
-            <Logo className="h-9" />
-
-            <nav aria-label="Main" className="hidden items-center gap-2 sm:flex">
-              {NAV_LINKS.map((link) => (
-                <NavLink
-                  key={link.to}
-                  to={link.to}
-                  end={link.end}
-                  className={navLinkClassName}
-                >
-                  {link.label}
-                </NavLink>
-              ))}
-            </nav>
-
-            {/*
-              F33 (R13.1): this cluster is ~534px wide -- with the logo and
-              nav it needs ~885px of viewport, but it used to appear at `sm`
-              (640px), so between roughly 640px and 885px it pushed the page
-              into a horizontal scroll. That predates V2.1 (F27's ThemeToggle
-              widened it by a further ~104px but did not cause it) and only
-              became a defect once R13.1 forbade page-level horizontal scroll
-              outright. Gated at `lg` instead, so the Sheet below -- which
-              already carries every one of these actions, ThemeToggle
-              included -- covers everything narrower.
-            */}
-            <div className="hidden items-center gap-4 lg:flex">
-              {user && (
-                <span className="hidden text-sm text-muted-foreground lg:inline">
-                  {user.email}
-                </span>
-              )}
-              <ThemeToggle />
-              <Button
-                size="lg"
-                variant="outline"
-                onClick={(event) => {
-                  actionOpenerRef.current = event.currentTarget
-                  setIsAutofillOpen(true)
-                }}
-              >
-                <ClipboardPaste />
-                Paste a Link
-              </Button>
-              <Button
-                size="lg"
-                onClick={(event) => {
-                  actionOpenerRef.current = event.currentTarget
-                  openCreateForm()
-                }}
-              >
-                <Plus />
-                Add Job
-              </Button>
-              <Button size="lg" variant="ghost" onClick={handleLogout}>
-                <LogOut />
-                Log out
-              </Button>
-            </div>
-
-            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-              <SheetTrigger
-                render={
-                  <Button ref={menuTriggerRef} size="icon-lg" variant="outline" className="lg:hidden" />
-                }
-              >
-                <Menu />
-                <span className="sr-only">Open menu</span>
-              </SheetTrigger>
-              <SheetContent side="right" className="lg:hidden">
-                <SheetHeader>
-                  {/*
-                    A11y: the title is the dialog's accessible name, and the
-                    logo's alt alone made that "JourneyJob, dialog" -- which
-                    doesn't say what opened. The hidden word completes it to
-                    "JourneyJob menu" without changing the visual lockup.
-                  */}
-                  <SheetTitle className="flex items-center">
-                    <Logo className="h-7" />
-                    <span className="sr-only"> menu</span>
-                  </SheetTitle>
-                </SheetHeader>
-
-                <nav aria-label="Mobile" className="flex flex-col gap-1 px-4">
-                  {NAV_LINKS.map((link) => (
-                    <NavLink
-                      key={link.to}
-                      to={link.to}
-                      end={link.end}
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className={({ isActive }) =>
-                        cn(navLinkClassName({ isActive }), "block w-full")
-                      }
-                    >
-                      {link.label}
-                    </NavLink>
+      <header className="top">
+        <Link className="logo" to="/app" aria-label="JourneyJob, Tracker">
+          <Logo className="h-6" />
+        </Link>
+        <nav className="tabs" aria-label="Main">
+          <NavLink className="tab" to="/app" end>
+            <Columns3 className="i" aria-hidden="true" />
+            Tracker
+          </NavLink>
+          <NavLink className="tab" to="/app/analytics">
+            <ChartColumn className="i" aria-hidden="true" />
+            Analytics
+          </NavLink>
+        </nav>
+        <div className="top-end">
+          {addMenu(
+            <button ref={addRef} className="btn btn-ink add" type="button">
+              <Plus className="i" aria-hidden="true" />
+              Add
+              <ChevronDown className="i i-sm" aria-hidden="true" />
+            </button>,
+            "bottom",
+            addRef
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<button ref={avatarRef} className="avatar" type="button" aria-label={`Account menu, ${email}`} />}>
+              {email.charAt(0).toUpperCase()}
+            </DropdownMenuTrigger>
+            <MenuContent aria-label="Account">
+              <div className="head">
+                <b>{email}</b>
+              </div>
+              <DropdownMenuItem onClick={() => setSettings("account", false)}>
+                <Settings2 className="i" aria-hidden="true" />
+                Settings
+              </DropdownMenuItem>
+              <div className="theme-row">
+                <span aria-hidden="true">Theme</span>
+                <DropdownMenuRadioGroup className="seg" aria-label="Theme" value={theme} onValueChange={(value: Theme) => setTheme(value)}>
+                  {THEME_OPTIONS.map(({ value, label, Icon }) => (
+                    <DropdownMenuRadioItem key={value} value={value} aria-label={`${label} theme`} title={label}>
+                      <Icon className="i" aria-hidden="true" />
+                    </DropdownMenuRadioItem>
                   ))}
-                </nav>
+                </DropdownMenuRadioGroup>
+              </div>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout}>
+                <LogOut className="i" aria-hidden="true" />
+                Log out
+              </DropdownMenuItem>
+            </MenuContent>
+          </DropdownMenu>
+        </div>
+      </header>
 
-                <Separator className="my-1" />
-
-                <div className="flex flex-col gap-3 px-4">
-                  <ThemeToggle />
-                  {user && (
-                    <span className="text-sm text-muted-foreground">{user.email}</span>
-                  )}
-                  <SheetClose
-                    render={
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          actionOpenerRef.current = menuTriggerRef.current
-                          setIsAutofillOpen(true)
-                        }}
-                      />
-                    }
-                  >
-                    <ClipboardPaste />
-                    Paste a Link
-                  </SheetClose>
-                  <SheetClose
-                    render={
-                      <Button
-                        onClick={() => {
-                          actionOpenerRef.current = menuTriggerRef.current
-                          openCreateForm()
-                        }}
-                      />
-                    }
-                  >
-                    <Plus />
-                    Add Job
-                  </SheetClose>
-                  <SheetClose render={<Button variant="ghost" onClick={handleLogout} />}>
-                    <LogOut />
-                    Log out
-                  </SheetClose>
-                </div>
-              </SheetContent>
-            </Sheet>
-          </div>
-        </header>
-      </BlurFade>
-
-      {/*
-        `tabIndex={-1}` makes <main> a programmatic focus target for both
-        the skip link and the route-change effect above; it is not in the
-        tab order. `outline-none` is safe here because focus is only ever
-        moved here programmatically, immediately after a user-initiated
-        navigation, and the page heading is what the user hears.
-      */}
-      <main
-        id="main-content"
-        ref={mainRef}
-        tabIndex={-1}
-        className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 outline-none"
-      >
+      {/* tabIndex -1: a programmatic focus target for the skip link and route changes, not a tab stop. */}
+      <main id="main-content" ref={mainRef} tabIndex={-1}>
         <Outlet />
       </main>
+
+      <nav className="bottom" aria-label="Main">
+        <NavLink to="/app" end>
+          <Columns3 className="i" aria-hidden="true" />
+          Tracker
+        </NavLink>
+        {addMenu(
+          <button ref={fabRef} className="btn btn-ink add-fab" type="button" aria-label="Add application">
+            <Plus className="i" aria-hidden="true" />
+          </button>,
+          "top",
+          fabRef
+        )}
+        <NavLink to="/app/analytics">
+          <ChartColumn className="i" aria-hidden="true" />
+          Analytics
+        </NavLink>
+      </nav>
 
       <p aria-live="polite" aria-atomic="true" className="sr-only">
         {routeAnnouncement}
       </p>
 
       <ApplicationFormDialog returnFocusRef={actionOpenerRef} />
-      <AutofillDialog
-        open={isAutofillOpen}
-        onOpenChange={setIsAutofillOpen}
-        returnFocusRef={actionOpenerRef}
+      <AutofillDialog open={isAutofillOpen} onOpenChange={setIsAutofillOpen} returnFocusRef={actionOpenerRef} />
+      <SettingsDialog
+        tab={searchParams.get("settings")}
+        onTabChange={(tab) => setSettings(tab, true)}
+        onClose={() => setSettings(null, true)}
+        onLogout={handleLogout}
+        returnFocusRef={avatarRef}
       />
     </div>
   )

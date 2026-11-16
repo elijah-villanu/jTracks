@@ -16,14 +16,16 @@ export interface UseDashboardStatsResult {
 export function useDashboardStats(
   range: DashboardRange,
   start: string | null,
-  end: string | null
+  end: string | null,
+  /** False skips the fetch (Analytics' prior-period call, for "all time"). */
+  enabled = true
 ): UseDashboardStatsResult {
   const { data, isLoading, error } = useRangedFetch<DashboardStats>(
     "/dashboard/stats",
     range,
     start,
     end,
-    true,
+    enabled,
     "Failed to load dashboard stats."
   )
   return { stats: data, isLoading, error }
